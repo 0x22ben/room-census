@@ -193,6 +193,10 @@ def update_site(record):
     """Ajoute la veille à site/data/pulses.csv, puis commit et push si site/ est un dépôt git."""
     if not SITE_DIR.exists():
         return
+    git = ["git", "-C", str(SITE_DIR)]
+    if (SITE_DIR / ".git").exists():
+        # récupère d'abord les changements faits ailleurs (page, README), sinon le push est refusé
+        subprocess.run(git + ["pull", "-q", "--rebase"], check=False, timeout=120)
     path = SITE_DIR / "data" / "pulses.csv"
     path.parent.mkdir(exist_ok=True)
     new = not path.exists()
@@ -203,11 +207,12 @@ def update_site(record):
         w.writerows(csv_rows(record))
     if not (SITE_DIR / ".git").exists():
         return
-    git = ["git", "-C", str(SITE_DIR)]
     try:
         subprocess.run(git + ["add", "data/pulses.csv"], check=True)
         subprocess.run(git + ["commit", "-q", "-m", f"Pulse {record['at_utc'][:16]} UTC"], check=True)
-        subprocess.run(git + ["push", "-q"], check=True, timeout=120)
+        if subprocess.run(git + ["push", "-q"], timeout=120).returncode != 0:
+            subprocess.run(git + ["pull", "-q", "--rebase"], check=True, timeout=120)
+            subprocess.run(git + ["push", "-q"], check=True, timeout=120)
         print("Site mis à jour.")
     except Exception as e:
         print("Mise à jour du site échouée :", e)
