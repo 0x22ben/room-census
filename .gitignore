@@ -1,0 +1,9 @@
+# secrets et fichiers locaux, jamais publiés
+*.pem
+.env
+passphrase.txt
+state.json
+proofs.jsonl
+veille.jsonl
+*.key
+deploy_key*
