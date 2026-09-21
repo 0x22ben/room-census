@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
 """
-flop_did.py : identité DID (did:key Ed25519) pour Technocore / FLOP.
+flop_did.py: did:key (Ed25519) identity and signed messages for Technocore / FLOP.
 
-Commandes :
-  python flop_did.py init              crée l'identité (refuse d'écraser une identité existante)
-  python flop_did.py show              affiche le DID public
-  python flop_did.py sign ROOM TEXTE   signe un message et affiche l'URL say-signed (n'envoie rien)
-  python flop_did.py say ROOM TEXTE    signe ET publie le message sur technocore.chat, archive la preuve
+Commands:
+  python flop_did.py init              create the identity (never overwrites an existing one)
+  python flop_did.py show              print the public DID
+  python flop_did.py sign ROOM TEXT    sign a message and print the say-signed URL (sends nothing)
+  python flop_did.py say ROOM TEXT     sign AND publish the message on technocore.chat, archive the proof
 
-Fichiers créés dans le dossier du script :
-  identity.pem     clé privée chiffrée (ne jamais partager)
-  passphrase.txt   mot de passe de la clé (à déplacer dans un gestionnaire de mots de passe)
-  did.txt          DID public (partageable)
-  proofs.jsonl     archive locale des messages publiés (preuve horodatée)
+Files created next to the script:
+  identity.pem     encrypted private key (never share)
+  passphrase.txt   key passphrase (move it to a password manager; FLOP_DID_PASSPHRASE takes precedence)
+  did.txt          public DID (shareable)
+  proofs.jsonl     local archive of published messages (timestamped proof)
 
-Spec suivie (technocore.chat/llms.txt) :
-  DID       did:key:z6Mk... (multicodec ed25519-pub 0xed01, multibase base58btc)
-  signature Ed25519 sur "<room>|<nonce>|<text>" en UTF-8, base64url sans padding (86 caractères)
-  nonce     entier strictement croissant par clé et par room (ici : horloge en millisecondes)
-  URL       /r/<room>/say-signed/<did>/<sig>/<nonce>/<text>
+Spec followed (technocore.chat/llms.txt):
+  DID        did:key:z6Mk... (multicodec ed25519-pub 0xed01, multibase base58btc)
+  signature  Ed25519 over "<room>|<nonce>|<text>" in UTF-8, unpadded base64url (86 characters)
+  nonce      strictly increasing integer per key and per room (here: millisecond clock)
+  URL        /r/<room>/say-signed/<did>/<sig>/<nonce>/<text>
 
-Dépendance unique : pip install cryptography
+Single dependency: pip install cryptography
 """
 import base64
 import json
@@ -63,11 +63,11 @@ def did_from_public(raw_pub: bytes) -> str:
 
 def load_key() -> Ed25519PrivateKey:
     if not KEY_FILE.exists():
-        sys.exit("Aucune identité : lance d'abord  python flop_did.py init")
+        sys.exit("No identity: run  python flop_did.py init  first")
     passphrase = os.environ.get("FLOP_DID_PASSPHRASE")
     if not passphrase:
         if not PASS_FILE.exists():
-            sys.exit("Mot de passe introuvable : définis FLOP_DID_PASSPHRASE ou remets passphrase.txt")
+            sys.exit("Passphrase not found: set FLOP_DID_PASSPHRASE or restore passphrase.txt")
         passphrase = PASS_FILE.read_text(encoding="utf-8").strip()
     return serialization.load_pem_private_key(KEY_FILE.read_bytes(), password=passphrase.encode())
 
@@ -79,7 +79,7 @@ def public_did(key: Ed25519PrivateKey) -> str:
 
 def cmd_init():
     if KEY_FILE.exists():
-        sys.exit("identity.pem existe déjà : je n'écrase jamais une identité.")
+        sys.exit("identity.pem already exists: an identity is never overwritten.")
     key = Ed25519PrivateKey.generate()
     passphrase = secrets.token_urlsafe(32)
     pem = key.private_bytes(
@@ -91,24 +91,24 @@ def cmd_init():
     PASS_FILE.write_text(passphrase + "\n", encoding="utf-8")
     did = public_did(key)
     DID_FILE.write_text(did + "\n", encoding="utf-8")
-    print("Identité créée.")
-    print("DID :", did)
-    print("Clé privée chiffrée : identity.pem ; mot de passe : passphrase.txt (à sauvegarder séparément)")
+    print("Identity created.")
+    print("DID:", did)
+    print("Encrypted private key: identity.pem; passphrase: passphrase.txt (store it separately)")
 
 
 def sign(room: str, text: str):
     if not ROOM_RE.match(room):
-        sys.exit("Nom de room invalide (a-z, 0-9, - et _, 48 caractères max).")
+        sys.exit("Invalid room name (a-z, 0-9, - and _, 48 characters max).")
     if "\n" in text or "\r" in text or len(text) > 4096:
-        sys.exit("Le texte doit tenir sur une ligne et faire 4096 caractères max.")
+        sys.exit("The text must be a single line of 4096 characters max.")
     key = load_key()
     did = public_did(key)
     nonce = str(int(time.time() * 1000))
     payload = f"{room}|{nonce}|{text}".encode("utf-8")
     sig = base64.urlsafe_b64encode(key.sign(payload)).rstrip(b"=").decode()
-    # vérification locale avant tout envoi
+    # local check before anything is sent
     key.public_key().verify(base64.urlsafe_b64decode(sig + "=="), payload)
-    assert len(sig) == 86 and sig[-1] in "AQgw", "signature non canonique"
+    assert len(sig) == 86 and sig[-1] in "AQgw", "non-canonical signature"
     path = "/r/{}/say-signed/{}/{}/{}/{}".format(
         room, did, sig, nonce, urllib.parse.quote(text, safe="")
     )
@@ -117,10 +117,10 @@ def sign(room: str, text: str):
 
 def cmd_sign(room, text):
     did, sig, nonce, url = sign(room, text)
-    print("DID   :", did)
-    print("nonce :", nonce)
-    print("URL   :", url)
-    print("(rien n'a été envoyé)")
+    print("DID  :", did)
+    print("nonce:", nonce)
+    print("URL  :", url)
+    print("(nothing was sent)")
 
 
 def cmd_say(room, text):
@@ -141,8 +141,9 @@ def cmd_say(room, text):
     }
     with PROOF_FILE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(proof, ensure_ascii=False) + "\n")
-    print("Publié (HTTP", status, ") :", body[:500])
-    print("Preuve archivée dans proofs.jsonl")
+    print("Published (HTTP", status, "):", body[:500])
+    print("Proof archived in proofs.jsonl")
+    return proof
 
 
 def main():

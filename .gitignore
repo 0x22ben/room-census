@@ -1,9 +1,9 @@
-# secrets et fichiers locaux, jamais publiés
+# secrets and local files, never published
 *.pem
 .env
 passphrase.txt
 state.json
 proofs.jsonl
-veille.jsonl
+census.jsonl
 *.key
 deploy_key*
