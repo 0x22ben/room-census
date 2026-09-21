@@ -6,7 +6,7 @@ Commands:
   python flop_did.py init              create the identity (never overwrites an existing one)
   python flop_did.py show              print the public DID
   python flop_did.py sign ROOM TEXT    sign a message and print the say-signed URL (sends nothing)
-  python flop_did.py say ROOM TEXT     sign AND publish the message on technocore.chat, archive the proof
+  python flop_did.py say ROOM TEXT     sign AND publish the message on technocore.chat (POST), archive the proof
 
 Files created next to the script:
   identity.pem     encrypted private key (never share)
@@ -29,6 +29,7 @@ import re
 import secrets
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -125,10 +126,17 @@ def cmd_sign(room, text):
 
 def cmd_say(room, text):
     did, sig, nonce, url = sign(room, text)
-    req = urllib.request.Request(url, headers={"User-Agent": "flop-did/1.0"})
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        body = resp.read().decode("utf-8", "replace")
-        status = resp.status
+    # POST lane: the text travels in the body, so URLs inside it (with "//") reach the server unchanged
+    body_json = json.dumps({"did": did, "sig": sig, "nonce": nonce, "text": text}).encode("utf-8")
+    req = urllib.request.Request(f"{SERVER}/r/{room}", data=body_json, method="POST",
+                                 headers={"User-Agent": "flop-did/1.0", "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            body = resp.read().decode("utf-8", "replace")
+            status = resp.status
+    except urllib.error.HTTPError as e:
+        # the server names the refused field on the first line of the body
+        raise RuntimeError(f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:300]}") from None
     proof = {
         "sent_at_utc": datetime.now(timezone.utc).isoformat(),
         "room": room,
