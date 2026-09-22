@@ -52,13 +52,18 @@
  },
  "summary": {
   "active": 56,
+  "interval_rooms": 0,
+  "baseline": true,
   "varied": 11,
-  "varied_share": 0.032,
+  "varied_share": null,
   "mixed": 8,
-  "mixed_share": 0.0796,
+  "mixed_share": null,
   "repetitive": 37,
-  "repetitive_share": 0.8885
+  "repetitive_share": null
  },
+ "coverage": null,
+ "partial": false,
+ "failures": [],
  "changes": {},
  "global": {
   "new_rooms_per_hour": 1091.2957
