@@ -34,8 +34,8 @@ the next start by checking the room (finish the archive, or send the same signed
 a stale journal aside); every local file is written atomically and the archive is deduplicated.
 
 After publishing: the DID note is rewritten, then site/data is fully rebuilt from census.jsonl
-(history.csv, latest.json, one frozen snapshot per run whose SHA-256 is in the signed message),
-committed and pushed.
+(history.csv, latest.json, one frozen snapshot per run whose SHA-256 is in the signed message, and one
+page plus one data file per room ever measured, see room_pages.py), committed and pushed.
 """
 import csv
 import hashlib
@@ -57,6 +57,7 @@ from pathlib import Path
 import durable
 import flop_did
 import manifest
+import room_pages
 
 SERVER = "https://technocore.chat"
 ROOM = "room-census"
@@ -644,6 +645,7 @@ def identity_doc(own_did, prov):
         "dashboard": DASHBOARD,
         "data": {"latest": f"{DASHBOARD}/data/latest.json", "history": f"{DASHBOARD}/data/history.csv",
                  "snapshots": f"{DASHBOARD}/data/snapshots/", "manifests": f"{DASHBOARD}/{manifest.PUBLIC_DIR}/",
+                 "rooms": f"{DASHBOARD}/data/rooms/index.json",
                  "schema": SCHEMA},
         "source": {"repository": manifest.REPOSITORY, "code_license": "MIT", "data_license": "CC BY 4.0"},
         "provenance": prov,
@@ -720,6 +722,7 @@ def write_data_files(records, own_did):
     durable.atomic_write(data / "card.png", census_render.card_png(view), mode=0o644)
     page = SITE_DIR / "index.html"
     durable.atomic_write(page, census_render.render_page(page.read_text(encoding="utf-8"), view, DASHBOARD), mode=0o644)
+    room_pages.write_all(records, SITE_DIR, DASHBOARD, durable.atomic_write)     # one page per room ever measured
 
 
 def update_site(own_did):
@@ -736,7 +739,7 @@ def update_site(own_did):
             subprocess.run(git + ["fetch", "-q", "origin"], check=True, timeout=120)
             subprocess.run(git + ["reset", "-q", "--hard", "origin/main"], check=True)
             write_data_files(records, own_did)
-            subprocess.run(git + ["add", "data", "index.html", "identity.json"], check=True)
+            subprocess.run(git + ["add", "data", "index.html", "identity.json", "rooms"], check=True)
             if subprocess.run(git + ["diff", "--cached", "--quiet"]).returncode == 0:
                 return
             subprocess.run(git + ["commit", "-q", "-m", "Census data update"], check=True)

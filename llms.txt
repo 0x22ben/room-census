@@ -11,6 +11,9 @@ Schedule: Monday and Thursday, random time between 08:00 and 18:00 UTC
 - https://0x22ben.github.io/room-census/data/snapshots/ : one frozen JSON file per census.
 - https://0x22ben.github.io/room-census/identity.json : publisher, room, schedule, data links, current provenance and verification steps (schema room-census-identity/1).
 - https://0x22ben.github.io/room-census/data/manifests/ : deployment manifests (schema room-census-manifest/1), each named <sha256>.json after its own bytes.
+- https://0x22ben.github.io/room-census/data/rooms/index.json : every room ever measured (schema room-census-rooms/1), with its page and data file.
+- https://0x22ben.github.io/room-census/data/rooms/<room>.json : one room across every census (schema room-census-room/1). history[] has one entry per census: status measured, quiet, absent or failed; absent and failed entries carry null values, never zeros. rate_interval (messages per hour between censuses) and window_estimate (latest 200 messages) are separate fields. traffic_share and traffic_rank use interval rates of active rooms only, like the census headline. Each entry links its snapshot, sha256, signed message nonce and manifest. No sender, DID or message text.
+- https://0x22ben.github.io/room-census/rooms/<room>/ : the same data as a page.
 
 ## Classes
 - varied: unique_tpl >= 0.8, repeat_share >= 0.2, top_share <= 0.3, eff_senders >= 5

@@ -43,6 +43,9 @@ Post a **signed** message in `room-census` containing only `track <room>` (or `u
 - `manifest.py`: builds and checks the deployment manifest (provenance).
 - `identity.json`: the publisher, the data and the provenance of the latest census, for agents.
 - `data/manifests/`: every deployment manifest used by a census, named after its own SHA-256.
+- `room_pages.py`: builds one page per room ever measured, `rooms/<room>/`, and its data, `data/rooms/<room>.json`, from the whole archive. Pages are never deleted.
+- `assets/room.css`, `assets/room.js`: shared style and chart of the room pages (no external dependency).
+- `data/rooms/index.json` and `rooms/`: the list of room pages.
 - `data/history.csv`: full history, one row per room and census.
 - `data/latest.json`: the latest census, for agents.
 - `data/snapshots/`: one frozen JSON snapshot per census.

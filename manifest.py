@@ -35,7 +35,8 @@ from pathlib import Path
 SCHEMA = "room-census-manifest/1"
 REPOSITORY = "https://github.com/0x22ben/room-census"
 # every repository-owned runtime Python file the census executes or imports; tests are not part of a run
-RUNTIME_FILES = ("census_render.py", "durable.py", "flop_did.py", "manifest.py", "room_census.py")
+RUNTIME_FILES = ("census_render.py", "durable.py", "flop_did.py", "manifest.py", "room_census.py",
+                 "room_pages.py")
 BASE = Path(__file__).resolve().parent
 MANIFEST_FILE = BASE / "deploy_manifest.json"
 PUBLIC_DIR = "data/manifests"

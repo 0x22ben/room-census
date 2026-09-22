@@ -37,6 +37,10 @@ const rateOf = r => num(r.rate_interval) ?? num(r.per_hour);
 const classLabel = c => ({ varied: "Varied", diverse: "Varied", mixed: "Mixed", repetitive: "Repetitive", quiet: "Quiet" }[c] || "Unclassified");
 const classVar = c => `var(--${c === "diverse" ? "varied" : ["varied", "mixed", "repetitive", "quiet"].includes(c) ? c : "quiet"})`;
 const didShort = d => (typeof d === "string" && d.length > 12 ? "…" + d.slice(-8) : "");
+const SLUG = /^[a-z0-9][a-z0-9_-]{0,47}$/;
+const technocore = room => "https://technocore.chat/r/" + encodeURIComponent(room);
+// Room Census page of a room, only when data/rooms/index.json lists it (no dead link before the first build)
+const pageOf = room => (DATA && DATA.pages.has(room) ? "rooms/" + encodeURIComponent(room) + "/" : null);
 
 // RFC 4180 parser: quoted fields, doubled quotes, commas and line breaks inside quotes
 function parseCSV(text) {
@@ -199,7 +203,7 @@ function render() {
     tg.append(chevron());
     tg.addEventListener("click", () => { open ? state.open.delete(r.room) : state.open.add(r.room); render(); });
     const name = h("div");
-    name.append(h("a", r.room, { href: "https://technocore.chat/r/" + encodeURIComponent(r.room) }));
+    name.append(h("a", r.room, { href: pageOf(r.room) || technocore(r.room) }));
     const badge = h("span", classLabel(r.class), { class: "badge" });
     badge.style.setProperty("--c", classVar(r.class));
     name.append(badge);
@@ -249,6 +253,11 @@ function detailRow(r, id, span) {
   add("First measured", hist.length ? when(hist[0].at_utc) : "–");
   add("Censuses measured", String(hist.length));
   td.append(dl);
+  const links = h("p", null, { class: "note" });
+  const page = pageOf(r.room);
+  if (page) links.append(h("a", "Room page", { href: page }), " · ");
+  links.append(h("a", "Open in Technocore", { href: technocore(r.room), rel: "noopener" }));
+  td.append(links);
   const pts = hist.filter(x => rateOf(x) !== null);
   if (pts.length >= 2) td.append(sparkline(pts, r.room));
   tr.append(td);
@@ -288,9 +297,10 @@ function renderInsights() {
       : fallback && ["Most varied texts", fallback, `${pct(fallback.unique_tpl)} unique texts after masking`],
   ].filter(Boolean);
   for (const [label, room, note] of cards) {
-    const a = h("a", null, { class: "insight", href: `?room=${encodeURIComponent(room.room)}#rooms`, "aria-label": `${label}: ${room.room}. ${note}` });
+    const page = pageOf(room.room);
+    const a = h("a", null, { class: "insight", href: page || `?room=${encodeURIComponent(room.room)}#rooms`, "aria-label": `${label}: ${room.room}. ${note}` });
     a.append(h("span", label, { class: "insight-label" }), h("span", room.room, { class: "insight-value" }), h("span", note, { class: "insight-note" }));
-    a.addEventListener("click", ev => { ev.preventDefault(); openRoom(room.room); });
+    if (!page) a.addEventListener("click", ev => { ev.preventDefault(); openRoom(room.room); });
     box.append(a);
   }
 }
@@ -415,7 +425,8 @@ function wireCopy() {
 Promise.all([
   getText("data/latest.json").then(JSON.parse),
   getText("data/history.csv").then(parseCSV).catch(() => []),
-]).then(([latest, rows]) => {
+  getText("data/rooms/index.json").then(JSON.parse).catch(() => null),
+]).then(([latest, rows, roomIndex]) => {
   const rooms = (Array.isArray(latest.rooms) ? latest.rooms : [])
     .filter(r => r && typeof r.room === "string" && /^[a-z0-9_-]{1,48}$/.test(r.room))
     .map(r => ({ ...r, class: r.class === "diverse" ? "varied" : r.class }));
@@ -426,7 +437,9 @@ Promise.all([
   const prevMap = new Map(active.filter(r => r.at_utc === prevAt).map(r => [r.room, r]));
   const byRoom = new Map();
   for (const r of active) { if (!byRoom.has(r.room)) byRoom.set(r.room, []); byRoom.get(r.room).push(r); }
-  DATA = { rooms, censuses, index, prevMap, byRoom };
+  const pages = new Set((roomIndex && Array.isArray(roomIndex.rooms) ? roomIndex.rooms : [])
+    .map(x => x && x.room).filter(x => typeof x === "string" && SLUG.test(x)));
+  DATA = { rooms, censuses, index, prevMap, byRoom, pages };
 
   renderInsights();
   renderChanges(latest);
@@ -445,7 +458,7 @@ Promise.all([
     t.append(hr);
     for (const r of tracked) {
       const tr = h("tr"), c = h("td");
-      c.append(h("a", r.room, { href: "https://technocore.chat/r/" + encodeURIComponent(r.room) }));
+      c.append(h("a", r.room, { href: pageOf(r.room) || technocore(r.room) }));
       tr.append(c, h("td", classLabel(r.class)), h("td", fmt(rateOf(r))), h("td", didShort(r.requested_by)));
       t.append(tr);
     }
