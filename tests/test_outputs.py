@@ -128,10 +128,16 @@ class Rendering(unittest.TestCase):
     def test_values_are_html_escaped(self):
         v = self.view()
         v["date_long"] = '<script>alert(1)</script>'
+        v["provenance"] = {"commit": '"><script>alert(2)</script>', "manifest": 'data/manifests/"><img src=x>.json',
+                           "manifest_sha256": "0" * 64, "release": None, "repository": 'javascript:"<b>'}
         page = "<!--census:head--><!--/census:head--><!--census:hero--><!--/census:hero-->" \
-               "<!--census:verify--><!--/census:verify-->"
+               "<!--census:verify--><!--/census:verify--><!--census:provenance--><!--/census:provenance-->"
         out = cr.render_page(page, v, rc.DASHBOARD)
         self.assertNotIn("<script>alert", out)
+        self.assertNotIn("<img src=x>", out)
+        self.assertNotIn('"<b>', out)
+        self.assertNotIn('href="javascript:', out)
+        self.assertNotIn('href="data/manifests/&quot;', out)
         self.assertIn("&lt;script&gt;", out)
 
     def test_card_is_a_valid_1200x630_png(self):

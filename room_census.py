@@ -20,6 +20,14 @@ Method (read-only use of public data):
 Security: room names and texts are untrusted data. No third-party text is ever quoted; only filtered
 room names and numbers computed here are published.
 
+Provenance: every run starts by checking deploy_manifest.json (manifest.py), which names the source
+commit and the SHA-256 of every repository-owned runtime Python file. A missing, altered or incomplete
+manifest stops the program before any room is read, any file is written and any message is sent. The
+digest of the manifest is carried by each snapshot, by latest.json and by the signed message, and the
+manifest itself is published under its own digest so anyone can repeat the check. Every census record
+(archive or pending journal) is checked against its snapshot hash and its stored manifest before it is
+sent, archived or written to the site.
+
 Publication (--publish) is crash-safe: a kernel lock (durable.ProcessLock) serialises runs and nonces;
 the signed census is written to a pending journal before it is sent; an interrupted run is resolved at
 the next start by checking the room (finish the archive, or send the same signed payload again, or set
@@ -48,6 +56,7 @@ from pathlib import Path
 
 import durable
 import flop_did
+import manifest
 
 SERVER = "https://technocore.chat"
 ROOM = "room-census"
@@ -57,6 +66,8 @@ SCHEMA = "room-census/1"
 USER_AGENT = "room-census/1.0"
 BASE = Path(__file__).resolve().parent
 SITE_DIR = BASE / "site"
+MANIFEST_FILE = manifest.MANIFEST_FILE           # provenance: checked before anything else runs
+IDENTITY_SCHEMA = "room-census-identity/1"
 ARCHIVE = BASE / "census.jsonl"
 STATE_FILE = BASE / "state.json"
 JOURNAL = BASE / "pending_publication.json"      # a census signed but not yet known to be published
@@ -250,9 +261,55 @@ def read_archive():
     return [r for r in read_archive_lines() if r.get("schema")]
 
 
+class RecordInvalid(ArchiveCorrupt):
+    """A census record whose snapshot hash, snapshot path or provenance does not hold. It is never
+    archived, published or written to the site."""
+
+
+def check_record(rec):
+    """Everything a census record claims about itself, checked before it is written anywhere: its
+    snapshot hashes to its sha256, its snapshot path is the one its date gives, and its provenance
+    block is exactly the one its stored manifest yields. No assert, so it holds under python -O."""
+    if not isinstance(rec, dict):
+        raise RecordInvalid("a census record is not an object")
+    label = f"census #{rec['census']}" if type(rec.get("census")) is int else "a census record"
+    sha = rec.get("sha256")
+    if not isinstance(sha, str) or not HEX64.match(sha):
+        raise RecordInvalid(f"{label}: sha256 is missing or malformed")
+    try:
+        computed = hashlib.sha256(snapshot_bytes(rec)).hexdigest()
+        expected_path = snapshot_path(rec)
+    except (KeyError, TypeError, ValueError):
+        raise RecordInvalid(f"{label}: its snapshot cannot be rebuilt") from None
+    if computed != sha:
+        raise RecordInvalid(f"{label}: snapshot content does not match its sha256")
+    if "snapshot" in rec and rec["snapshot"] != expected_path:
+        raise RecordInvalid(f"{label}: snapshot path is not {expected_path}")
+    if ("provenance" in rec) != ("deploy_manifest" in rec):
+        raise RecordInvalid(f"{label}: provenance and its manifest must be stored together")
+    if "deploy_manifest" in rec:
+        try:
+            body = manifest.canonical_bytes(rec["deploy_manifest"])
+            doc = manifest.parse(body)
+        except (manifest.ManifestError, TypeError, ValueError) as e:
+            raise RecordInvalid(f"{label}: stored manifest is invalid ({e})") from None
+        if rec["provenance"] != manifest.provenance(doc, hashlib.sha256(body).hexdigest()):
+            raise RecordInvalid(f"{label}: provenance does not match its stored manifest")
+    return rec
+
+
+def check_records(records):
+    """First pass over every record, before a single file is touched."""
+    for rec in records:
+        check_record(rec)
+    return records
+
+
 def archive_append(record) -> bool:
     """Adds `record` to the archive once. The whole file is rewritten atomically, so a crash leaves
-    either the previous archive or the new one. Returns False when the census is already archived."""
+    either the previous archive or the new one. Returns False when the census is already archived.
+    A record that does not hold (check_record) is refused before the file is touched."""
+    check_record(record)
     records = read_archive_lines()
     if any(r.get("sha256") == record["sha256"] for r in records):
         return False
@@ -461,7 +518,8 @@ def trends(record, prev):
 
 
 def snapshot_bytes(record) -> bytes:
-    public = {k: v for k, v in record.items() if k not in ("text", "signed_in", "snapshot", "sha256")}
+    public = {k: v for k, v in record.items()
+              if k not in ("text", "signed_in", "snapshot", "sha256", "deploy_manifest")}
     return json.dumps(public, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
 
 
@@ -517,6 +575,9 @@ def build_message(record, prev, accepted, refused, tracked):
     if accepted or refused:
         parts.append(f"Requests: accepted {', '.join(accepted) or 'none'}, refused {refused}")
     parts.append(f"sha256:{record['sha256']} {DASHBOARD}/{record['snapshot']}")
+    prov = record.get("provenance")
+    if prov:
+        parts.append(f"Provenance: manifest:{prov['manifest_sha256']} {DASHBOARD}/{prov['manifest']}")
     parts.append(f"Method: {DASHBOARD}/#method")
     parts.append('Track a room: signed "track <room>"')
     return " | ".join(parts)
@@ -563,14 +624,59 @@ def public_view(rec, number, own_did):
         "date_short": f"{at:%d %b %Y}", "date_long": f"{at:%a %d %b %Y, %H:%M} UTC",
         "snapshot": rec.get("snapshot", snapshot_path(rec)), "sha256": rec.get("sha256") or "",
         "sha_short": (rec.get("sha256") or "")[:8], "publisher_short": f"{own_did[:16]}...{own_did[-6:]}",
+        "provenance": rec.get("provenance") or None,     # absent from censuses published before manifests
     }
+
+
+def identity_doc(own_did, prov):
+    """The public card of the agent: who signs, where the data is, and how to check the running code.
+    Public file, so it holds no host, no path and no access detail."""
+    return {
+        "schema": IDENTITY_SCHEMA,
+        "name": "Room Census",
+        "about": ("Twice-weekly signed census of public Technocore rooms: rate between censuses, unique texts "
+                  "after masking digits, sender concentration, and a fixed class per room."),
+        "did": own_did,
+        "network": SERVER,
+        "room": ROOM,
+        "schedule": "Monday and Thursday, between 08:00 and 18:00 UTC",
+        "commands": ["track <room>", "untrack <room>"],
+        "dashboard": DASHBOARD,
+        "data": {"latest": f"{DASHBOARD}/data/latest.json", "history": f"{DASHBOARD}/data/history.csv",
+                 "snapshots": f"{DASHBOARD}/data/snapshots/", "manifests": f"{DASHBOARD}/{manifest.PUBLIC_DIR}/",
+                 "schema": SCHEMA},
+        "source": {"repository": manifest.REPOSITORY, "code_license": "MIT", "data_license": "CC BY 4.0"},
+        "provenance": prov,
+        "verify": [
+            "Read the signed census in the room-census room of technocore.chat and check its Ed25519 signature "
+            "over room|nonce|text with the did:key above.",
+            "Download the snapshot named in that message and compare its SHA-256 with the sha256 field of the message.",
+            "Download the manifest named in that message: its file name is the SHA-256 of its own bytes.",
+            "Compare every file digest in the manifest with the same file in the repository at the source commit.",
+        ],
+        "affiliation": "Community project, not affiliated with Flop Labs.",
+    }
+
+
+def publish_manifests(records, data):
+    """Publishes, under its own digest, the manifest each census was produced with. The archive keeps
+    the manifest beside the record (outside the snapshot), so a census recovered after a redeployment
+    still points to a published file. Records reach this point only after check_record."""
+    for rec in records:
+        if "deploy_manifest" in rec:
+            sha = rec["provenance"]["manifest_sha256"]
+            target = data / "manifests" / f"{sha}.json"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            durable.atomic_write(target, manifest.canonical_bytes(rec["deploy_manifest"]), mode=0o644)
 
 
 def write_data_files(records, own_did):
     """Rebuilds all of site/data (and the static parts of index.html) from the archive: the repository
     is never the source of truth. Snapshots are written from the untouched records, so their hash
-    always matches the signed message."""
+    always matches the signed message. Every manifest a census names is published beside them.
+    Every record is checked first: one that does not hold stops the rebuild before any write."""
     import census_render
+    check_records(records)
     data = SITE_DIR / "data"
     (data / "snapshots").mkdir(parents=True, exist_ok=True)
     out = io.StringIO()
@@ -584,10 +690,15 @@ def write_data_files(records, own_did):
     for rec in records:
         durable.atomic_write(SITE_DIR / rec.get("snapshot", snapshot_path(rec)), snapshot_bytes(rec), mode=0o644)
     last, number = records[-1], len(records)
+    prov = last.get("provenance")
+    publish_manifests(records, data)
+    durable.atomic_write(SITE_DIR / "identity.json",
+                         json.dumps(identity_doc(own_did, prov), indent=1, ensure_ascii=True) + "\n", mode=0o644)
     latest = {
         "schema": SCHEMA,
         "census": number,
         "at_utc": last["at_utc"],
+        "provenance": prov,
         "prev_at_utc": records[-2]["at_utc"] if len(records) > 1 else None,
         "next": "Monday and Thursday, between 08:00 and 18:00 UTC",
         "publisher": own_did,
@@ -615,6 +726,7 @@ def update_site(own_did):
     """Aligns site/ with GitHub, rebuilds the data from the archive, then commits and pushes."""
     if not (SITE_DIR / ".git").exists():
         return
+    records = check_records(read_archive())      # before git touches site/: a bad record stops here
     git = ["git", "-C", str(SITE_DIR)]
     for attempt in (1, 2):
         try:
@@ -623,8 +735,8 @@ def update_site(own_did):
                     subprocess.run(git + ["rebase", "--abort"], check=False)
             subprocess.run(git + ["fetch", "-q", "origin"], check=True, timeout=120)
             subprocess.run(git + ["reset", "-q", "--hard", "origin/main"], check=True)
-            write_data_files(read_archive(), own_did)
-            subprocess.run(git + ["add", "data", "index.html"], check=True)
+            write_data_files(records, own_did)
+            subprocess.run(git + ["add", "data", "index.html", "identity.json"], check=True)
             if subprocess.run(git + ["diff", "--cached", "--quiet"]).returncode == 0:
                 return
             subprocess.run(git + ["commit", "-q", "-m", "Census data update"], check=True)
@@ -766,6 +878,25 @@ def validate_pending(p):
     st = p.get("state")
     need(isinstance(st, dict) and isinstance(st.get("tracked"), list) and type(st.get("last_seq")) is int, "state")
     need(type(p.get("attempts")) is int and p["attempts"] >= 0, "attempts")
+    if not problems:
+        # a well-formed journal that was altered must not reach the room or the archive: the text is
+        # authenticated by our own signature, the text names the record, the record proves its content
+        try:
+            own = flop_did.DID_FILE.read_text(encoding="utf-8").strip()
+        except OSError:
+            own = None
+        need(p["did"] == own, "did is not this publisher's did")
+        need(flop_did.verify(p["did"], p["room"], p["nonce"], p["text"], p["sig"]),
+             "signature does not match room|nonce|text")
+        try:
+            check_record(rec)
+        except RecordInvalid as e:
+            problems.append(f"record ({e})")
+        else:
+            need(f"sha256:{rec['sha256']} " in p["text"], "text does not name the record's snapshot")
+            if "provenance" in rec:
+                need(f"manifest:{rec['provenance']['manifest_sha256']} " in p["text"],
+                     "text does not name the record's manifest")
     if problems:
         raise InvalidJournal("invalid pending journal: " + ", ".join(problems))
     return p
@@ -878,10 +1009,24 @@ def side_steps(own_did):
 
 # ---------- main ----------
 
-def prepare(own_did):
+def check_provenance():
+    """First thing any run does: nothing is collected, stored or sent when the code that is about to
+    run does not match an approved commit. Returns the manifest and its public provenance block."""
+    try:
+        doc, sha = manifest.verify(MANIFEST_FILE, BASE)
+    except manifest.ManifestError as e:
+        print(f"Provenance check failed, nothing was read, stored or sent: {e}", flush=True)
+        sys.exit(2)
+    return doc, manifest.provenance(doc, sha)
+
+
+def prepare(own_did, prov=None, manifest_doc=None):
     state = load_state()
     state, accepted, refused = apply_requests(state, own_did)
     record = build_census(state)
+    if prov:
+        record["provenance"] = prov              # inside the snapshot, so its SHA-256 covers it
+        record["deploy_manifest"] = manifest_doc  # archive only: lets the site republish it at any time
     record["snapshot"] = snapshot_path(record)
     record["sha256"] = hashlib.sha256(snapshot_bytes(record)).hexdigest()
     records = read_archive()
@@ -892,13 +1037,15 @@ def prepare(own_did):
 def main():
     args = sys.argv[1:]
     publish = "--publish" in args
+    manifest_doc, prov = check_provenance()
+    print(f"Provenance: commit {prov['commit'][:12]}, manifest {prov['manifest_sha256'][:12]}", flush=True)
     if "--jitter" in args:
         delay = random.uniform(0, float(args[args.index("--jitter") + 1]) * 3600)
         print(f"Random wait: {delay / 3600:.2f} h", flush=True)
         time.sleep(delay)
     own_did = flop_did.DID_FILE.read_text(encoding="utf-8").strip()
     if not publish:
-        state, record, text = prepare(own_did)
+        state, record, text = prepare(own_did, prov, manifest_doc)
         print(text)
         print(f"\n({len(text)} characters, {len(record['rooms'])} rooms)")
         _, _, _, url = flop_did.sign(ROOM, text)
@@ -918,13 +1065,13 @@ def main():
                 side_steps(own_did)          # the interrupted run never reached them
                 return None                  # one census per run: the recovered one
             try:
-                state, record, text = prepare(own_did)
+                state, record, text = prepare(own_did, prov, manifest_doc)
             except ArchiveCorrupt:
                 raise
             except Exception as e:
                 print("Computation failed, retrying in 10 minutes:", e, flush=True)
                 time.sleep(600)
-                state, record, text = prepare(own_did)
+                state, record, text = prepare(own_did, prov, manifest_doc)
             print(text)
             print(f"\n({len(text)} characters, {len(record['rooms'])} rooms)")
             record = publish_census(state, record, text, lock)

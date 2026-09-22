@@ -1,5 +1,6 @@
 """Crash, recovery and duplication scenarios of the publication path, against a fake Technocore that
 enforces the real nonce rule (a nonce must exceed the last one this key used in the room)."""
+import hashlib
 import json
 import os
 import shutil
@@ -14,7 +15,8 @@ from unittest import mock
 import durable
 import flop_did
 import room_census as rc
-from tests.helpers import FakeTechnocore, install, messages
+from tests.helpers import FakeTechnocore, altered_records, install, install_manifest, messages
+from tests.test_outputs import record as census_record
 
 
 class Crash(BaseException):
@@ -102,6 +104,7 @@ class PublicationCase(unittest.TestCase):
             p = mock.patch.object(module, name, value)
             p.start()
             self.addCleanup(p.stop)
+        install_manifest(self, self.tmp)
         env = mock.patch.dict(os.environ)
         env.start()
         self.addCleanup(env.stop)
@@ -151,6 +154,15 @@ class Publication(PublicationCase):
         self.assertEqual(json.loads(flop_did.NONCE_FILE.read_text())[rc.ROOM], nonce)
         self.assertTrue(rc.STATE_FILE.exists())
         self.assertEqual(len(flop_did.PROOF_FILE.read_text().splitlines()), 1)
+
+    def test_the_signed_census_names_the_manifest_of_the_code_that_ran(self):
+        sha = hashlib.sha256(rc.MANIFEST_FILE.read_bytes()).hexdigest()
+        self.assertEqual(self.run_main(), 0)
+        landed, archived = self.server.stored[0], self.archive()[0]
+        self.assertIn(f"manifest:{sha}", landed["text"])
+        self.assertEqual(archived["provenance"]["manifest_sha256"], sha)
+        self.assertIn(sha.encode(), rc.snapshot_bytes(archived))
+        self.assertIn(f"sha256:{archived['sha256']}", landed["text"])   # the snapshot hash covers the provenance
 
     def test_crash_after_the_message_landed_is_recovered_without_a_second_post(self):
         self.server.plan = ["crash_after"]
@@ -243,7 +255,7 @@ class Publication(PublicationCase):
         self.assertEqual(self.server.post_calls, 1)
 
     def test_archive_append_is_idempotent(self):
-        rec = {"schema": rc.SCHEMA, "sha256": "abc", "census": 1}
+        rec = census_record(1)
         self.assertTrue(rc.archive_append(rec))
         self.assertFalse(rc.archive_append(rec))
         self.assertEqual(len(self.archive()), 1)
@@ -612,14 +624,121 @@ class JournalValidation(PublicationCase):
 
     def test_validation_holds_under_python_optimize_mode(self):
         good = self.leave_journal()
-        code = ("import json, sys; sys.path.insert(0, sys.argv[1]); import room_census as rc\n"
+        code = ("import json, sys, pathlib; sys.path.insert(0, sys.argv[1]); import room_census as rc\n"
+                "rc.flop_did.DID_FILE = pathlib.Path(sys.argv[3])\n"
                 "good = json.loads(sys.argv[2])\n"
                 "assert False, 'asserts are stripped under -O'\n"
                 "rc.validate_pending(good)\n"
-                "try:\n    rc.validate_pending({**good, 'sig': 'short'})\nexcept rc.InvalidJournal:\n    print('rejected')\n")
-        out = subprocess.run([sys.executable, "-O", "-c", code, str(Path(rc.__file__).parent), json.dumps(good)],
-                             capture_output=True, text=True, timeout=60)
+                "bad_sig = good['sig'][:-2] + ('AA' if good['sig'][-2:] != 'AA' else 'QA')\n"
+                "for broken in ({**good, 'sig': 'short'}, {**good, 'sig': bad_sig}, {**good, 'text': good['text'] + ' '}):\n"
+                "    try:\n        rc.validate_pending(broken)\n        print('accepted'); sys.exit(1)\n"
+                "    except rc.InvalidJournal:\n        pass\n"
+                "print('rejected')\n")
+        out = subprocess.run([sys.executable, "-O", "-c", code, str(Path(rc.__file__).parent), json.dumps(good),
+                              str(flop_did.DID_FILE)], capture_output=True, text=True, timeout=60)
         self.assertEqual((out.returncode, out.stdout.strip()), (0, "rejected"), out.stderr)
+
+
+
+class JournalRecordIntegrity(JournalValidation):
+    """A pending journal that is valid JSON but altered never reaches the room, the proofs, the state
+    or the archive: the record is checked like an archived one, the text must name it, and the text
+    must carry this publisher's own signature."""
+
+    def snapshot_of_files(self):
+        return {p.name: p.read_bytes() for p in (rc.ARCHIVE, rc.STATE_FILE, flop_did.PROOF_FILE) if p.exists()}
+
+    def assert_refused_before_anything(self, journal, before, posts):
+        data = json.dumps(journal).encode()
+        rc.JOURNAL.write_bytes(data)
+        self.assertEqual(self.run_main(), 1)
+        self.assertEqual(self.server.post_calls, posts)                 # nothing sent
+        self.assertEqual(self.snapshot_of_files(), before)             # no archive, state or proof written
+        self.assertEqual(rc.JOURNAL.read_bytes(), data)                 # kept for inspection
+
+    def resigned(self, good, record):
+        """The journal an attacker holding the key would write: consistent text, valid signature.
+        Only check_record can refuse it."""
+        text = good["text"].replace(f"sha256:{good['record']['sha256']} ", f"sha256:{record['sha256']} ")
+        if "provenance" in good["record"] and "provenance" in record:
+            text = text.replace(f"manifest:{good['record']['provenance']['manifest_sha256']} ",
+                                f"manifest:{record['provenance']['manifest_sha256']} ")
+        did, sig, nonce, _ = flop_did.sign(rc.ROOM, text, nonce=good["nonce"])
+        return {**good, "record": record, "run_id": record["sha256"], "text": text, "sig": sig, "did": did}
+
+    def test_each_altered_record_is_refused_even_when_consistently_resigned(self):
+        good = self.leave_journal()
+        self.assertIn("provenance", good["record"])
+        before, posts = self.snapshot_of_files(), self.server.post_calls
+        for name, (record, reason) in altered_records(good["record"]).items():
+            with self.subTest(alteration=name):
+                if "sha256" in name and "malformed" in name:
+                    journal = {**good, "record": record}
+                else:
+                    journal = self.resigned(good, record)
+                with self.assertRaises(rc.InvalidJournal) as caught:
+                    rc.validate_pending(journal)
+                if "malformed" not in name:                     # a malformed hash fails the shape check first
+                    self.assertIn("record (", str(caught.exception))
+                    self.assertIn(reason, str(caught.exception))
+                self.assert_refused_before_anything(journal, before, posts)
+
+    def test_each_altered_record_is_refused_with_the_original_signature(self):
+        good = self.leave_journal()
+        before, posts = self.snapshot_of_files(), self.server.post_calls
+        for name, (record, _) in altered_records(good["record"]).items():
+            with self.subTest(alteration=name):
+                journal = {**good, "record": record, "run_id": record["sha256"] if len(record["sha256"]) == 64
+                           else good["run_id"]}
+                self.assert_refused_before_anything(journal, before, posts)
+
+    def test_the_text_must_name_the_record_and_its_manifest(self):
+        good = self.leave_journal()
+        before, posts = self.snapshot_of_files(), self.server.post_calls
+        for old, new in ((f"sha256:{good['record']['sha256']} ", f"sha256:{'0' * 64} "),
+                         (f"manifest:{good['record']['provenance']['manifest_sha256']} ", f"manifest:{'0' * 64} ")):
+            with self.subTest(segment=old[:7]):
+                text = good["text"].replace(old, new)
+                did, sig, _, _ = flop_did.sign(rc.ROOM, text, nonce=good["nonce"])
+                journal = {**good, "text": text, "sig": sig}
+                with self.assertRaises(rc.InvalidJournal) as caught:
+                    rc.validate_pending(journal)
+                self.assertIn("text does not name", str(caught.exception))
+                self.assert_refused_before_anything(journal, before, posts)
+
+    def test_a_journal_signed_by_another_key_is_refused(self):
+        good = self.leave_journal()
+        before, posts = self.snapshot_of_files(), self.server.post_calls
+        other = self.tmp / "other"
+        other.mkdir()
+        with mock.patch.object(flop_did, "KEY_FILE", other / "identity.pem"),                 mock.patch.object(flop_did, "PASS_FILE", other / "passphrase.txt"),                 mock.patch.object(flop_did, "DID_FILE", other / "did.txt"), mock.patch("builtins.print"):
+            flop_did.cmd_init()
+            did, sig, _, _ = flop_did.sign(rc.ROOM, good["text"], nonce=good["nonce"])
+        self.assertNotEqual(did, good["did"])
+        journal = {**good, "did": did, "sig": sig}                      # valid signature, wrong publisher
+        with self.assertRaises(rc.InvalidJournal) as caught:
+            rc.validate_pending(journal)
+        self.assertIn("did is not this publisher", str(caught.exception))
+        self.assert_refused_before_anything(journal, before, posts)
+
+    def test_a_forged_journal_reusing_a_published_signature_cannot_reach_the_archive(self):
+        """Without the signature check, the room would show this nonce and signature as published
+        (landed() matches did, nonce and sig) and finalize() would archive the forged record."""
+        self.assertEqual(self.run_main(), 0)                            # census 1, really published
+        real = self.server.stored[0]
+        good = self.leave_journal()                                     # census 2, never sent
+        forged, _ = altered_records(good["record"])["snapshot content"]
+        forged["sha256"] = hashlib.sha256(rc.snapshot_bytes(forged)).hexdigest()
+        text = good["text"].replace(f"sha256:{good['record']['sha256']} ", f"sha256:{forged['sha256']} ")
+        journal = {**good, "record": forged, "run_id": forged["sha256"], "text": text,
+                   "nonce": str(real["nonce"]), "sig": real["sig"]}
+        rc.check_record(forged)                                         # the record alone is consistent
+        before, posts = self.snapshot_of_files(), self.server.post_calls
+        with self.assertRaises(rc.InvalidJournal) as caught:
+            rc.validate_pending(journal)
+        self.assertIn("signature", str(caught.exception))
+        self.assert_refused_before_anything(journal, before, posts)
+        self.assertEqual(len(self.archive()), 1)
 
 
 if __name__ == "__main__":

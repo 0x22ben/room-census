@@ -29,6 +29,7 @@ Spec followed (technocore.chat/llms.txt):
 Single dependency: pip install cryptography
 """
 import base64
+import binascii
 import json
 import os
 import re
@@ -41,8 +42,9 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 import durable
 
@@ -71,8 +73,40 @@ def b58encode(data: bytes) -> str:
     return "1" * pad + out
 
 
+def b58decode(text: str) -> bytes:
+    n = 0
+    for ch in text:
+        i = B58.find(ch)
+        if i < 0:
+            raise ValueError("not base58")
+        n = n * 58 + i
+    body = n.to_bytes((n.bit_length() + 7) // 8, "big") if n else b""
+    return b"\0" * (len(text) - len(text.lstrip("1"))) + body
+
+
 def did_from_public(raw_pub: bytes) -> str:
     return "did:key:z" + b58encode(b"\xed\x01" + raw_pub)
+
+
+def public_key_of(did: str) -> Ed25519PublicKey:
+    """The Ed25519 key a did:key names (multicodec 0xed01). Raises ValueError for anything else."""
+    if not isinstance(did, str) or not did.startswith("did:key:z"):
+        raise ValueError("not a did:key")
+    raw = b58decode(did[len("did:key:z"):])
+    if len(raw) != 34 or raw[:2] != b"\xed\x01":
+        raise ValueError("not an Ed25519 did:key")
+    return Ed25519PublicKey.from_public_bytes(raw[2:])
+
+
+def verify(did, room, nonce, text, sig) -> bool:
+    """True only when `sig` is the Ed25519 signature of `did` over room|nonce|text, the exact bytes
+    Technocore checks. Needs no private key, so a journal can be checked before anything is sent."""
+    try:
+        data = base64.urlsafe_b64decode(sig + "=" * (-len(sig) % 4))
+        public_key_of(did).verify(data, f"{room}|{nonce}|{text}".encode("utf-8"))
+        return True
+    except (ValueError, TypeError, InvalidSignature, binascii.Error):
+        return False
 
 
 def load_key() -> Ed25519PrivateKey:

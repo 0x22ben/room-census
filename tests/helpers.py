@@ -61,3 +61,52 @@ def install(test_case, fake):
     def restore():
         rc.get_json, rc.get_text, rc.time.sleep = originals
     test_case.addCleanup(restore)
+
+
+def install_manifest(test_case, tmp, commit="0" * 40):
+    """A valid deployment manifest of the real program files, in a temporary place: every run of
+    room_census checks one before doing anything."""
+    import manifest
+    from pathlib import Path
+    from unittest import mock
+    path = Path(tmp) / "deploy_manifest.json"
+    path.write_bytes(manifest.canonical_bytes(manifest.build(commit)))
+    patch = mock.patch.object(rc, "MANIFEST_FILE", path)
+    patch.start()
+    test_case.addCleanup(patch.stop)
+    return path
+
+
+def altered_records(rec):
+    """Every way a stored census record can be tampered with, one change at a time: name -> (record,
+    reason check_record must give). "resealed" changes recompute the snapshot sha256, so only the
+    provenance check can catch them; the others leave it, so the snapshot check must."""
+    import hashlib
+    import manifest
+    other = manifest.build("1" * 40, reader=lambda name: f"# other {name}\n".encode())
+    out = {}
+
+    def alt(name, change, reason, reseal=True):
+        r = json.loads(json.dumps(rec))
+        change(r)
+        if reseal:
+            r["sha256"] = hashlib.sha256(rc.snapshot_bytes(r)).hexdigest()
+        out[name] = (r, reason)
+    mismatch = "provenance does not match"
+    alt("provenance.commit", lambda r: r["provenance"].update(commit="f" * 40), mismatch)
+    alt("provenance.repository", lambda r: r["provenance"].update(repository="https://github.com/other/fork"), mismatch)
+    alt("provenance.manifest", lambda r: r["provenance"].update(manifest=f"data/manifests/{'0' * 64}.json"), mismatch)
+    alt("provenance.manifest_sha256", lambda r: r["provenance"].update(manifest_sha256="0" * 64), mismatch)
+    alt("provenance.release", lambda r: r["provenance"].update(release="v9"), mismatch)
+    alt("provenance extra field", lambda r: r["provenance"].update(note="trust me"), mismatch)
+    alt("deploy_manifest swapped for another valid one", lambda r: r.update(deploy_manifest=other), mismatch)
+    alt("deploy_manifest not a manifest",
+        lambda r: r["deploy_manifest"]["files"][0].update(path="../identity.pem"), "stored manifest is invalid")
+    alt("deploy_manifest removed", lambda r: r.pop("deploy_manifest"), "stored together")
+    alt("provenance removed", lambda r: r.pop("provenance"), "stored together")
+    alt("snapshot content", lambda r: r["rooms"][0].update(per_hour=123456.0), "snapshot content does not match",
+        reseal=False)
+    alt("snapshot sha256", lambda r: r.update(sha256="0" * 64), "snapshot content does not match", reseal=False)
+    alt("snapshot sha256 malformed", lambda r: r.update(sha256="not-a-hash"), "missing or malformed", reseal=False)
+    alt("snapshot path", lambda r: r.update(snapshot="../../identity.pem"), "snapshot path", reseal=False)
+    return out

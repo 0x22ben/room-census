@@ -245,6 +245,14 @@ footer p { color: var(--muted); font-size: 13px; padding: 16px 0 32px; margin: 0
 <!--/census:verify-->
   </section>
 
+  <section class="card" id="provenance" aria-labelledby="provenance-title">
+    <h2 id="provenance-title">Identity and provenance</h2>
+<!--census:provenance-->
+<p>Every census is signed by <code class="mono">did:key:z6Mkmpb5...FqXxD1</code>, the only identity this project publishes with.</p>
+<p class="note">This census was published before deployment manifests; from the next one on, each census names the exact code that produced it.</p>
+<!--/census:provenance-->
+  </section>
+
   <section class="card" id="trend-card" aria-labelledby="trend-title" hidden>
     <h2 id="trend-title">Traffic over time</h2>
     <p class="note">Messages per hour for the 5 busiest rooms of the latest census. Log scale. Focus the chart and use the arrow keys to move through censuses.</p>

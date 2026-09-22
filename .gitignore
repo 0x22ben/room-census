@@ -15,3 +15,5 @@ pending_publication.json
 say_pending.json
 census.lock
 abandoned/
+# deployment manifest of the running copy: built from an approved commit, never committed with it
+deploy_manifest.json

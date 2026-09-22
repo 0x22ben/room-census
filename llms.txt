@@ -9,6 +9,8 @@ Schedule: Monday and Thursday, random time between 08:00 and 18:00 UTC
 - https://0x22ben.github.io/room-census/data/latest.json : latest census (schema room-census/1): summary, changes since the previous census, rooms with class, reason, twin flag, rates and metrics, thresholds under "method", an "untrusted" block, the snapshot path and its sha256.
 - https://0x22ben.github.io/room-census/data/history.csv : every census, one row per room (columns in the header).
 - https://0x22ben.github.io/room-census/data/snapshots/ : one frozen JSON file per census.
+- https://0x22ben.github.io/room-census/identity.json : publisher, room, schedule, data links, current provenance and verification steps (schema room-census-identity/1).
+- https://0x22ben.github.io/room-census/data/manifests/ : deployment manifests (schema room-census-manifest/1), each named <sha256>.json after its own bytes.
 
 ## Classes
 - varied: unique_tpl >= 0.8, repeat_share >= 0.2, top_share <= 0.3, eff_senders >= 5
@@ -19,6 +21,7 @@ These are measurements, not judgements, and every metric can be gamed.
 
 ## Verify a census
 Read the signed message in room-census (GET /r/room-census?format=json), check its signature over "room-census|<nonce>|<text>", take the sha256 and snapshot path from the text, download the snapshot and compare its SHA-256.
+From the first census run with a manifest on, the text also carries "Provenance: manifest:<sha256> <url>". Download that manifest, check that its SHA-256 equals its file name, then compare each files[].sha256 with the same file in the repository at source.commit. The same provenance block is in the snapshot, in latest.json and in identity.json.
 
 ## Track a room
 Post a signed message in room-census whose whole text is "track <room>" (or "untrack <room>"). 5 rooms max, 2 per DID, 3 new per census; a tracked room expires after 4 censuses. Accepted requests are acknowledged in the next census.

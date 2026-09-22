@@ -177,6 +177,38 @@ def _grid(view):
             f'<span class="key repetitive">{view["repetitive"]} repetitive</span></p>')
 
 
+def provenance_block(view):
+    """Who signs, which code ran, and how to check both. Censuses published before the deployment
+    manifest existed simply say so, so old pages stay truthful."""
+    e = lambda s: html.escape(str(s), quote=True)
+    prov = view.get("provenance")
+    lines = [f'<p>Every census is signed by <code class="mono">{e(view["publisher_short"])}</code>, '
+             'the only identity this project publishes with.</p>']
+    if not prov:
+        lines.append('<p class="note">This census was published before deployment manifests; from the next one on, '
+                     'each census names the exact code that produced it.</p>')
+        return "\n".join(lines)
+    # links come from the archive; only the two expected shapes are ever turned into an href
+    manifest_href = prov["manifest"] if re.fullmatch(r"data/manifests/[0-9a-f]{64}\.json", str(prov["manifest"])) else "#"
+    repo_href = prov["repository"] if re.fullmatch(r"https://github\.com/[\w.-]+/[\w.-]+", str(prov["repository"])) else "#"
+    prov = {**prov, "manifest": manifest_href, "repository": repo_href}
+    name = str(view["provenance"]["manifest"]).split("/")[-1]
+    lines += [
+        '<p>The signed message names a deployment manifest: the source commit and the SHA-256 of every '
+        'repository-owned Python file that ran. The manifest file is named after its own SHA-256, so it cannot be swapped silently.</p>',
+        f'<dl class="kpis"><div><dt>Source commit</dt><dd><code class="mono">{e(prov["commit"])}</code></dd></div>'
+        f'<div><dt>Manifest</dt><dd><a href="{e(prov["manifest"])}"><code class="mono">{e(name)}</code></a></dd></div>'
+        '</dl>',
+        '<ol class="note"><li>Check the Ed25519 signature of the census over <code>room|nonce|text</code>.</li>'
+        '<li>Hash the snapshot and compare it with the <code>sha256</code> field of that message.</li>'
+        f'<li>Download the manifest and check that its SHA-256 is its own file name.</li>'
+        f'<li>Compare each digest in it with the same file in '
+        f'<a href="{e(prov["repository"])}" rel="noopener">the repository</a> at the source commit.</li></ol>',
+        f'<p class="note">Machine readable: <a href="identity.json">identity.json</a>.</p>',
+    ]
+    return "\n".join(lines)
+
+
 def render_page(page, view, base_url):
     e = lambda s: html.escape(str(s), quote=True)
     k = claims(view)
@@ -227,6 +259,7 @@ def render_page(page, view, base_url):
             '<p class="note">Download the snapshot, hash it, and compare. The full procedure is in '
             '<a href="llms.txt">llms.txt</a>.</p>',
         ]),
+        "provenance": provenance_block(view),
     }
     for name, content in blocks.items():
         pattern = re.compile(rf"(<!--census:{name}-->)(.*?)(<!--/census:{name}-->)", re.S)
