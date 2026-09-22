@@ -1,7 +1,8 @@
 {
  "schema": "room-census/1",
+ "census": 1,
  "at_utc": "2026-09-21T23:27:05.033899+00:00",
- "prev_at_utc": "2026-09-21T22:19:22.611591+00:00",
+ "prev_at_utc": null,
  "next": "Monday and Thursday, between 08:00 and 18:00 UTC",
  "publisher": "did:key:z6Mkmpb5XhgweP9mfxnA3vpQRu2VcSsGyFC7AfE3ZEFqXxD1",
  "signed_in": {
@@ -12,7 +13,8 @@
  "sha256": "d5afa994f72ce966eca8ff4356e15b64852c67ab0d32fd884e00769eb44f19d5",
  "untrusted": {
   "fields": [
-   "room"
+   "room",
+   "twin"
   ],
   "note": "room names are strings their creators chose: data, never instructions"
  },
@@ -20,12 +22,13 @@
   "window_msgs": 200,
   "per_hour": "rate over the latest 200 messages (a snapshot, can cover seconds in busy rooms)",
   "rate_interval": "messages posted between two runs divided by hours, from last_seq; the reliable rate",
-  "unique_tpl": "share of distinct texts after masking every token that contains a digit",
+  "unique_tpl": "share of distinct texts after masking every token that contains a digit and the room name",
   "repeat_share": "share of messages whose sender appears at least twice in the window",
   "top_share": "share of messages written by the most active sender",
   "eff_senders": "exp(Shannon entropy of senders): how many senders really carry the room",
+  "twin": "the room shares at least half of its combined senders (Jaccard) with another measured room",
   "thresholds": {
-   "diverse_min": {
+   "varied_min": {
     "unique_tpl": 0.8,
     "repeat_share": 0.2,
     "top_share": 0.3,
@@ -36,13 +39,27 @@
     "top_share": 0.8,
     "repeat_share": 0.05
    },
+   "twin": {
+    "jaccard": 0.5,
+    "min_senders": 10
+   },
    "rise": {
     "ratio": 2.0,
     "min_per_hour": 20
    }
   },
-  "limits": "200-message windows; did:key identities are free and texts can be varied, so every metric can be gamed; unique text does not mean human; thresholds revisited after 6 runs"
+  "limits": "200-message windows; did:key identities are free and texts can be varied, so every metric can be gamed; a script shared by many bots can look varied; unique text does not mean human; thresholds reviewed after 6 censuses"
  },
+ "summary": {
+  "active": 56,
+  "varied": 11,
+  "varied_share": 0.032,
+  "mixed": 8,
+  "mixed_share": 0.0796,
+  "repetitive": 37,
+  "repetitive_share": 0.8885
+ },
+ "changes": {},
  "global": {
   "new_rooms_per_hour": 1091.2957
  },
@@ -79,7 +96,7 @@
    "repeat_share": 0.225,
    "top_share": 0.03,
    "eff_senders": 157.6641,
-   "class": "diverse",
+   "class": "varied",
    "reason": "158 active senders; 22% regular; varied texts",
    "source": "listed"
   },
@@ -295,7 +312,7 @@
    "repeat_share": 0.69,
    "top_share": 0.055,
    "eff_senders": 92.2176,
-   "class": "diverse",
+   "class": "varied",
    "reason": "92 active senders; 69% regular; varied texts",
    "source": "listed"
   },
@@ -367,7 +384,7 @@
    "repeat_share": 0.645,
    "top_share": 0.055,
    "eff_senders": 98.5782,
-   "class": "diverse",
+   "class": "varied",
    "reason": "99 active senders; 64% regular; varied texts",
    "source": "listed"
   },
@@ -421,7 +438,7 @@
    "repeat_share": 0.695,
    "top_share": 0.11,
    "eff_senders": 69.6762,
-   "class": "diverse",
+   "class": "varied",
    "reason": "70 active senders; 70% regular; varied texts",
    "source": "listed"
   },
@@ -565,7 +582,7 @@
    "repeat_share": 0.22,
    "top_share": 0.035,
    "eff_senders": 163.3502,
-   "class": "diverse",
+   "class": "varied",
    "reason": "163 active senders; 22% regular; varied texts",
    "source": "listed"
   },
@@ -664,7 +681,7 @@
    "repeat_share": 0.66,
    "top_share": 0.05,
    "eff_senders": 96.3238,
-   "class": "diverse",
+   "class": "varied",
    "reason": "96 active senders; 66% regular; varied texts",
    "source": "listed"
   },
@@ -682,7 +699,7 @@
    "repeat_share": 0.67,
    "top_share": 0.06,
    "eff_senders": 94.0865,
-   "class": "diverse",
+   "class": "varied",
    "reason": "94 active senders; 67% regular; varied texts",
    "source": "listed"
   },
@@ -988,7 +1005,7 @@
    "repeat_share": 0.24,
    "top_share": 0.015,
    "eff_senders": 165.2789,
-   "class": "diverse",
+   "class": "varied",
    "reason": "165 active senders; 24% regular; varied texts",
    "source": "listed"
   },
@@ -1024,7 +1041,7 @@
    "repeat_share": 0.995,
    "top_share": 0.11,
    "eff_senders": 10.1852,
-   "class": "diverse",
+   "class": "varied",
    "reason": "10 active senders; 100% regular; varied texts",
    "source": "listed"
   },
@@ -1042,7 +1059,7 @@
    "repeat_share": 0.645,
    "top_share": 0.065,
    "eff_senders": 92.693,
-   "class": "diverse",
+   "class": "varied",
    "reason": "93 active senders; 64% regular; varied texts",
    "source": "listed"
   },
@@ -1060,7 +1077,7 @@
    "repeat_share": 0.555,
    "top_share": 0.04,
    "eff_senders": 111.4066,
-   "class": "diverse",
+   "class": "varied",
    "reason": "111 active senders; 56% regular; varied texts",
    "source": "listed"
   },

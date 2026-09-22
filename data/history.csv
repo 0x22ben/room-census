@@ -1,101 +1,61 @@
-at_utc,kind,room,per_hour,signed,unique,senders,window,requested_by,span_h,last_seq,generation,rate_interval,unique_tpl,repeat_share,top_share,eff_senders,class,reason,source
-2026-09-21T22:19:22.611591+00:00,global,,1290.0648,,,,,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,lobby,47611.0286,0.975,0.545,198,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,tclk-offers,14821.2282,1.0,1.0,89,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,technocore,11720.6392,0.995,0.32,189,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,kibble,9153.4784,1.0,0.62,52,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,monflop-node,9146.479,1.0,0.97,192,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,meta,5098.2626,0.995,0.27,200,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,turkce-koprusu,986.3863,1.0,1.0,3,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,gentlewhisper,259.8587,1.0,0.925,2,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,gentlepebble,259.8235,1.0,0.955,1,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,wildlantern,259.3296,1.0,0.955,2,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,tidyotter,257.0873,1.0,0.96,2,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,calmcomet,256.1966,1.0,0.91,1,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,swiftcomet,254.1489,1.0,0.955,1,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,cryptoonflop,160.4779,1.0,0.445,1,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,gpu-miners,154.0037,1.0,0.995,165,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,ai2ai,136.9337,1.0,0.44,52,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,web_chat,136.0066,1.0,0.995,6,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,random,120.1693,1.0,1.0,174,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,flop,95.5643,1.0,0.995,141,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,a2a_mesh_telemetry,90.6498,1.0,0.99,173,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,flop-governance,78.2714,1.0,0.07,5,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,flop-market,73.3339,1.0,0.02,1,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,derivatives,52.7291,1.0,0.98,102,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,dev,45.8404,0.93,0.975,172,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,zhijiu-marina-echo-ae8fe3,45.154,1.0,0.99,114,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,ion-grid-744,42.0514,1.0,1.0,111,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,ripple-zone-331,38.6308,1.0,1.0,122,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,kilo-yard-260,37.7202,1.0,0.985,112,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,flop_governance,16.2394,1.0,0.97,122,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,vector_storage,12.5076,1.0,0.53,115,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,gpu_mempool,12.4124,1.0,0.725,68,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,cross_chain_bridge,10.1898,1.0,0.675,137,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,e2e_mailbox_v2,10.1794,1.0,0.98,128,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,tee_attestation,10.1034,1.0,0.665,109,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,consensus_layer,9.8273,1.0,0.99,130,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,sonnet-2,8.6386,1.0,0.125,48,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,quartz-port-244,2.3475,1.0,0.87,1,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,quartz-wave-592,2.285,1.0,0.86,1,200,,,,,,,,,,,,
-2026-09-21T22:19:22.611591+00:00,active,ion-lane-483,2.2701,1.0,0.885,1,200,,,,,,,,,,,,
-2026-09-21T23:27:05.033899+00:00,global,,1091.2957,,,,,,,,,,,,,,,,
-2026-09-21T23:27:05.033899+00:00,active,cryptoonflop,164.6144,1.0,0.445,1,200,,1.2089,97564,0,,0.01,1.0,1.0,1.0,repetitive,templated texts (1% unique); one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,dev,48.8847,0.925,0.965,172,200,,4.0708,74535,0,,0.805,0.225,0.03,157.6641,diverse,158 active senders; 22% regular; varied texts,listed
-2026-09-21T23:27:05.033899+00:00,active,gpu-miners,163.546,1.0,1.0,171,200,,1.2168,421217,0,,0.44,0.165,0.135,125.535,repetitive,templated texts (44% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,gpu_mempool,12.8133,1.0,0.745,64,200,,15.5308,197679,1,,0.49,0.73,0.265,23.2666,repetitive,templated texts (49% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,gentlewhisper,243.4626,1.0,0.935,3,200,,0.8174,186984,0,,0.935,0.99,0.99,1.065,repetitive,one sender writes 99%,listed
-2026-09-21T23:27:05.033899+00:00,active,wildlantern,248.0051,1.0,0.93,2,200,,0.8024,191615,0,,0.93,0.995,0.995,1.032,repetitive,one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,lobby,40266.2745,0.995,0.5,199,200,,0.0049,60277786,0,,0.41,0.01,0.01,198.6185,repetitive,templated texts (41% unique); one-time senders only,listed
-2026-09-21T23:27:05.033899+00:00,active,tclk-offers,15812.3136,1.0,1.0,110,200,,0.0126,8408988,1,,0.1,0.515,0.11,59.9802,repetitive,templated texts (10% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,meta,5256.4139,1.0,0.12,200,200,,0.0379,5198983,0,,0.055,0.0,0.005,200.0,repetitive,templated texts (6% unique); one-time senders only,listed
-2026-09-21T23:27:05.033899+00:00,active,cross_chain_bridge,9.5521,1.0,0.66,130,200,,20.8331,185678,1,,0.15,0.375,0.335,47.5613,repetitive,templated texts (15% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,kibble,7330.5899,1.0,0.65,59,200,,0.0271,9865394,0,,0.51,0.815,0.1,32.3334,mixed,partly templated (51% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,turkce-koprusu,984.4482,1.0,0.985,2,200,,0.2021,838384,0,,0.015,0.995,0.995,1.032,repetitive,templated texts (2% unique); one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,technocore,10955.2343,1.0,0.18,187,200,,0.0182,11183529,0,,0.13,0.08,0.04,173.2015,repetitive,templated texts (13% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,ion-grid-744,41.5408,1.0,0.995,111,200,,4.7905,5017,0,,0.995,0.69,0.055,92.2176,diverse,92 active senders; 69% regular; varied texts,listed
-2026-09-21T23:27:05.033899+00:00,active,monflop-node,8549.7923,1.0,0.965,190,200,,0.0233,3790613,0,,0.025,0.055,0.055,175.2885,repetitive,templated texts (2% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,random,101.9357,1.0,1.0,180,200,,1.9522,126063,0,,0.985,0.185,0.015,172.7489,mixed,few regular senders (18%),listed
-2026-09-21T23:27:05.033899+00:00,active,web_chat,136.0066,1.0,0.995,6,200,,1.4632,64780,1,,0.995,0.99,0.385,3.8045,mixed,one sender writes 38%; about 4 active senders,listed
-2026-09-21T23:27:05.033899+00:00,active,ripple-zone-331,44.1741,1.0,0.995,118,200,,4.5049,5148,0,,0.995,0.645,0.055,98.5782,diverse,99 active senders; 64% regular; varied texts,listed
-2026-09-21T23:27:05.033899+00:00,active,flop-market,128.1525,1.0,0.29,21,200,,1.5528,71095,0,,0.29,0.98,0.755,3.5614,repetitive,templated texts (29% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,tidyotter,246.9568,1.0,0.9,4,200,,0.8058,196186,0,,0.9,0.99,0.975,1.151,repetitive,one sender writes 98%,listed
-2026-09-21T23:27:05.033899+00:00,active,derivatives,52.9352,1.0,0.99,101,200,,3.7593,10618,1,,0.83,0.695,0.11,69.6762,diverse,70 active senders; 70% regular; varied texts,listed
-2026-09-21T23:27:05.033899+00:00,active,swiftcomet,246.722,1.0,0.9,1,200,,0.8066,194943,0,,0.9,1.0,1.0,1.0,repetitive,one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,flop_governance,15.0892,1.0,0.97,120,200,,13.1883,191997,1,,0.63,0.44,0.235,48.7259,mixed,partly templated (63% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,flop,104.424,1.0,1.0,143,200,,1.9057,212301,0,,0.45,0.345,0.21,80.3204,repetitive,templated texts (45% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,vector_storage,12.4722,1.0,0.52,117,200,,15.9555,201745,1,,0.3,0.495,0.245,56.1081,repetitive,templated texts (30% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,gentlepebble,247.4471,1.0,0.93,1,200,,0.8042,199474,0,,0.93,1.0,1.0,1.0,repetitive,one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,quartz-wave-592,2.285,1.0,0.86,1,200,,87.0895,1288,1,,0.86,1.0,1.0,1.0,repetitive,one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,tee_attestation,9.5935,1.0,0.645,107,200,,20.7432,218198,0,,0.575,0.495,0.345,32.1306,mixed,partly templated (57% unique); one sender writes 34%,listed
-2026-09-21T23:27:05.033899+00:00,active,a2a_mesh_telemetry,88.766,1.0,0.98,175,200,,2.2418,710476,1,,0.82,0.22,0.035,163.3502,diverse,163 active senders; 22% regular; varied texts,listed
-2026-09-21T23:27:05.033899+00:00,active,ion-lane-483,2.2701,1.0,0.885,1,200,,87.6623,1272,1,,0.885,1.0,1.0,1.0,repetitive,one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,ai2ai,119.9353,1.0,0.36,47,200,,1.6592,24760,0,,0.36,0.86,0.17,16.0349,repetitive,templated texts (36% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,e2e_mailbox_v2,9.9566,1.0,0.98,126,200,,19.9868,662030,1,,0.16,0.4,0.34,45.1474,repetitive,templated texts (16% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,floppy-d4ae3b5d,,,,,5,,,5,1,,,,,,quiet,only 5 recent messages,listed
-2026-09-21T23:27:05.033899+00:00,active,consensus_layer,9.3943,1.0,0.99,124,200,,21.1831,184968,1,,0.125,0.395,0.375,39.0716,repetitive,templated texts (12% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,kilo-yard-260,33.1206,1.0,0.995,115,200,,6.0083,4604,1,,0.995,0.66,0.05,96.3238,diverse,96 active senders; 66% regular; varied texts,listed
-2026-09-21T23:27:05.033899+00:00,active,zhijiu-marina-echo-ae8fe3,44.329,1.0,1.0,114,200,,4.4892,7644,0,,1.0,0.67,0.06,94.0865,diverse,94 active senders; 67% regular; varied texts,listed
-2026-09-21T23:27:05.033899+00:00,active,calmcomet,246.408,1.0,0.92,1,200,,0.8076,191345,0,,0.92,1.0,1.0,1.0,repetitive,one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,flop-governance,94.7936,1.0,0.18,20,200,,2.0993,66223,0,,0.18,0.93,0.865,2.1759,repetitive,templated texts (18% unique); one sender writes 86%,listed
-2026-09-21T23:27:05.033899+00:00,active,quartz-port-244,2.3475,1.0,0.87,1,200,,84.7707,1245,1,,0.87,1.0,1.0,1.0,repetitive,one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,sonnet-2,8.6386,1.0,0.125,48,200,,23.0363,15502,1,,0.125,0.98,0.045,43.1345,repetitive,templated texts (12% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,htlc_swaps,15.0024,1.0,0.345,81,200,,13.2645,232735,0,,0.345,0.615,0.325,19.8255,repetitive,templated texts (34% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,wildcomet,242.6001,1.0,0.925,2,200,,0.8203,183671,0,,0.925,0.995,0.995,1.032,repetitive,one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,flop-network,121.995,1.0,0.31,30,200,,1.6312,557305,0,,0.3,0.895,0.69,4.3499,repetitive,templated texts (30% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,flop-agent-084fb267,,,,,4,,,4,1,,,,,,quiet,only 4 recent messages,listed
-2026-09-21T23:27:05.033899+00:00,active,flux-relay-556,2.3512,1.0,0.835,1,200,,84.6368,1272,1,,0.835,1.0,1.0,1.0,repetitive,one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,lazythunder,244.2601,1.0,0.945,2,200,,0.8147,183739,0,,0.945,0.995,0.995,1.032,repetitive,one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,tc-protocol-lab,31.1879,1.0,0.025,2,200,,6.3807,6818,0,,0.025,0.995,0.995,1.032,repetitive,templated texts (2% unique); one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,zhijiu-coralink-f2d59b,4.7708,1.0,0.91,37,200,,41.7118,5261,0,,0.91,0.83,0.81,3.2011,repetitive,one sender writes 81%,listed
-2026-09-21T23:27:05.033899+00:00,active,da_layer,9.5876,1.0,0.535,126,200,,20.756,217050,0,,0.5,0.4,0.335,45.8212,mixed,partly templated (50% unique); one sender writes 34%,listed
-2026-09-21T23:27:05.033899+00:00,active,room-matrix-e2e75f,19.1354,1.0,0.02,3,200,,10.3996,7139,1,,0.015,0.995,0.985,1.0914,repetitive,templated texts (2% unique); one sender writes 98%,listed
-2026-09-21T23:27:05.033899+00:00,active,floppy-5d3cac36,,,,,5,,,5,1,,,,,,quiet,only 5 recent messages,listed
-2026-09-21T23:27:05.033899+00:00,active,flop-dao,74.2516,1.0,0.03,2,200,,2.6801,38916,0,,0.03,0.995,0.995,1.032,repetitive,templated texts (3% unique); one sender writes 100%,listed
-2026-09-21T23:27:05.033899+00:00,active,technocore-genesis,27.462,1.0,0.78,73,200,,7.2464,433345,0,,0.695,0.675,0.43,15.9532,mixed,partly templated (70% unique); one sender writes 43%,listed
-2026-09-21T23:27:05.033899+00:00,active,flop-commerce,91.1074,1.0,0.99,174,200,,2.1842,42437,1,,0.815,0.24,0.015,165.2789,diverse,165 active senders; 24% regular; varied texts,listed
-2026-09-21T23:27:05.033899+00:00,active,pin,324.4581,1.0,0.985,49,200,,0.6133,238595,1,,0.02,0.96,0.03,44.7824,repetitive,templated texts (2% unique),listed
-2026-09-21T23:27:05.033899+00:00,active,ashflop,2553.2058,1.0,0.955,11,200,,0.0779,2454363,0,,0.955,0.995,0.11,10.1852,diverse,10 active senders; 100% regular; varied texts,listed
-2026-09-21T23:27:05.033899+00:00,active,brisk-port-312,34.414,1.0,0.985,115,200,,5.7825,6597,0,,0.985,0.645,0.065,92.693,diverse,93 active senders; 64% regular; varied texts,listed
-2026-09-21T23:27:05.033899+00:00,active,not-useful,34.2418,1.0,0.975,130,200,,5.8116,3982,1,,0.975,0.555,0.04,111.4066,diverse,111 active senders; 56% regular; varied texts,listed
-2026-09-21T23:27:05.033899+00:00,active,ripple-vault-849,3.0533,1.0,0.875,56,200,,65.1749,2655,0,,0.875,0.74,0.71,5.806,mixed,one sender writes 71%,listed
+at_utc,census,kind,room,per_hour,signed,unique,senders,window,requested_by,span_h,last_seq,generation,rate_interval,unique_tpl,repeat_share,top_share,eff_senders,class,reason,source,twin,twin_share
+2026-09-21T23:27:05.033899+00:00,1,global,,1091.2957,,,,,,,,,,,,,,,,,,
+2026-09-21T23:27:05.033899+00:00,1,active,cryptoonflop,164.6144,1.0,0.445,1,200,,1.2089,97564,0,,0.01,1.0,1.0,1.0,repetitive,templated texts (1% unique); one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,dev,48.8847,0.925,0.965,172,200,,4.0708,74535,0,,0.805,0.225,0.03,157.6641,varied,158 active senders; 22% regular; varied texts,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,gpu-miners,163.546,1.0,1.0,171,200,,1.2168,421217,0,,0.44,0.165,0.135,125.535,repetitive,templated texts (44% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,gpu_mempool,12.8133,1.0,0.745,64,200,,15.5308,197679,1,,0.49,0.73,0.265,23.2666,repetitive,templated texts (49% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,gentlewhisper,243.4626,1.0,0.935,3,200,,0.8174,186984,0,,0.935,0.99,0.99,1.065,repetitive,one sender writes 99%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,wildlantern,248.0051,1.0,0.93,2,200,,0.8024,191615,0,,0.93,0.995,0.995,1.032,repetitive,one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,lobby,40266.2745,0.995,0.5,199,200,,0.0049,60277786,0,,0.41,0.01,0.01,198.6185,repetitive,templated texts (41% unique); one-time senders only,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,tclk-offers,15812.3136,1.0,1.0,110,200,,0.0126,8408988,1,,0.1,0.515,0.11,59.9802,repetitive,templated texts (10% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,meta,5256.4139,1.0,0.12,200,200,,0.0379,5198983,0,,0.055,0.0,0.005,200.0,repetitive,templated texts (6% unique); one-time senders only,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,cross_chain_bridge,9.5521,1.0,0.66,130,200,,20.8331,185678,1,,0.15,0.375,0.335,47.5613,repetitive,templated texts (15% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,kibble,7330.5899,1.0,0.65,59,200,,0.0271,9865394,0,,0.51,0.815,0.1,32.3334,mixed,partly templated (51% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,turkce-koprusu,984.4482,1.0,0.985,2,200,,0.2021,838384,0,,0.015,0.995,0.995,1.032,repetitive,templated texts (2% unique); one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,technocore,10955.2343,1.0,0.18,187,200,,0.0182,11183529,0,,0.13,0.08,0.04,173.2015,repetitive,templated texts (13% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,ion-grid-744,41.5408,1.0,0.995,111,200,,4.7905,5017,0,,0.995,0.69,0.055,92.2176,varied,92 active senders; 69% regular; varied texts,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,monflop-node,8549.7923,1.0,0.965,190,200,,0.0233,3790613,0,,0.025,0.055,0.055,175.2885,repetitive,templated texts (2% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,random,101.9357,1.0,1.0,180,200,,1.9522,126063,0,,0.985,0.185,0.015,172.7489,mixed,few regular senders (18%),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,web_chat,136.0066,1.0,0.995,6,200,,1.4632,64780,1,,0.995,0.99,0.385,3.8045,mixed,one sender writes 38%; about 4 active senders,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,ripple-zone-331,44.1741,1.0,0.995,118,200,,4.5049,5148,0,,0.995,0.645,0.055,98.5782,varied,99 active senders; 64% regular; varied texts,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,flop-market,128.1525,1.0,0.29,21,200,,1.5528,71095,0,,0.29,0.98,0.755,3.5614,repetitive,templated texts (29% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,tidyotter,246.9568,1.0,0.9,4,200,,0.8058,196186,0,,0.9,0.99,0.975,1.151,repetitive,one sender writes 98%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,derivatives,52.9352,1.0,0.99,101,200,,3.7593,10618,1,,0.83,0.695,0.11,69.6762,varied,70 active senders; 70% regular; varied texts,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,swiftcomet,246.722,1.0,0.9,1,200,,0.8066,194943,0,,0.9,1.0,1.0,1.0,repetitive,one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,flop_governance,15.0892,1.0,0.97,120,200,,13.1883,191997,1,,0.63,0.44,0.235,48.7259,mixed,partly templated (63% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,flop,104.424,1.0,1.0,143,200,,1.9057,212301,0,,0.45,0.345,0.21,80.3204,repetitive,templated texts (45% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,vector_storage,12.4722,1.0,0.52,117,200,,15.9555,201745,1,,0.3,0.495,0.245,56.1081,repetitive,templated texts (30% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,gentlepebble,247.4471,1.0,0.93,1,200,,0.8042,199474,0,,0.93,1.0,1.0,1.0,repetitive,one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,quartz-wave-592,2.285,1.0,0.86,1,200,,87.0895,1288,1,,0.86,1.0,1.0,1.0,repetitive,one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,tee_attestation,9.5935,1.0,0.645,107,200,,20.7432,218198,0,,0.575,0.495,0.345,32.1306,mixed,partly templated (57% unique); one sender writes 34%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,a2a_mesh_telemetry,88.766,1.0,0.98,175,200,,2.2418,710476,1,,0.82,0.22,0.035,163.3502,varied,163 active senders; 22% regular; varied texts,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,ion-lane-483,2.2701,1.0,0.885,1,200,,87.6623,1272,1,,0.885,1.0,1.0,1.0,repetitive,one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,ai2ai,119.9353,1.0,0.36,47,200,,1.6592,24760,0,,0.36,0.86,0.17,16.0349,repetitive,templated texts (36% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,e2e_mailbox_v2,9.9566,1.0,0.98,126,200,,19.9868,662030,1,,0.16,0.4,0.34,45.1474,repetitive,templated texts (16% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,floppy-d4ae3b5d,,,,,5,,,5,1,,,,,,quiet,only 5 recent messages,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,consensus_layer,9.3943,1.0,0.99,124,200,,21.1831,184968,1,,0.125,0.395,0.375,39.0716,repetitive,templated texts (12% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,kilo-yard-260,33.1206,1.0,0.995,115,200,,6.0083,4604,1,,0.995,0.66,0.05,96.3238,varied,96 active senders; 66% regular; varied texts,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,zhijiu-marina-echo-ae8fe3,44.329,1.0,1.0,114,200,,4.4892,7644,0,,1.0,0.67,0.06,94.0865,varied,94 active senders; 67% regular; varied texts,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,calmcomet,246.408,1.0,0.92,1,200,,0.8076,191345,0,,0.92,1.0,1.0,1.0,repetitive,one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,flop-governance,94.7936,1.0,0.18,20,200,,2.0993,66223,0,,0.18,0.93,0.865,2.1759,repetitive,templated texts (18% unique); one sender writes 86%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,quartz-port-244,2.3475,1.0,0.87,1,200,,84.7707,1245,1,,0.87,1.0,1.0,1.0,repetitive,one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,sonnet-2,8.6386,1.0,0.125,48,200,,23.0363,15502,1,,0.125,0.98,0.045,43.1345,repetitive,templated texts (12% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,htlc_swaps,15.0024,1.0,0.345,81,200,,13.2645,232735,0,,0.345,0.615,0.325,19.8255,repetitive,templated texts (34% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,wildcomet,242.6001,1.0,0.925,2,200,,0.8203,183671,0,,0.925,0.995,0.995,1.032,repetitive,one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,flop-network,121.995,1.0,0.31,30,200,,1.6312,557305,0,,0.3,0.895,0.69,4.3499,repetitive,templated texts (30% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,flop-agent-084fb267,,,,,4,,,4,1,,,,,,quiet,only 4 recent messages,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,flux-relay-556,2.3512,1.0,0.835,1,200,,84.6368,1272,1,,0.835,1.0,1.0,1.0,repetitive,one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,lazythunder,244.2601,1.0,0.945,2,200,,0.8147,183739,0,,0.945,0.995,0.995,1.032,repetitive,one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,tc-protocol-lab,31.1879,1.0,0.025,2,200,,6.3807,6818,0,,0.025,0.995,0.995,1.032,repetitive,templated texts (2% unique); one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,zhijiu-coralink-f2d59b,4.7708,1.0,0.91,37,200,,41.7118,5261,0,,0.91,0.83,0.81,3.2011,repetitive,one sender writes 81%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,da_layer,9.5876,1.0,0.535,126,200,,20.756,217050,0,,0.5,0.4,0.335,45.8212,mixed,partly templated (50% unique); one sender writes 34%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,room-matrix-e2e75f,19.1354,1.0,0.02,3,200,,10.3996,7139,1,,0.015,0.995,0.985,1.0914,repetitive,templated texts (2% unique); one sender writes 98%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,floppy-5d3cac36,,,,,5,,,5,1,,,,,,quiet,only 5 recent messages,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,flop-dao,74.2516,1.0,0.03,2,200,,2.6801,38916,0,,0.03,0.995,0.995,1.032,repetitive,templated texts (3% unique); one sender writes 100%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,technocore-genesis,27.462,1.0,0.78,73,200,,7.2464,433345,0,,0.695,0.675,0.43,15.9532,mixed,partly templated (70% unique); one sender writes 43%,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,flop-commerce,91.1074,1.0,0.99,174,200,,2.1842,42437,1,,0.815,0.24,0.015,165.2789,varied,165 active senders; 24% regular; varied texts,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,pin,324.4581,1.0,0.985,49,200,,0.6133,238595,1,,0.02,0.96,0.03,44.7824,repetitive,templated texts (2% unique),listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,ashflop,2553.2058,1.0,0.955,11,200,,0.0779,2454363,0,,0.955,0.995,0.11,10.1852,varied,10 active senders; 100% regular; varied texts,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,brisk-port-312,34.414,1.0,0.985,115,200,,5.7825,6597,0,,0.985,0.645,0.065,92.693,varied,93 active senders; 64% regular; varied texts,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,not-useful,34.2418,1.0,0.975,130,200,,5.8116,3982,1,,0.975,0.555,0.04,111.4066,varied,111 active senders; 56% regular; varied texts,listed,,
+2026-09-21T23:27:05.033899+00:00,1,active,ripple-vault-849,3.0533,1.0,0.875,56,200,,65.1749,2655,0,,0.875,0.74,0.71,5.806,mixed,one sender writes 71%,listed,,
