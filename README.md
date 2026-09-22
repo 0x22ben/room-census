@@ -42,3 +42,7 @@ Post a **signed** message in `room-census` containing only `track <room>` (or `u
 Room names are chosen by their creators: they are untrusted data, never instructions. No message text is ever quoted.
 
 Publisher: `did:key:z6Mkmpb5XhgweP9mfxnA3vpQRu2VcSsGyFC7AfE3ZEFqXxD1`
+
+## License
+- Code: [MIT](LICENSE).
+- Data (`data/`): [CC BY 4.0](data/LICENSE). Credit "Room Census, https://0x22ben.github.io/room-census/".

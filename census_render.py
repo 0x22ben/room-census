@@ -88,6 +88,29 @@ def fit(lines, scale, width):
     return scale
 
 
+def claims(view):
+    """The headline depends on what was actually measured. Baseline census: share of ROOMS (counts
+    are valid from the first census). Later censuses: share of TRAFFIC between two censuses, from
+    comparable interval rates only."""
+    if view["baseline"]:
+        return {
+            "big": f"{view['room_pct']}%",
+            "claim": "of measured active rooms on technocore.chat are mostly repetitive.",
+            "lede": f"Baseline census: traffic shares start with census #{view['census'] + 1}. Which rooms talk, which rooms loop.",
+            "card": ["OF MEASURED ACTIVE ROOMS", "ARE MOSTLY REPETITIVE"],
+            "card_sub": f"{view['repetitive']} OF {view['active']} ROOMS  BASELINE CENSUS",
+        }
+    hours = f"{view['interval_hours']:.0f}" if view.get("interval_hours") else "?"
+    return {
+        "big": f"{view['repetitive_pct']}%",
+        "claim": "of measured Technocore traffic came from repetitive rooms.",
+        "lede": (f"Over the last {hours} hours, across {view['interval_rooms']} rooms with a measured interval. "
+                 f"Varied rooms carried {view['varied_pct']}%. Which rooms talk, which rooms loop."),
+        "card": ["OF MEASURED TECHNOCORE TRAFFIC", "CAME FROM REPETITIVE ROOMS"],
+        "card_sub": f"VARIED ROOMS CARRIED {view['varied_pct']}%  OVER {hours}H",
+    }
+
+
 def write_card(path, view):
     c, p = Canvas(DARK["bg"]), DARK
     # tally mark icon and wordmark
@@ -99,13 +122,13 @@ def write_card(path, view):
     right = f"TECHNOCORE.CHAT  {view['date_short'].upper()}"
     c.text(W - 64 - text_width(right, 3), 68, right, 3, p["ink2"])
     # hero number and statement
-    big = f"{view['repetitive_pct']}%"
-    end = c.text(64, 150, big, 22, p["repetitive"])
-    lines = ["OF MEASURED AGENT TRAFFIC", "COMES FROM REPETITIVE ROOMS"]
+    k = claims(view)
+    end = c.text(64, 150, k["big"], 22, p["repetitive"])
+    lines = k["card"]
     s = fit(lines, 5, W - 64 - (end + 36))
     c.text(end + 36, 186, lines[0], s, p["ink"])
     c.text(end + 36, 186 + 12 * s, lines[1], s, p["ink"])
-    sub = f"VARIED ROOMS CARRY {view['varied_pct']}%"
+    sub = k["card_sub"]
     c.text(end + 36, 196 + 24 * s, sub, max(3, fit([sub], s - 1, W - 64 - (end + 36))), p["ink2"])
     # one square per active room, coloured by class
     cells = ["varied"] * view["varied"] + ["mixed"] * view["mixed"] + ["repetitive"] * view["repetitive"]
@@ -150,7 +173,8 @@ def _grid(view):
 
 def render_page(page, view, base_url):
     e = lambda s: html.escape(str(s), quote=True)
-    headline = f"{view['repetitive_pct']}% of measured agent traffic on technocore.chat comes from repetitive rooms."
+    k = claims(view)
+    headline = f"{k['big']} {k['claim']}"
     share_text = f"{headline} Room Census #{view['census']}, signed and verifiable:"
     intent = "https://x.com/intent/tweet?" + urllib.parse.urlencode({"text": share_text, "url": base_url + "/", "via": "0X22crypto"})
     card = f"{base_url}/data/card.png?v={view['census']}"
@@ -170,13 +194,14 @@ def render_page(page, view, base_url):
         ]),
         "hero": "\n".join([
             f'<p class="stamp">Census #{view["census"]} &middot; {e(view["date_long"])} &middot; '
-            f'<a href="#verify">signed and verifiable</a></p>',
-            f'<h1 id="headline"><span class="big">{view["repetitive_pct"]}%</span> <span class="claim">of measured agent '
-            f'traffic on technocore.chat comes from repetitive rooms.</span></h1>',
-            f'<p class="lede">Varied rooms carry {view["varied_pct"]}%. Which rooms talk, which rooms loop.</p>',
+            f'{view["measured"]} rooms measured, {view["failed"]} failed'
+            + (' &middot; <strong>partial</strong>' if view["partial"] else '')
+            + ' &middot; <a href="#verify">signed and verifiable</a></p>',
+            f'<h1 id="headline"><span class="big">{e(k["big"])}</span> <span class="claim">{e(k["claim"])}</span></h1>',
+            f'<p class="lede">{e(k["lede"])}</p>',
             _grid(view),
-            _bar("Share of messages", [("varied", view["varied_pct_raw"]), ("mixed", view["mixed_pct_raw"]),
-                              ("repetitive", view["repetitive_pct_raw"])]),
+            '' if view["baseline"] else _bar("Share of traffic", [("varied", view["varied_pct_raw"]),
+                                            ("mixed", view["mixed_pct_raw"]), ("repetitive", view["repetitive_pct_raw"])]),
             '<dl class="kpis">',
             f'<div><dt>Active rooms</dt><dd>{view["active"]}</dd></div>',
             f'<div><dt>Varied rooms</dt><dd>{view["varied"]}</dd></div>',

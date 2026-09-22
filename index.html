@@ -23,7 +23,7 @@
 <meta name="twitter:image:alt" content="89% of measured agent traffic on technocore.chat comes from repetitive rooms. 11 varied, 8 mixed, 37 repetitive rooms out of 56.">
 <!--/census:head-->
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"Dataset","name":"Room Census","description":"A signed, twice-weekly census of public rooms on technocore.chat: message rates, text uniqueness, sender diversity and a published classification (varied, mixed, repetitive).","url":"https://0x22ben.github.io/room-census/","license":"https://github.com/0x22ben/room-census","isAccessibleForFree":true,"creator":{"@type":"Organization","name":"Room Census","url":"https://github.com/0x22ben/room-census"},"distribution":[{"@type":"DataDownload","encodingFormat":"application/json","contentUrl":"https://0x22ben.github.io/room-census/data/latest.json"},{"@type":"DataDownload","encodingFormat":"text/csv","contentUrl":"https://0x22ben.github.io/room-census/data/history.csv"}]}
+{"@context":"https://schema.org","@type":"Dataset","name":"Room Census","description":"A signed, twice-weekly census of public rooms on technocore.chat: message rates, text uniqueness, sender diversity and a published classification (varied, mixed, repetitive).","url":"https://0x22ben.github.io/room-census/","license":"https://creativecommons.org/licenses/by/4.0/","isAccessibleForFree":true,"creator":{"@type":"Organization","name":"Room Census","url":"https://github.com/0x22ben/room-census"},"distribution":[{"@type":"DataDownload","encodingFormat":"application/json","contentUrl":"https://0x22ben.github.io/room-census/data/latest.json"},{"@type":"DataDownload","encodingFormat":"text/csv","contentUrl":"https://0x22ben.github.io/room-census/data/history.csv"}]}
 </script>
 <style>
 :root {
@@ -295,11 +295,12 @@ footer p { color: var(--muted); font-size: 13px; padding: 16px 0 32px; margin: 0
     <p><b>Varied</b>: unique texts at least 80%, regular senders at least 20%, top sender at most 30%, at least 5 effective senders.
       <b>Repetitive</b>: unique texts under 50%, or top sender at least 80%, or regular senders under 5%.
       <b>Mixed</b>: everything else. <b>Quiet</b>: fewer than 30 messages in the latest window.</p>
+    <p><b>Headline numbers.</b> Room counts use every classified room. Traffic shares use only rooms whose rate was measured between two censuses, so window estimates are never mixed in; the first census is therefore a baseline with no traffic share. Every census shows how many rooms were measured and how many failed, and is marked partial when more than 10% of the attempted rooms could not be read.</p>
     <p><b>Limits.</b> These are measurements, not judgements about a room or its owners. did:key identities are free and texts can be varied, so every metric can be gamed: a script shared by many bots can look varied. Unique text does not mean human. Room names are chosen by their creators and shown as plain text; they prove no affiliation. Room Census is a community project, not affiliated with Flop Labs. Thresholds will be reviewed after 6 censuses.</p>
   </section>
 </main>
 
-<footer><div class="wrap"><p>A new census every Monday and Thursday, at a random time between 08:00 and 18:00 UTC. No message text is ever quoted. Updates on X: <a href="https://x.com/0X22crypto" rel="noopener">@0X22crypto</a>.</p></div></footer>
+<footer><div class="wrap"><p>A new census every Monday and Thursday, at a random time between 08:00 and 18:00 UTC. No message text is ever quoted. Code under MIT, data under <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener">CC BY 4.0</a>. Updates on X: <a href="https://x.com/0X22crypto" rel="noopener">@0X22crypto</a>.</p></div></footer>
 <script src="app.js"></script>
 </body>
 </html>
