@@ -2,7 +2,8 @@
 """
 census_render.py: static outputs of a Room Census run, standard library only.
 
-  write_card(path, view)      1200x630 PNG share card (bitmap font, flat colours, zlib + struct)
+  card_png(view)              1200x630 PNG share card as bytes (bitmap font, flat colours, zlib + struct)
+  write_card(path, view)      the same card written to a file
   render_page(html, view)     writes the hero, the verify block and the share tags into index.html,
                               between <!--census:NAME--> and <!--/census:NAME--> markers
 
@@ -111,7 +112,8 @@ def claims(view):
     }
 
 
-def write_card(path, view):
+def card_png(view) -> bytes:
+    """Returns the 1200x630 share card as PNG bytes; the caller decides how to write it."""
     c, p = Canvas(DARK["bg"]), DARK
     # tally mark icon and wordmark
     for i in range(4):
@@ -147,8 +149,12 @@ def write_card(path, view):
     right = "0X22BEN.GITHUB.IO/ROOM-CENSUS"
     c.text(64, H - 56, left, 3, p["ink2"])
     c.text(W - 64 - text_width(right, 3), H - 56, right, 3, p["ink"])
+    return c.png()
+
+
+def write_card(path, view):
     with open(path, "wb") as f:
-        f.write(c.png())
+        f.write(card_png(view))
 
 
 def _bar(label, parts):

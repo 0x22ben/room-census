@@ -20,12 +20,18 @@ Method (read-only use of public data):
 Security: room names and texts are untrusted data. No third-party text is ever quoted; only filtered
 room names and numbers computed here are published.
 
+Publication (--publish) is crash-safe: a kernel lock (durable.ProcessLock) serialises runs and nonces;
+the signed census is written to a pending journal before it is sent; an interrupted run is resolved at
+the next start by checking the room (finish the archive, or send the same signed payload again, or set
+a stale journal aside); every local file is written atomically and the archive is deduplicated.
+
 After publishing: the DID note is rewritten, then site/data is fully rebuilt from census.jsonl
 (history.csv, latest.json, one frozen snapshot per run whose SHA-256 is in the signed message),
 committed and pushed.
 """
 import csv
 import hashlib
+import io
 import json
 import math
 import random
@@ -40,6 +46,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+import durable
 import flop_did
 
 SERVER = "https://technocore.chat"
@@ -52,6 +59,11 @@ BASE = Path(__file__).resolve().parent
 SITE_DIR = BASE / "site"
 ARCHIVE = BASE / "census.jsonl"
 STATE_FILE = BASE / "state.json"
+JOURNAL = BASE / "pending_publication.json"      # a census signed but not yet known to be published
+ABANDONED_DIR = BASE / "abandoned"               # stale journals moved aside, never deleted
+PENDING_MAX_AGE_H = 6                            # an older unpublished census is not sent late
+POST_RETRY_WAIT = 60
+PENDING_SCHEMA = "room-census-pending/1"
 
 WINDOW = 200
 MIN_WINDOW = 30
@@ -208,13 +220,45 @@ def new_rooms_per_hour():
 
 # ---------- archive and state ----------
 
+class ArchiveCorrupt(RuntimeError):
+    """census.jsonl contains a line that is not a JSON object. Nothing reads past it and nothing
+    rewrites the file: an operator must inspect it, so no archived census can be lost silently."""
+
+
+def read_archive_lines():
+    """Every archived record, pilot run included, in file order. Raises ArchiveCorrupt on any line
+    that is not a JSON object, so the archive is never rewritten from a partial reading."""
+    if not ARCHIVE.exists():
+        return []
+    records = []
+    for n, line in enumerate(ARCHIVE.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            raise ArchiveCorrupt(f"census.jsonl line {n} is not valid JSON; the archive was left untouched") from None
+        if not isinstance(record, dict):
+            raise ArchiveCorrupt(f"census.jsonl line {n} is not a JSON object; the archive was left untouched")
+        records.append(record)
+    return records
+
+
 def read_archive():
     """Public censuses only: the pilot run (older method, no schema) stays in the archive but is never
     published or compared against. Records are returned untouched so snapshots keep their signed hash."""
-    if not ARCHIVE.exists():
-        return []
-    records = [json.loads(l) for l in ARCHIVE.read_text(encoding="utf-8").splitlines() if l.strip()]
-    return [r for r in records if r.get("schema")]
+    return [r for r in read_archive_lines() if r.get("schema")]
+
+
+def archive_append(record) -> bool:
+    """Adds `record` to the archive once. The whole file is rewritten atomically, so a crash leaves
+    either the previous archive or the new one. Returns False when the census is already archived."""
+    records = read_archive_lines()
+    if any(r.get("sha256") == record["sha256"] for r in records):
+        return False
+    lines = [json.dumps(r, ensure_ascii=False) for r in records + [record]]
+    durable.atomic_write(ARCHIVE, "\n".join(lines) + "\n")
+    return True
 
 
 def norm_class(c):
@@ -529,15 +573,16 @@ def write_data_files(records, own_did):
     import census_render
     data = SITE_DIR / "data"
     (data / "snapshots").mkdir(parents=True, exist_ok=True)
-    with (data / "history.csv").open("w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=CSV_FIELDS, extrasaction="ignore", lineterminator="\n")
-        w.writeheader()
-        for i, rec in enumerate(records, 1):
-            w.writerow({"at_utc": rec["at_utc"], "census": i, "kind": "global", "per_hour": rnd(rec.get("new_rooms_per_hour"))})
-            for r in public_rooms(rec):
-                w.writerow({"at_utc": rec["at_utc"], "census": i, "kind": "active", **r})
+    out = io.StringIO()
+    w = csv.DictWriter(out, fieldnames=CSV_FIELDS, extrasaction="ignore", lineterminator="\n")
+    w.writeheader()
+    for i, rec in enumerate(records, 1):
+        w.writerow({"at_utc": rec["at_utc"], "census": i, "kind": "global", "per_hour": rnd(rec.get("new_rooms_per_hour"))})
+        for r in public_rooms(rec):
+            w.writerow({"at_utc": rec["at_utc"], "census": i, "kind": "active", **r})
+    durable.atomic_write(data / "history.csv", out.getvalue(), mode=0o644)
     for rec in records:
-        (SITE_DIR / rec.get("snapshot", snapshot_path(rec))).write_bytes(snapshot_bytes(rec))
+        durable.atomic_write(SITE_DIR / rec.get("snapshot", snapshot_path(rec)), snapshot_bytes(rec), mode=0o644)
     last, number = records[-1], len(records)
     latest = {
         "schema": SCHEMA,
@@ -559,11 +604,11 @@ def write_data_files(records, own_did):
         "global": {"new_rooms_per_hour": rnd(last.get("new_rooms_per_hour"))},
         "rooms": public_rooms(last),
     }
-    (data / "latest.json").write_text(json.dumps(latest, indent=1, ensure_ascii=True) + "\n", encoding="utf-8")
+    durable.atomic_write(data / "latest.json", json.dumps(latest, indent=1, ensure_ascii=True) + "\n", mode=0o644)
     view = public_view(last, number, own_did)
-    census_render.write_card(data / "card.png", view)
+    durable.atomic_write(data / "card.png", census_render.card_png(view), mode=0o644)
     page = SITE_DIR / "index.html"
-    page.write_text(census_render.render_page(page.read_text(encoding="utf-8"), view, DASHBOARD), encoding="utf-8")
+    durable.atomic_write(page, census_render.render_page(page.read_text(encoding="utf-8"), view, DASHBOARD), mode=0o644)
 
 
 def update_site(own_did):
@@ -590,6 +635,245 @@ def update_site(own_did):
             print(f"Site update, attempt {attempt} failed:", e)
 
 
+# ---------- robust publication ----------
+#
+# Every step below runs under durable.ProcessLock (a kernel lock released if the process dies).
+#   1. recover_pending(): finish or safely resolve a census left by an interrupted run;
+#   2. publish_census(): reserve a nonce, sign, write the pending journal atomically, send;
+#   3. finalize(): archive (idempotent), state, proof, and only then remove the journal.
+# A signed payload is sent again only when the room shows it did not land, and always with the same
+# nonce and signature, so Technocore itself refuses a second copy.
+
+class PublishUncertain(RuntimeError):
+    """The census may or may not be published; the journal is kept for the next run to resolve."""
+
+
+def next_state(state):
+    """State to persist once the census is published: every tracked room uses one of its runs."""
+    out = json.loads(json.dumps(state))
+    for t in out["tracked"]:
+        t["pulses_left"] -= 1
+    out["tracked"] = [t for t in out["tracked"] if t["pulses_left"] > 0]
+    return out
+
+
+class RoomCheckFailed(RuntimeError):
+    """What we published in the census room cannot be established; the caller must not guess."""
+
+
+class InvalidJournal(ValueError):
+    """The pending journal does not match the expected schema."""
+
+
+HEX64 = re.compile(r"^[0-9a-f]{64}$")
+SIG_RE = re.compile(r"^[A-Za-z0-9_-]{85}[AQgw]$")
+
+
+def get_text(path: str) -> str:
+    url = f"{SERVER}{path}{'&' if '?' in path else '?'}n={int(time.time() * 1000)}"
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        return resp.read().decode("utf-8")
+
+
+def room_export(room=ROOM):
+    """Every record Technocore still retains for the room (GET /r/<room>/export, raw JSONL), not only
+    the latest page of messages. Raises RoomCheckFailed if it cannot be read or parsed."""
+    try:
+        body = get_text(f"/r/{room}/export")
+    except Exception as e:
+        raise RoomCheckFailed(f"room export unreachable ({type(e).__name__})") from None
+    records = []
+    for n, line in enumerate(body.splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except ValueError:
+            raise RoomCheckFailed(f"room export line {n} is not JSON") from None
+        if not isinstance(record, dict):
+            raise RoomCheckFailed(f"room export line {n} is not an object")
+        records.append(record)
+    return records
+
+
+def publication_status(pending) -> str:
+    """"published" or "absent", from the full retained export. Absence is only asserted when the
+    retained history reaches back to before the census was signed; otherwise RoomCheckFailed."""
+    records = room_export(pending["room"])
+    for r in records:
+        if (r.get("from") == pending["did"] and str(r.get("nonce")) == pending["nonce"]
+                and r.get("sig") == pending["sig"]):
+            return "published"
+    if not records:
+        raise RoomCheckFailed("the room export is empty; absence cannot be proven")
+    try:
+        oldest = min(parse_ts(r["ts"]) for r in records)
+    except (KeyError, TypeError, ValueError):
+        raise RoomCheckFailed("the room export has records without a valid timestamp") from None
+    if oldest > parse_ts(pending["created_utc"]):
+        raise RoomCheckFailed("the retained history starts after this census was signed; absence cannot be proven")
+    return "absent"
+
+
+def landed(pending):
+    """True (published), False (proven absent) or None (cannot be established)."""
+    try:
+        return publication_status(pending) == "published"
+    except RoomCheckFailed as e:
+        print(f"Room check impossible: {e}", flush=True)
+        return None
+
+
+def is_published(pending) -> bool:
+    return landed(pending) is True
+
+
+def highest_seen_nonce(did) -> int:
+    """Highest nonce of ours in the whole retained export: a floor for the next nonce if nonces.json
+    was lost. Raises RoomCheckFailed rather than guessing 0."""
+    nonces = [int(r["nonce"]) for r in room_export(ROOM)
+              if r.get("from") == did and str(r.get("nonce", "")).isdigit()]
+    return max(nonces, default=0)
+
+
+def validate_pending(p):
+    """Explicit schema check of the pending journal (independent of `assert`, so it holds under -O)."""
+    if not isinstance(p, dict):
+        raise InvalidJournal("the journal is not a JSON object")
+    problems = []
+
+    def need(ok, field):
+        if not ok:
+            problems.append(field)
+    need(p.get("schema") == PENDING_SCHEMA, "schema")
+    need(isinstance(p.get("run_id"), str) and bool(HEX64.match(p["run_id"])), "run_id")
+    try:
+        parse_ts(p["created_utc"])
+        need(True, "created_utc")
+    except (KeyError, TypeError, ValueError, AttributeError):
+        need(False, "created_utc")
+    need(p.get("room") == ROOM, "room")
+    need(isinstance(p.get("did"), str) and p["did"].startswith("did:key:z6Mk") and len(p["did"]) == 56, "did")
+    need(isinstance(p.get("nonce"), str) and bool(flop_did.NONCE_RE.match(p["nonce"])), "nonce")
+    need(isinstance(p.get("sig"), str) and bool(SIG_RE.match(p["sig"])), "sig")
+    need(isinstance(p.get("text"), str) and 0 < len(p["text"]) <= 4096 and "\n" not in p["text"], "text")
+    rec = p.get("record")
+    need(isinstance(rec, dict) and rec.get("sha256") == p.get("run_id") and type(rec.get("census")) is int
+         and isinstance(rec.get("rooms"), list), "record")
+    st = p.get("state")
+    need(isinstance(st, dict) and isinstance(st.get("tracked"), list) and type(st.get("last_seq")) is int, "state")
+    need(type(p.get("attempts")) is int and p["attempts"] >= 0, "attempts")
+    if problems:
+        raise InvalidJournal("invalid pending journal: " + ", ".join(problems))
+    return p
+
+
+def write_journal(pending):
+    durable.atomic_write(JOURNAL, json.dumps(pending, ensure_ascii=False, sort_keys=True))
+
+
+def deliver(pending) -> bool:
+    """Sends the signed payload. Returns True once the message is known to be in the room. Never sends
+    a second time without first checking that the first attempt did not land."""
+    for attempt in (1, 2):
+        if attempt > 1:
+            time.sleep(POST_RETRY_WAIT)
+            state = landed(pending)
+            if state is True:
+                return True
+            if state is None:            # absence not proven: never send blindly
+                return False
+        pending["attempts"] = pending.get("attempts", 0) + 1
+        write_journal(pending)
+        try:
+            status, body = flop_did.post_signed(pending["room"], pending["did"], pending["sig"],
+                                                pending["nonce"], pending["text"])
+            pending["http_status"], pending["server_response"] = status, body[:2000]
+            return True
+        except flop_did.PublishRefused as e:
+            # a refusal can mean "already stored" (same nonce): the room is the only authority
+            print(f"Publishing refused ({e}); checking the room", flush=True)
+        except Exception as e:
+            print(f"Publishing outcome unknown ({type(e).__name__}: {e}); checking the room", flush=True)
+        state = landed(pending)
+        if state is True:
+            return True
+        if state is None:
+            return False
+    return False
+
+
+def finalize(pending):
+    """Idempotent: archive the census once, persist the state, record the proof, drop the journal."""
+    record = dict(pending["record"])
+    record["text"] = pending["text"]
+    record["signed_in"] = {"room": pending["room"], "nonce": pending["nonce"]}
+    archive_append(record)
+    durable.atomic_write(STATE_FILE, json.dumps(pending["state"], ensure_ascii=False, indent=1))
+    flop_did.record_proof(pending["room"], pending["did"], pending["sig"], pending["nonce"], pending["text"],
+                          pending.get("http_status"), pending.get("server_response"))
+    JOURNAL.unlink(missing_ok=True)
+    return record
+
+
+def recover_pending():
+    """Resolves a journal left by an interrupted run. Returns "none" (no journal), "recovered" (the
+    pending census is now published and archived), "abandoned" (stale and never published: moved
+    aside) or "unresolved" (keep the journal, publish nothing new)."""
+    if not JOURNAL.exists():
+        return "none"
+    try:
+        pending = validate_pending(json.loads(JOURNAL.read_text(encoding="utf-8")))
+    except ValueError as e:              # JSON errors and InvalidJournal
+        print(f"The pending journal is unusable ({e}); it is kept for inspection and nothing is published", flush=True)
+        return "unresolved"
+    state = landed(pending)
+    if state is None:
+        print("The pending census cannot be checked; the journal is kept", flush=True)
+        return "unresolved"
+    if state:
+        finalize(pending)
+        print(f"Recovered census #{pending['record']['census']}: it was published, archive completed", flush=True)
+        return "recovered"
+    age_h = (time.time() - parse_ts(pending["created_utc"])) / 3600
+    if age_h > PENDING_MAX_AGE_H:
+        ABANDONED_DIR.mkdir(exist_ok=True)
+        target = ABANDONED_DIR / f"{pending['created_utc'][:19].replace(':', '')}.json"
+        JOURNAL.replace(target)
+        print(f"A census signed {age_h:.0f} h ago was never published; moved to {target.name}", flush=True)
+        return "abandoned"
+    if deliver(pending):
+        finalize(pending)
+        print(f"Recovered census #{pending['record']['census']}: sent again with the same nonce", flush=True)
+        return "recovered"
+    return "unresolved"
+
+
+def publish_census(state, record, text, lock):
+    """Journal first, then send, then finalize. Raises PublishUncertain when the outcome is unknown."""
+    if any(r.get("sha256") == record["sha256"] for r in read_archive_lines()):
+        raise RuntimeError("this census is already archived; refusing to publish it twice")
+    did = flop_did.DID_FILE.read_text(encoding="utf-8").strip()
+    nonce = durable.NonceStore(flop_did.NONCE_FILE, lock).reserve(ROOM, floor=highest_seen_nonce(did))
+    did, sig, nonce, _ = flop_did.sign(ROOM, text, nonce=nonce)
+    pending = {"schema": PENDING_SCHEMA, "run_id": record["sha256"], "created_utc": datetime.now(timezone.utc).isoformat(),
+               "room": ROOM, "did": did, "nonce": nonce, "sig": sig, "text": text,
+               "record": record, "state": next_state(state), "attempts": 0}
+    write_journal(validate_pending(pending))
+    if not deliver(pending):
+        raise PublishUncertain(f"census #{record['census']} (nonce {nonce}) may not be published; journal kept")
+    return finalize(pending)
+
+
+def side_steps(own_did):
+    for step in (lambda: refresh_did_note(own_did), lambda: update_site(own_did)):
+        try:
+            step()
+        except Exception as e:
+            print("Side step failed:", e)
+
+
 # ---------- main ----------
 
 def prepare(own_did):
@@ -611,39 +895,41 @@ def main():
         print(f"Random wait: {delay / 3600:.2f} h", flush=True)
         time.sleep(delay)
     own_did = flop_did.DID_FILE.read_text(encoding="utf-8").strip()
-    try:
-        state, record, text = prepare(own_did)
-    except Exception as e:
-        if not publish:
-            raise
-        print("Computation failed, retrying in 10 minutes:", e, flush=True)
-        time.sleep(600)
-        state, record, text = prepare(own_did)
-    print(text)
-    print(f"\n({len(text)} characters, {len(record['rooms'])} rooms)")
     if not publish:
+        state, record, text = prepare(own_did)
+        print(text)
+        print(f"\n({len(text)} characters, {len(record['rooms'])} rooms)")
         _, _, _, url = flop_did.sign(ROOM, text)
         print(f"Signed URL: {len(url)} bytes (limit ~16 KB). Dry run: nothing was sent or stored.")
         return record
     try:
-        proof = flop_did.cmd_say(ROOM, text)
-    except Exception as e:
-        print("Publishing failed, retrying in 60 seconds:", e, flush=True)
-        time.sleep(60)
-        proof = flop_did.cmd_say(ROOM, text)
-    record["text"] = text
-    record["signed_in"] = {"room": ROOM, "nonce": proof["nonce"]}
-    for t in state["tracked"]:
-        t["pulses_left"] -= 1
-    state["tracked"] = [t for t in state["tracked"] if t["pulses_left"] > 0]
-    STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=1), encoding="utf-8")
-    with ARCHIVE.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    for step in (lambda: refresh_did_note(own_did), lambda: update_site(own_did)):
+        lock = durable.ProcessLock(flop_did.LOCK_FILE).acquire()
+    except durable.LockBusy as e:
+        print(f"Another run holds the lock ({e}); nothing done", flush=True)
+        return None
+    with lock:
         try:
-            step()
-        except Exception as e:
-            print("Side step failed:", e)
+            outcome = recover_pending()
+            if outcome == "unresolved":
+                sys.exit(1)
+            if outcome == "recovered":
+                side_steps(own_did)          # the interrupted run never reached them
+                return None                  # one census per run: the recovered one
+            try:
+                state, record, text = prepare(own_did)
+            except ArchiveCorrupt:
+                raise
+            except Exception as e:
+                print("Computation failed, retrying in 10 minutes:", e, flush=True)
+                time.sleep(600)
+                state, record, text = prepare(own_did)
+            print(text)
+            print(f"\n({len(text)} characters, {len(record['rooms'])} rooms)")
+            record = publish_census(state, record, text, lock)
+        except (ArchiveCorrupt, RoomCheckFailed, PublishUncertain) as e:
+            print(f"Stopped without publishing anything new: {e}", flush=True)
+            sys.exit(1)
+        side_steps(own_did)
     return record
 
 

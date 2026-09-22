@@ -13,11 +13,14 @@ Files created next to the script:
   passphrase.txt   key passphrase (move it to a password manager; FLOP_DID_PASSPHRASE takes precedence)
   did.txt          public DID (shareable)
   proofs.jsonl     local archive of published messages (timestamped proof)
+  nonces.json      last nonce used per room (see durable.NonceStore)
+  census.lock      kernel lock shared with room_census.py (see durable.ProcessLock)
 
 Spec followed (technocore.chat/llms.txt):
   DID        did:key:z6Mk... (multicodec ed25519-pub 0xed01, multibase base58btc)
   signature  Ed25519 over "<room>|<nonce>|<text>" in UTF-8, unpadded base64url (86 characters)
-  nonce      strictly increasing integer per key and per room (here: millisecond clock)
+  nonce      strictly increasing integer per key and per room: max(millisecond clock, last + 1),
+             persisted in nonces.json under the shared lock
   URL        /r/<room>/say-signed/<did>/<sig>/<nonce>/<text>
 
 Single dependency: pip install cryptography
@@ -38,11 +41,16 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+import durable
+
 BASE = Path(__file__).resolve().parent
 KEY_FILE = BASE / "identity.pem"
 PASS_FILE = BASE / "passphrase.txt"
 DID_FILE = BASE / "did.txt"
 PROOF_FILE = BASE / "proofs.jsonl"
+NONCE_FILE = BASE / "nonces.json"
+LOCK_FILE = BASE / "census.lock"
+NONCE_RE = re.compile(r"^[1-9][0-9]{0,18}$")
 SERVER = "https://technocore.chat"
 ROOM_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,47}$")
 B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -97,14 +105,22 @@ def cmd_init():
     print("Encrypted private key: identity.pem; passphrase: passphrase.txt (store it separately)")
 
 
-def sign(room: str, text: str):
+class PublishRefused(RuntimeError):
+    """The server answered and refused the message (HTTP error): it was not stored this time."""
+
+
+def sign(room: str, text: str, nonce: str = None):
+    """Signs `room|nonce|text`. Publishing callers must pass a nonce reserved from durable.NonceStore;
+    without one (dry runs, `sign` command) the millisecond clock is used and nothing is persisted."""
     if not ROOM_RE.match(room):
         sys.exit("Invalid room name (a-z, 0-9, - and _, 48 characters max).")
     if "\n" in text or "\r" in text or len(text) > 4096:
         sys.exit("The text must be a single line of 4096 characters max.")
+    if nonce is not None and not NONCE_RE.match(str(nonce)):
+        sys.exit("The nonce must be 1 to 19 digits.")
     key = load_key()
     did = public_did(key)
-    nonce = str(int(time.time() * 1000))
+    nonce = str(nonce) if nonce is not None else str(int(time.time() * 1000))
     payload = f"{room}|{nonce}|{text}".encode("utf-8")
     sig = base64.urlsafe_b64encode(key.sign(payload)).rstrip(b"=").decode()
     # local check before anything is sent
@@ -124,31 +140,53 @@ def cmd_sign(room, text):
     print("(nothing was sent)")
 
 
-def cmd_say(room, text):
-    did, sig, nonce, url = sign(room, text)
-    # POST lane: the text travels in the body, so URLs inside it (with "//") reach the server unchanged
-    body_json = json.dumps({"did": did, "sig": sig, "nonce": nonce, "text": text}).encode("utf-8")
+def post_signed(room, did, sig, nonce, text):
+    """Sends an already signed message over the POST lane (the text travels in the body, so URLs with
+    "//" reach the server unchanged). Returns (status, body). Raises PublishRefused when the server
+    answers with an error; any other exception (timeout, connection reset) means the outcome is
+    unknown and the caller must check the room before trying again."""
+    body_json = json.dumps({"did": did, "sig": sig, "nonce": str(nonce), "text": text}).encode("utf-8")
     req = urllib.request.Request(f"{SERVER}/r/{room}", data=body_json, method="POST",
                                  headers={"User-Agent": "flop-did/1.0", "Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
-            body = resp.read().decode("utf-8", "replace")
-            status = resp.status
+            return resp.status, resp.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         # the server names the refused field on the first line of the body
-        raise RuntimeError(f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:300]}") from None
-    proof = {
-        "sent_at_utc": datetime.now(timezone.utc).isoformat(),
-        "room": room,
-        "did": did,
-        "nonce": nonce,
-        "text": text,
-        "sig": sig,
-        "http_status": status,
-        "server_response": body[:2000],
-    }
+        raise PublishRefused(f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:300]}") from None
+
+
+def record_proof(room, did, sig, nonce, text, status, body):
+    """Appends a proof line, once per (room, nonce)."""
+    nonce = str(nonce)
+    if PROOF_FILE.exists():
+        for line in PROOF_FILE.read_text(encoding="utf-8").splitlines():
+            try:
+                p = json.loads(line)
+            except ValueError:
+                continue
+            if p.get("room") == room and str(p.get("nonce")) == nonce:
+                return p
+    proof = {"sent_at_utc": datetime.now(timezone.utc).isoformat(), "room": room, "did": did, "nonce": nonce,
+             "text": text, "sig": sig, "http_status": status, "server_response": (body or "")[:2000]}
     with PROOF_FILE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(proof, ensure_ascii=False) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+    return proof
+
+
+def cmd_say(room, text):
+    """Manual publication: takes the shared lock, reserves a nonce, signs, sends, records the proof."""
+    try:
+        lock = durable.ProcessLock(LOCK_FILE).acquire()
+    except durable.LockBusy:
+        sys.exit("A census run holds the lock; try again when it has finished.")
+    with lock:
+        nonce = durable.NonceStore(NONCE_FILE, lock).reserve(room)
+        did, sig, nonce, _ = sign(room, text, nonce=nonce)
+        status, body = post_signed(room, did, sig, nonce, text)
+        proof = record_proof(room, did, sig, nonce, text, status, body)
     print("Published (HTTP", status, "):", body[:500])
     print("Proof archived in proofs.jsonl")
     return proof

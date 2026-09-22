@@ -46,10 +46,18 @@ class FakeTechnocore:
         return json.loads(json.dumps(data))
 
 
+def no_network(path):
+    raise AssertionError(f"a test tried to reach the network: {path}")
+
+
 def install(test_case, fake):
-    """Routes room_census network calls to `fake` and removes sleeps, restoring both afterwards."""
-    orig_get, orig_sleep = rc.get_json, rc.time.sleep
+    """Routes room_census network calls to `fake` (get_json, and get_text when the fake provides
+    `text`; otherwise any text request fails the test) and removes sleeps, restoring all afterwards."""
+    originals = (rc.get_json, rc.get_text, rc.time.sleep)
     rc.get_json = fake
+    rc.get_text = getattr(fake, "text", no_network)
     rc.time.sleep = lambda s: None
-    test_case.addCleanup(setattr, rc, "get_json", orig_get)
-    test_case.addCleanup(setattr, rc.time, "sleep", orig_sleep)
+
+    def restore():
+        rc.get_json, rc.get_text, rc.time.sleep = originals
+    test_case.addCleanup(restore)
