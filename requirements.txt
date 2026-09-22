@@ -1,0 +1,2 @@
+# Runtime dependency of flop_did.py (Ed25519 did:key signatures). The rest is the standard library.
+cryptography>=41,<50

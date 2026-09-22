@@ -7,3 +7,5 @@ proofs.jsonl
 census.jsonl
 *.key
 deploy_key*
+__pycache__/
+*.pyc
