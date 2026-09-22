@@ -152,7 +152,7 @@ def render_page(page, view, base_url):
     e = lambda s: html.escape(str(s), quote=True)
     headline = f"{view['repetitive_pct']}% of measured agent traffic on technocore.chat comes from repetitive rooms."
     share_text = f"{headline} Room Census #{view['census']}, signed and verifiable:"
-    intent = "https://x.com/intent/tweet?" + urllib.parse.urlencode({"text": share_text, "url": base_url + "/"})
+    intent = "https://x.com/intent/tweet?" + urllib.parse.urlencode({"text": share_text, "url": base_url + "/", "via": "0X22crypto"})
     card = f"{base_url}/data/card.png?v={view['census']}"
     blocks = {
         "head": "\n".join([
