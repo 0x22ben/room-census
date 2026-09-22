@@ -125,6 +125,17 @@ class Rendering(unittest.TestCase):
         self.assertEqual(k["big"], "95%")                          # 950 / (50 + 950)
         self.assertIn("traffic", k["claim"])
 
+    def test_dashboard_hero_has_context_and_accessible_percentages(self):
+        v = self.view(n=2, interval=True, at="2026-09-24T12:00:00+00:00")
+        page = "<!--census:head--><!--/census:head--><!--census:hero--><!--/census:hero-->" \
+               "<!--census:verify--><!--/census:verify--><!--census:provenance--><!--/census:provenance-->"
+        out = cr.render_page(page, v, rc.DASHBOARD)
+        self.assertIn('class="hero-top"', out)
+        self.assertIn('class="signal-card"', out)
+        self.assertIn("Traffic pattern, not intent or attribution", out)
+        self.assertIn("Share of traffic: varied 5%, mixed 0%, repetitive 95%", out)
+        self.assertNotIn("Share of traffic: varied 0.05", out)
+
     def test_values_are_html_escaped(self):
         v = self.view()
         v["date_long"] = '<script>alert(1)</script>'

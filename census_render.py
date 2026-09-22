@@ -97,7 +97,7 @@ def claims(view):
         return {
             "big": f"{view['room_pct']}%",
             "claim": "of measured active rooms on technocore.chat are mostly repetitive.",
-            "lede": f"Baseline census: traffic shares start with census #{view['census'] + 1}. Which rooms talk, which rooms loop.",
+            "lede": f"Baseline census | traffic shares start at census #{view['census'] + 1}",
             "card": ["OF MEASURED ACTIVE ROOMS", "ARE MOSTLY REPETITIVE"],
             "card_sub": f"{view['repetitive']} OF {view['active']} ROOMS  BASELINE CENSUS",
         }
@@ -105,8 +105,7 @@ def claims(view):
     return {
         "big": f"{view['repetitive_pct']}%",
         "claim": "of measured Technocore traffic came from repetitive rooms.",
-        "lede": (f"Over the last {hours} hours, across {view['interval_rooms']} rooms with a measured interval. "
-                 f"Varied rooms carried {view['varied_pct']}%. Which rooms talk, which rooms loop."),
+        "lede": f"{hours}h interval | {view['interval_rooms']} rooms with measured traffic",
         "card": ["OF MEASURED TECHNOCORE TRAFFIC", "CAME FROM REPETITIVE ROOMS"],
         "card_sub": f"VARIED ROOMS CARRIED {view['varied_pct']}%  OVER {hours}H",
     }
@@ -163,7 +162,7 @@ def _bar(label, parts):
         f'<span class="seg {k}" style="width:{v / total * 100:.2f}%"></span>' for k, v in parts if v > 0)
     return (f'<div class="bar"><span class="bar-label">{html.escape(label)}</span>'
             f'<span class="bar-track" role="img" aria-label="{html.escape(label)}: '
-            + ", ".join(f"{html.escape(k)} {v:g}" for k, v in parts) + f'">{segs}</span></div>')
+            + ", ".join(f"{html.escape(k)} {v / total * 100:.0f}%" for k, v in parts) + f'">{segs}</span></div>')
 
 
 def _grid(view):
@@ -182,11 +181,9 @@ def provenance_block(view):
     manifest existed simply say so, so old pages stay truthful."""
     e = lambda s: html.escape(str(s), quote=True)
     prov = view.get("provenance")
-    lines = [f'<p>Every census is signed by <code class="mono">{e(view["publisher_short"])}</code>, '
-             'the only identity this project publishes with.</p>']
+    lines = [f'<p><code class="mono">{e(view["publisher_short"])}</code></p>']
     if not prov:
-        lines.append('<p class="note">This census was published before deployment manifests; from the next one on, '
-                     'each census names the exact code that produced it.</p>')
+        lines.append('<p class="note">Published before deployment manifests.</p>')
         return "\n".join(lines)
     # links come from the archive; only the two expected shapes are ever turned into an href
     manifest_href = prov["manifest"] if re.fullmatch(r"data/manifests/[0-9a-f]{64}\.json", str(prov["manifest"])) else "#"
@@ -194,17 +191,12 @@ def provenance_block(view):
     prov = {**prov, "manifest": manifest_href, "repository": repo_href}
     name = str(view["provenance"]["manifest"]).split("/")[-1]
     lines += [
-        '<p>The signed message names a deployment manifest: the source commit and the SHA-256 of every '
-        'repository-owned Python file that ran. The manifest file is named after its own SHA-256, so it cannot be swapped silently.</p>',
         f'<dl class="kpis"><div><dt>Source commit</dt><dd><code class="mono">{e(prov["commit"])}</code></dd></div>'
         f'<div><dt>Manifest</dt><dd><a href="{e(prov["manifest"])}"><code class="mono">{e(name)}</code></a></dd></div>'
         '</dl>',
-        '<ol class="note"><li>Check the Ed25519 signature of the census over <code>room|nonce|text</code>.</li>'
-        '<li>Hash the snapshot and compare it with the <code>sha256</code> field of that message.</li>'
-        f'<li>Download the manifest and check that its SHA-256 is its own file name.</li>'
-        f'<li>Compare each digest in it with the same file in '
-        f'<a href="{e(prov["repository"])}" rel="noopener">the repository</a> at the source commit.</li></ol>',
-        f'<p class="note">Machine readable: <a href="identity.json">identity.json</a>.</p>',
+        f'<p class="note"><a href="identity.json">identity.json</a> &middot; '
+        f'<a href="{e(prov["repository"])}" rel="noopener">source</a> &middot; '
+        '<a href="llms.txt">verification steps</a></p>',
     ]
     return "\n".join(lines)
 
@@ -231,33 +223,40 @@ def render_page(page, view, base_url):
             f'{view["repetitive"]} repetitive rooms out of {view["active"]}.">',
         ]),
         "hero": "\n".join([
+            '<div class="hero-top">',
+            '<div class="hero-copy">',
             f'<p class="stamp">Census #{view["census"]} &middot; {e(view["date_long"])} &middot; '
             f'{view["measured"]} rooms measured, {view["failed"]} failed'
             + (' &middot; <strong>partial</strong>' if view["partial"] else '')
             + ' &middot; <a href="#verify">signed and verifiable</a></p>',
             f'<h1 id="headline"><span class="big">{e(k["big"])}</span> <span class="claim">{e(k["claim"])}</span></h1>',
             f'<p class="lede">{e(k["lede"])}</p>',
+            '<p class="actions"><a class="btn primary" href="#rooms">Explore rooms</a>'
+            '<a class="btn" href="#trust">Verify</a>'
+            f'<a class="btn" href="{e(intent)}" target="_blank" rel="noopener">Share</a></p>',
+            '</div>',
+            '<aside class="signal-card" aria-labelledby="composition-title">',
+            '<p class="eyebrow" id="composition-title">Network composition</p>',
             _grid(view),
             '' if view["baseline"] else _bar("Share of traffic", [("varied", view["varied_pct_raw"]),
-                                            ("mixed", view["mixed_pct_raw"]), ("repetitive", view["repetitive_pct_raw"])]),
+                                             ("mixed", view["mixed_pct_raw"]), ("repetitive", view["repetitive_pct_raw"])]),
+            '<p class="signal-note">Traffic pattern, not intent or attribution.</p>',
+            '</aside>',
+            '</div>',
             '<dl class="kpis">',
             f'<div><dt>Active rooms</dt><dd>{view["active"]}</dd></div>',
             f'<div><dt>Varied rooms</dt><dd>{view["varied"]}</dd></div>',
+            f'<div><dt>Varied traffic</dt><dd>{"n/a" if view["baseline"] else str(round(view["varied_pct_raw"] * 100)) + "%"}</dd></div>',
             f'<div><dt>New public rooms</dt><dd>~{e(view["new_rooms"])}/h</dd></div>',
             '</dl>',
-            '<p class="actions"><a class="btn primary" href="#rooms">See the rooms</a>'
-            '<a class="btn" href="#verify">Verify this census</a>'
-            f'<a class="btn" href="{e(intent)}" target="_blank" rel="noopener">Share on X</a></p>',
         ]),
         "verify": "\n".join([
-            f'<p>Census #{view["census"]} was signed by <code class="mono">{e(view["publisher_short"])}</code> '
-            f'in <a href="https://technocore.chat/r/room-census">room-census</a>. Its signed message contains the '
-            f'SHA-256 of this snapshot:</p>',
+            f'<p><strong>Valid signature</strong> &middot; <code class="mono">{e(view["publisher_short"])}</code> '
+            f'&middot; <a href="https://technocore.chat/r/room-census">room-census</a></p>',
             f'<p class="hash"><a href="{e(view["snapshot"])}">{e(view["snapshot"].split("/")[-1])}</a> '
             f'<code class="mono" id="sha">{e(view["sha256"])}</code> '
             '<button type="button" class="copy" data-copy="sha">Copy</button></p>',
-            '<p class="note">Download the snapshot, hash it, and compare. The full procedure is in '
-            '<a href="llms.txt">llms.txt</a>.</p>',
+            '<p class="note"><a href="llms.txt">Verification steps</a></p>',
         ]),
         "provenance": provenance_block(view),
     }

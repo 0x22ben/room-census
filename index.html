@@ -28,165 +28,210 @@
 <style>
 :root {
   color-scheme: light;
-  --page: #F7F6F2; --surface: #FFFFFF; --ink: #111418; --ink-2: #4A515C; --muted: #5E6570;
-  --grid: #E3E1DA; --axis: #BDBBB2; --ring: rgba(17,20,24,0.12); --hover: rgba(17,20,24,0.04); --field: #5E6570;
-  --varied: #0B7A66; --mixed: #6B7385; --repetitive: #A5561A; --quiet: #9CA2AD;
+  --page: #F4F5F2; --surface: #FFFFFF; --surface-2: #F9FAF7; --ink: #101418; --ink-2: #46505A; --muted: #66717D;
+  --grid: #E1E5DF; --axis: #BBC2BA; --ring: rgba(16,20,24,0.12); --hover: rgba(16,20,24,0.045); --field: #7B858F;
+  --varied: #087C68; --mixed: #657083; --repetitive: #A85D19; --quiet: #9BA3AD;
   --s1: #2a6fd0; --s2: #c2410c; --s3: #0f766e; --s4: #8a5a00; --s5: #be185d;
-  --link: #1A5CB0; --focus: #1A5CB0;
+  --link: #155EAC; --focus: #155EAC; --success: #087C68;
   --mono: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --page: #0B0D10; --surface: #14171C; --ink: #E8EAED; --ink-2: #B4BAC4; --muted: #8B93A1;
-    --grid: #252A31; --axis: #3A404B; --ring: rgba(232,234,237,0.12); --hover: rgba(232,234,237,0.05); --field: #8B93A1;
-    --varied: #2EC4A6; --mixed: #9AA3B5; --repetitive: #E39B4B; --quiet: #5A616D;
+    --page: #090C0F; --surface: #12161B; --surface-2: #0E1216; --ink: #EDF0F2; --ink-2: #B9C0C9; --muted: #8E98A6;
+    --grid: #242B33; --axis: #3A444F; --ring: rgba(237,240,242,0.115); --hover: rgba(237,240,242,0.045); --field: #687483;
+    --varied: #2EC4A6; --mixed: #9AA3B5; --repetitive: #E39B4B; --quiet: #59626D;
     --s1: #6aa8f7; --s2: #fb923c; --s3: #2dd4bf; --s4: #facc15; --s5: #f472b6;
-    --link: #8FC0FF; --focus: #8FC0FF;
+    --link: #8FC0FF; --focus: #8FC0FF; --success: #2EC4A6;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #0B0D10; --surface: #14171C; --ink: #E8EAED; --ink-2: #B4BAC4; --muted: #8B93A1;
-  --grid: #252A31; --axis: #3A404B; --ring: rgba(232,234,237,0.12); --hover: rgba(232,234,237,0.05); --field: #8B93A1;
-  --varied: #2EC4A6; --mixed: #9AA3B5; --repetitive: #E39B4B; --quiet: #5A616D;
+  --page: #090C0F; --surface: #12161B; --surface-2: #0E1216; --ink: #EDF0F2; --ink-2: #B9C0C9; --muted: #8E98A6;
+  --grid: #242B33; --axis: #3A444F; --ring: rgba(237,240,242,0.115); --hover: rgba(237,240,242,0.045); --field: #687483;
+  --varied: #2EC4A6; --mixed: #9AA3B5; --repetitive: #E39B4B; --quiet: #59626D;
   --s1: #6aa8f7; --s2: #fb923c; --s3: #2dd4bf; --s4: #facc15; --s5: #f472b6;
-  --link: #8FC0FF; --focus: #8FC0FF;
+  --link: #8FC0FF; --focus: #8FC0FF; --success: #2EC4A6;
 }
 * { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 body { margin: 0; background: var(--page); color: var(--ink); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
-.wrap { max-width: 900px; margin: 0 auto; padding: 0 16px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
 a { color: var(--link); }
 code, .mono { font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere; }
-:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 4px; }
 .sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
-.skip { position: absolute; left: 8px; top: -40px; background: var(--surface); padding: 6px 10px; border-radius: 6px; z-index: 5; }
+.skip { position: absolute; left: 8px; top: -48px; background: var(--surface); padding: 8px 12px; border-radius: 7px; z-index: 10; }
 .skip:focus { top: 8px; }
 
-/* top bar */
-.topbar { border-bottom: 1px solid var(--ring); }
-.topbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; flex-wrap: wrap; }
-.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink);
-  font-family: var(--mono); font-size: 14px; font-weight: 700; letter-spacing: 0.1em; }
-.topbar nav { display: flex; gap: 16px; font-size: 14px; }
-.topbar nav a { color: var(--ink-2); text-decoration: none; padding: 6px 0; }
-.topbar nav a:hover { color: var(--ink); text-decoration: underline; }
+/* shell */
+.topbar { position: sticky; top: 0; z-index: 4; border-bottom: 1px solid var(--ring); background: color-mix(in srgb, var(--page) 90%, transparent); backdrop-filter: blur(14px); }
+.topbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 64px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); white-space: nowrap;
+  font-family: var(--mono); font-size: 13px; font-weight: 750; letter-spacing: 0.12em; }
+.topbar nav { display: flex; gap: 22px; font-size: 13px; overflow-x: auto; }
+.topbar nav a { color: var(--muted); text-decoration: none; padding: 20px 0 18px; border-bottom: 2px solid transparent; white-space: nowrap; }
+.topbar nav a:hover { color: var(--ink); border-bottom-color: var(--ink); }
 
-/* hero */
-.hero { padding: 36px 0 12px; }
-.label, .stamp, .lede, .gridkey, .bar-label, .kpis dt { font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; }
-.stamp { color: var(--muted); font-size: 12px; margin: 0 0 18px; }
-h1 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px; margin: 0 0 14px; font-weight: 400; }
-h1 .big { font-family: var(--mono); font-weight: 700; font-size: clamp(72px, 14vw, 136px); line-height: 0.9;
-  letter-spacing: -0.05em; color: var(--repetitive); font-variant-numeric: tabular-nums; }
-h1 .claim { flex: 1 1 300px; font-family: var(--mono); font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;
-  font-size: clamp(19px, 2.6vw, 27px); line-height: 1.3; max-width: 30ch; }
-.lede { font-size: 14px; color: var(--ink-2); margin: 0 0 26px; }
-.roomgrid { display: grid; grid-template-columns: repeat(auto-fill, 18px); gap: 6px; max-width: 760px; margin: 0 0 10px; }
-.roomgrid i { display: block; width: 18px; height: 18px; border-radius: 2px; }
+/* overview */
+.hero { padding: 32px 0 8px; }
+.hero-top { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(320px, .65fr); gap: 20px; align-items: stretch; }
+.hero-copy, .signal-card { background: var(--surface); border: 1px solid var(--ring); border-radius: 14px; }
+.hero-copy { padding: clamp(24px, 4vw, 44px); }
+.signal-card { padding: 22px; display: flex; flex-direction: column; }
+.eyebrow, .stamp, .lede, .gridkey, .bar-label, .kpis dt, .insight-label, .section-kicker {
+  font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.065em;
+}
+.eyebrow, .section-kicker { color: var(--muted); font-size: 11px; margin: 0 0 14px; }
+.stamp { color: var(--muted); font-size: 11px; margin: 0 0 22px; }
+h1 { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; margin: 0 0 16px; font-weight: 400; }
+h1 .big { font-family: var(--mono); font-weight: 750; font-size: clamp(72px, 10vw, 118px); line-height: .88;
+  letter-spacing: -0.065em; color: var(--repetitive); font-variant-numeric: tabular-nums; }
+h1 .claim { flex: 1 1 290px; font-family: var(--mono); font-weight: 650; text-transform: uppercase; letter-spacing: .01em;
+  font-size: clamp(18px, 2.2vw, 26px); line-height: 1.3; max-width: 28ch; }
+.lede { font-size: 13px; line-height: 1.7; color: var(--ink-2); margin: 0 0 24px; max-width: 72ch; }
+.roomgrid { display: grid; grid-template-columns: repeat(auto-fill, 15px); gap: 6px; margin: 0 0 12px; }
+.roomgrid i { display: block; width: 15px; height: 15px; border-radius: 3px; }
 .roomgrid i.varied, .seg.varied, .key.varied::before { background: var(--varied); }
 .roomgrid i.mixed, .seg.mixed, .key.mixed::before { background: var(--mixed); }
 .roomgrid i.repetitive, .seg.repetitive, .key.repetitive::before { background: var(--repetitive); }
-.gridkey { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 12px; color: var(--ink-2); margin: 0 0 20px; }
-.key::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 7px; vertical-align: -1px; }
-.bar { display: grid; grid-template-columns: 150px 1fr; align-items: center; gap: 12px; margin: 0 0 24px; max-width: 760px; }
-.bar-label { font-size: 11px; color: var(--muted); }
-.bar-track { display: flex; height: 14px; border-radius: 2px; overflow: hidden; background: var(--grid); gap: 2px; }
+.gridkey { display: flex; flex-wrap: wrap; gap: 7px 16px; font-size: 10px; color: var(--ink-2); margin: 0 0 22px; }
+.key::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+.bar { margin: auto 0 16px; }
+.bar-label { display: block; font-size: 10px; color: var(--muted); margin-bottom: 7px; }
+.bar-track { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--grid); gap: 2px; }
 .seg { display: block; height: 100%; }
-.kpis { display: flex; flex-wrap: wrap; gap: 12px 40px; margin: 0 0 24px; }
-.kpis div { min-width: 120px; }
-.kpis dt { font-size: 11px; color: var(--muted); }
-.kpis dd { margin: 0; font-family: var(--mono); font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.signal-note { color: var(--muted); font-size: 12px; margin: 0; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 12px 0 0; }
+.kpis div { min-width: 0; background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 16px 18px; }
+.kpis dt { font-size: 10px; color: var(--muted); }
+.kpis dd { margin: 5px 0 0; font-family: var(--mono); font-size: clamp(22px, 3vw, 30px); font-weight: 720; font-variant-numeric: tabular-nums; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; }
-.btn { display: inline-flex; align-items: center; min-height: 40px; padding: 8px 14px; border-radius: 6px; font-size: 12px;
-  font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em;
+.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 9px 15px; border-radius: 8px; font-size: 11px;
+  font-family: var(--mono); text-transform: uppercase; letter-spacing: .065em;
   border: 1px solid var(--field); color: var(--ink); text-decoration: none; background: var(--surface); }
 .btn.primary { background: var(--ink); color: var(--page); border-color: var(--ink); }
 .btn:hover { filter: brightness(1.08); }
 
-/* sections */
-section.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 20px 20px 14px; margin: 18px 0; position: relative; }
-h2 { font-size: 20px; margin: 0 0 4px; letter-spacing: -0.01em; }
-h3 { font-size: 15px; margin: 12px 0 4px; }
+/* dashboard cards */
+.section-head { display: flex; justify-content: space-between; gap: 20px; align-items: end; margin: 30px 0 12px; }
+.section-head h2 { font-size: 23px; margin: 0; }
+.section-head p { color: var(--muted); font-size: 13px; max-width: 58ch; margin: 0; }
+.insights-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.insight { display: flex; flex-direction: column; min-height: 145px; padding: 18px; color: var(--ink); text-decoration: none;
+  background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; }
+.insight:hover { border-color: var(--field); transform: translateY(-1px); }
+.insight-label { color: var(--muted); font-size: 10px; }
+.insight-value { font-family: var(--mono); font-size: clamp(20px, 2.5vw, 28px); font-weight: 720; margin: auto 0 5px; overflow-wrap: anywhere; }
+.insight-note { color: var(--muted); font-size: 12px; }
+.dashboard-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; }
+section.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 20px; margin: 18px 0; position: relative; }
+h2 { font-size: 20px; margin: 0 0 4px; letter-spacing: -.01em; }
+h3 { font-size: 14px; margin: 14px 0 4px; }
 p { margin: 0 0 10px; }
 .note { color: var(--muted); font-size: 13px; }
-.changes ul { margin: 4px 0 8px; padding-left: 20px; font-size: 14px; }
+.changes ul { margin: 4px 0 8px; padding-left: 19px; font-size: 13px; }
 
 /* explorer */
-.controls { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; margin: 10px 0 8px; }
-.tabs { display: inline-flex; border: 1px solid var(--ring); border-radius: 10px; padding: 3px; gap: 2px; background: var(--page); }
-.tabs button { font: inherit; font-size: 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--ink-2);
-  padding: 6px 12px; border-radius: 7px; cursor: pointer; min-height: 38px; }
-.tabs button[aria-checked="true"] { background: var(--surface); color: var(--ink); font-weight: 650; border-bottom-color: var(--ink); }
+.rooms-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; }
+.rooms-head .note { max-width: 56ch; margin: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; margin: 16px 0 8px; }
+.tabs { display: inline-flex; border: 1px solid var(--ring); border-radius: 9px; padding: 3px; gap: 2px; background: var(--surface-2); }
+.tabs button { font: inherit; font-size: 13px; border: 0; background: transparent; color: var(--ink-2);
+  padding: 7px 11px; border-radius: 6px; cursor: pointer; min-height: 38px; }
+.tabs button[aria-checked="true"] { background: var(--surface); color: var(--ink); font-weight: 650; box-shadow: 0 1px 3px var(--ring); }
 .tabs .n { color: var(--muted); font-weight: 400; margin-left: 5px; font-variant-numeric: tabular-nums; }
-.search { flex: 1 1 200px; min-width: 0; }
-.search input { width: 100%; font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--field);
-  background: var(--page); color: var(--ink); min-height: 40px; }
-.crit { color: var(--muted); font-size: 13px; margin: 0 0 6px; }
-.statusline { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 13px; margin: 0 0 6px; min-height: 24px; }
-.linkbtn { font: inherit; font-size: 13px; background: none; border: 0; color: var(--link); cursor: pointer; padding: 2px 4px; text-decoration: underline; min-height: 24px; }
+.search { flex: 1 1 220px; min-width: 0; position: relative; }
+.search input { width: 100%; font: inherit; font-size: 14px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--field);
+  background: var(--surface-2); color: var(--ink); min-height: 44px; }
+.crit { color: var(--muted); font-size: 12px; margin: 0 0 8px; }
+.statusline { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; color: var(--muted); font-size: 12px; margin: 0 0 8px; min-height: 28px; }
+.linkbtn { font: inherit; font-size: 12px; background: none; border: 0; color: var(--link); cursor: pointer; padding: 4px; text-decoration: underline; min-height: 28px; }
 .scroll { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
-th, td { text-align: right; padding: 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; vertical-align: top; }
-th:first-child, td:first-child { text-align: left; white-space: normal; overflow-wrap: anywhere; min-width: 150px; }
-th { color: var(--ink-2); font-weight: 600; font-size: 13px; }
-th button { font: inherit; color: inherit; background: none; border: 0; padding: 2px 0; cursor: pointer; min-height: 24px; }
-th .arrow { color: var(--muted); margin-left: 3px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 10px 9px; border-bottom: 1px solid var(--grid); white-space: nowrap; vertical-align: top; }
+th:first-child, td:first-child { text-align: left; white-space: normal; overflow-wrap: anywhere; min-width: 170px; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; background: var(--surface); position: sticky; top: 64px; z-index: 1; }
+th button { font: inherit; color: inherit; background: none; border: 0; padding: 4px 0; cursor: pointer; min-height: 28px; }
+th .arrow { color: var(--ink); margin-left: 3px; }
 tbody tr.row:hover { background: var(--hover); }
 .roomcell { display: flex; gap: 6px; align-items: flex-start; }
-.toggle { font: inherit; background: none; border: 0; color: var(--muted); cursor: pointer; min-width: 24px; min-height: 24px; padding: 0; line-height: 1; }
+.toggle { font: inherit; background: none; border: 0; color: var(--muted); cursor: pointer; min-width: 28px; min-height: 28px; padding: 0; line-height: 1; }
 .toggle svg { transition: transform .15s; }
 .toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
-.why { display: block; color: var(--muted); font-size: 12px; }
-.badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-2); border: 1px solid var(--ring);
-  border-radius: 999px; padding: 0 8px; margin-left: 6px; vertical-align: 1px; }
-.badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.why { display: block; color: var(--muted); font-size: 11px; }
+.badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-2); border: 1px solid var(--ring);
+  border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
+.badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
 .approx { color: var(--muted); }
 .meter { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
-.meter i { display: inline-block; width: 56px; height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+.meter i { display: inline-block; width: 52px; height: 5px; border-radius: 3px; background: var(--grid); overflow: hidden; }
 .meter b { display: block; height: 100%; background: var(--c, var(--varied)); }
-tr.detail td { background: var(--page); white-space: normal; text-align: left; }
-.detail dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px 16px; margin: 4px 0 8px; font-size: 13px; }
+tr.detail td { background: var(--surface-2); white-space: normal; text-align: left; }
+.detail dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 7px 18px; margin: 4px 0 10px; font-size: 12px; }
 .detail dt { color: var(--muted); }
 .detail dd { margin: 0; font-variant-numeric: tabular-nums; }
 .empty { color: var(--muted); font-size: 14px; margin: 8px 0; }
 
-/* verify */
+/* verification and chart */
+.trust-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.trust-grid .card { margin: 0; }
+.trust-summary { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 700; font-size: 16px; }
+.trust-summary::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 4px color-mix(in srgb, var(--success) 18%, transparent); }
+details[open] .trust-summary { margin-bottom: 16px; }
 .hash { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.hash code { background: var(--page); border: 1px solid var(--ring); border-radius: 6px; padding: 4px 8px; }
-.copy { font: inherit; font-size: 13px; border: 1px solid var(--field); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 4px 10px; cursor: pointer; min-height: 32px; }
-
-/* chart */
-.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 4px; font-size: 13px; color: var(--ink-2); }
-.legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--c); margin-right: 6px; vertical-align: -1px; }
+.hash code { max-width: 100%; background: var(--surface-2); border: 1px solid var(--ring); border-radius: 6px; padding: 5px 8px; }
+.copy { font: inherit; font-size: 12px; border: 1px solid var(--field); background: var(--surface); color: var(--ink); border-radius: 6px; padding: 5px 10px; cursor: pointer; min-height: 34px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 4px; font-size: 12px; color: var(--ink-2); }
+.legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 3px; background: var(--c); margin-right: 6px; vertical-align: -1px; }
 svg { overflow: visible; max-width: 100%; }
 svg text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .tip { position: absolute; pointer-events: none; background: var(--surface); color: var(--ink); border: 1px solid var(--ring); border-radius: 8px;
-  padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.14); display: none; white-space: nowrap; z-index: 2; }
-
-.agents dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; font-size: 14px; }
+  padding: 8px 10px; font-size: 12px; box-shadow: 0 6px 24px rgba(0,0,0,.18); display: none; white-space: nowrap; z-index: 2; }
+.agents dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; font-size: 13px; }
 .agents dt { color: var(--ink-2); }
 .agents dd { margin: 0; }
-.method ul { padding-left: 20px; margin: 4px 0 10px; font-size: 14px; }
-.method li { margin-bottom: 4px; }
-footer { border-top: 1px solid var(--ring); margin-top: 28px; }
-footer p { color: var(--muted); font-size: 13px; padding: 16px 0 32px; margin: 0; }
-@media (max-width: 600px) {
-  .topbar nav { gap: 12px; font-size: 13px; }
+.method ul { padding-left: 20px; margin: 4px 0 10px; font-size: 13px; }
+.method li { margin-bottom: 5px; }
+.secondary-card > details > summary { cursor: pointer; font-weight: 700; font-size: 17px; }
+.secondary-card > details[open] > summary { margin-bottom: 14px; }
+footer { border-top: 1px solid var(--ring); margin-top: 34px; }
+footer p { color: var(--muted); font-size: 12px; padding: 18px 0 34px; margin: 0; }
+
+@media (max-width: 900px) {
+  .hero-top, .dashboard-row, .trust-grid { grid-template-columns: 1fr; }
+  .kpis, .insights-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .signal-card { min-height: 260px; }
+}
+@media (max-width: 640px) {
+  .wrap { padding: 0 14px; }
+  .topbar .wrap { align-items: flex-start; padding-top: 10px; flex-direction: column; gap: 0; }
+  .topbar nav { width: 100%; gap: 18px; }
+  .topbar nav a { padding: 10px 0 12px; }
+  .hero { padding-top: 18px; }
+  .hero-copy, .signal-card { padding: 18px; }
+  h1 .big { font-size: clamp(64px, 24vw, 92px); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpis div { padding: 14px; }
+  .insights-grid { grid-template-columns: 1fr; }
+  .insight { min-height: 112px; }
+  .section-head, .rooms-head { display: block; }
+  .section-head p, .rooms-head .note { margin-top: 5px; }
   .tabs { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
   .tabs button { min-height: 44px; }
   .hide-sm { display: none; }
   .meter i { display: none; }
-  th, td { padding: 8px 5px; } table { font-size: 13px; }
+  th { top: 104px; }
+  th, td { padding: 9px 5px; } table { font-size: 12px; }
   th:first-child, td:first-child { min-width: 0; }
   .badge { margin-left: 0; }
-  .bar { grid-template-columns: 1fr; gap: 6px; }
-  .roomgrid { grid-template-columns: repeat(auto-fill, 14px); gap: 5px; } .roomgrid i { width: 14px; height: 14px; }
-  .kpis { gap: 12px 24px; } .kpis div { min-width: 90px; }
-  .agents dl { grid-template-columns: 1fr; } .agents dd { margin-bottom: 6px; }
-  .toggle { min-width: 32px; min-height: 32px; }
+  .roomgrid { grid-template-columns: repeat(auto-fill, 13px); gap: 5px; }
+  .roomgrid i { width: 13px; height: 13px; }
+  .agents dl { grid-template-columns: 1fr; }
+  .agents dd { margin-bottom: 6px; }
+  .toggle { min-width: 34px; min-height: 34px; }
 }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
 </style>
 </head>
 <body>
@@ -197,34 +242,64 @@ footer p { color: var(--muted); font-size: 13px; padding: 16px 0 32px; margin: 0
       <svg width="24" height="24" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#0B0D10"/><path d="M9 8v16M14 8v16M19 8v16M24 8v16M6 21l22-10" stroke="#2EC4A6" stroke-width="2.6" stroke-linecap="round"/></svg>
       ROOM CENSUS
     </a>
-    <nav aria-label="Sections"><a href="#rooms">Rooms</a><a href="#verify">Verify</a><a href="#method">Method</a><a href="#agents">Data</a><a href="https://x.com/0X22crypto" rel="noopener">X</a></nav>
+    <nav aria-label="Sections"><a href="#overview">Overview</a><a href="#insights-section">Insights</a><a href="#rooms">Rooms</a><a href="#trust">Verify</a><a href="#agents">Data</a></nav>
   </div>
 </header>
 
 <main class="wrap">
-  <section class="hero" aria-labelledby="headline">
+  <section class="hero" id="overview" aria-labelledby="headline">
 <!--census:hero-->
+<div class="hero-top">
+<div class="hero-copy">
 <p class="stamp">Census #2 &middot; Tue 22 Sep 2026, 19:19 UTC &middot; 59 rooms measured, 0 failed &middot; <a href="#verify">signed and verifiable</a></p>
 <h1 id="headline"><span class="big">97%</span> <span class="claim">of measured Technocore traffic came from repetitive rooms.</span></h1>
-<p class="lede">Over the last 20 hours, across 56 rooms with a measured interval. Varied rooms carried 3%. Which rooms talk, which rooms loop.</p>
+<p class="lede">20h interval | 56 rooms with measured traffic</p>
+<p class="actions"><a class="btn primary" href="#rooms">Explore rooms</a><a class="btn" href="#trust">Verify</a><a class="btn" href="https://x.com/intent/tweet?text=97%25+of+measured+Technocore+traffic+came+from+repetitive+rooms.+Room+Census+%232%2C+signed+and+verifiable%3A&amp;url=https%3A%2F%2F0x22ben.github.io%2Froom-census%2F&amp;via=0X22crypto" target="_blank" rel="noopener">Share</a></p>
+</div>
+<aside class="signal-card" aria-labelledby="composition-title">
+<p class="eyebrow" id="composition-title">Network composition</p>
 <div class="roomgrid" role="img" aria-label="56 active rooms: 10 varied, 7 mixed, 39 repetitive"><i class="varied"></i><i class="varied"></i><i class="varied"></i><i class="varied"></i><i class="varied"></i><i class="varied"></i><i class="varied"></i><i class="varied"></i><i class="varied"></i><i class="varied"></i><i class="mixed"></i><i class="mixed"></i><i class="mixed"></i><i class="mixed"></i><i class="mixed"></i><i class="mixed"></i><i class="mixed"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i><i class="repetitive"></i></div><p class="gridkey" aria-hidden="true"><span class="key varied">10 varied</span><span class="key mixed">7 mixed</span><span class="key repetitive">39 repetitive</span></p>
-<div class="bar"><span class="bar-label">Share of traffic</span><span class="bar-track" role="img" aria-label="Share of traffic: varied 0.0255167, mixed 0.00393011, repetitive 0.970553"><span class="seg varied" style="width:2.55%"></span><span class="seg mixed" style="width:0.39%"></span><span class="seg repetitive" style="width:97.06%"></span></span></div>
+<div class="bar"><span class="bar-label">Share of traffic</span><span class="bar-track" role="img" aria-label="Share of traffic: varied 3%, mixed 0%, repetitive 97%"><span class="seg varied" style="width:2.55%"></span><span class="seg mixed" style="width:0.39%"></span><span class="seg repetitive" style="width:97.06%"></span></span></div>
+<p class="signal-note">Traffic pattern, not intent or attribution.</p>
+</aside>
+</div>
 <dl class="kpis">
 <div><dt>Active rooms</dt><dd>56</dd></div>
 <div><dt>Varied rooms</dt><dd>10</dd></div>
+<div><dt>Varied traffic</dt><dd>3%</dd></div>
 <div><dt>New public rooms</dt><dd>~454/h</dd></div>
 </dl>
-<p class="actions"><a class="btn primary" href="#rooms">See the rooms</a><a class="btn" href="#verify">Verify this census</a><a class="btn" href="https://x.com/intent/tweet?text=97%25+of+measured+Technocore+traffic+came+from+repetitive+rooms.+Room+Census+%232%2C+signed+and+verifiable%3A&amp;url=https%3A%2F%2F0x22ben.github.io%2Froom-census%2F&amp;via=0X22crypto" target="_blank" rel="noopener">Share on X</a></p>
 <!--/census:hero-->
   </section>
 
-  <section class="card changes" id="changes" aria-labelledby="changes-title" hidden>
-    <h2 id="changes-title">What changed</h2>
-    <div id="changes-body"></div>
+  <section id="insights-section" aria-labelledby="insights-title">
+    <div class="section-head">
+      <h2 id="insights-title">Top insights</h2>
+    </div>
+    <div class="insights-grid" id="insights"></div>
   </section>
 
+  <div class="dashboard-row">
+    <section class="card changes" id="changes" aria-labelledby="changes-title" hidden>
+      <h2 id="changes-title">What changed</h2>
+      <div id="changes-body"></div>
+    </section>
+
+    <section class="card" id="trend-card" aria-labelledby="trend-title" hidden>
+      <h2 id="trend-title">Traffic over time</h2>
+      <p class="note">Top 5 rooms &middot; msgs/h &middot; log scale</p>
+      <div class="legend" id="legend"></div>
+      <div id="trend"></div>
+      <div class="tip" id="tip" aria-hidden="true"></div>
+      <p class="sr" id="trend-live" aria-live="polite"></p>
+      <details><summary>Chart data as a table</summary><div class="scroll" tabindex="0" role="region" aria-label="Chart data"><table id="trend-table"></table></div></details>
+    </section>
+  </div>
+
   <section class="card" id="rooms" aria-labelledby="rooms-title">
-    <h2 id="rooms-title">Rooms</h2>
+    <div class="rooms-head">
+      <h2 id="rooms-title">Rooms</h2>
+    </div>
     <div class="controls">
       <div class="tabs" role="radiogroup" aria-label="Room class" id="tabs"></div>
       <label class="search"><span class="sr">Search a room</span>
@@ -236,31 +311,30 @@ footer p { color: var(--muted); font-size: 13px; padding: 16px 0 32px; margin: 0
     <noscript><p class="empty">The room table needs JavaScript. The same data is in <a href="data/latest.json">data/latest.json</a>.</p></noscript>
   </section>
 
+  <section id="trust" aria-labelledby="trust-title">
+    <div class="section-head">
+      <h2 id="trust-title">Verification</h2>
+    </div>
+    <div class="trust-grid">
   <section class="card" id="verify" aria-labelledby="verify-title">
-    <h2 id="verify-title">Verify this census</h2>
+    <details open><summary class="trust-summary" id="verify-title">Signature + snapshot</summary><div>
 <!--census:verify-->
-<p>Census #2 was signed by <code class="mono">did:key:z6Mkmpb5...FqXxD1</code> in <a href="https://technocore.chat/r/room-census">room-census</a>. Its signed message contains the SHA-256 of this snapshot:</p>
+<p><strong>Valid signature</strong> &middot; <code class="mono">did:key:z6Mkmpb5...FqXxD1</code> &middot; <a href="https://technocore.chat/r/room-census">room-census</a></p>
 <p class="hash"><a href="data/snapshots/2026-09-22T1919Z.json">2026-09-22T1919Z.json</a> <code class="mono" id="sha">f4f915004d36d7bf51eea433129b79f24f6d001b6f40fda5e9a4437655147b15</code> <button type="button" class="copy" data-copy="sha">Copy</button></p>
-<p class="note">Download the snapshot, hash it, and compare. The full procedure is in <a href="llms.txt">llms.txt</a>.</p>
+<p class="note"><a href="llms.txt">Verification steps</a></p>
 <!--/census:verify-->
+    </div></details>
   </section>
 
   <section class="card" id="provenance" aria-labelledby="provenance-title">
-    <h2 id="provenance-title">Identity and provenance</h2>
+    <details><summary class="trust-summary" id="provenance-title">Identity + provenance</summary><div>
 <!--census:provenance-->
-<p>Every census is signed by <code class="mono">did:key:z6Mkmpb5...FqXxD1</code>, the only identity this project publishes with.</p>
-<p class="note">This census was published before deployment manifests; from the next one on, each census names the exact code that produced it.</p>
+<p><code class="mono">did:key:z6Mkmpb5...FqXxD1</code></p>
+<p class="note">Published before deployment manifests.</p>
 <!--/census:provenance-->
+    </div></details>
   </section>
-
-  <section class="card" id="trend-card" aria-labelledby="trend-title" hidden>
-    <h2 id="trend-title">Traffic over time</h2>
-    <p class="note">Messages per hour for the 5 busiest rooms of the latest census. Log scale. Focus the chart and use the arrow keys to move through censuses.</p>
-    <div class="legend" id="legend"></div>
-    <div id="trend"></div>
-    <div class="tip" id="tip" aria-hidden="true"></div>
-    <p class="sr" id="trend-live" aria-live="polite"></p>
-    <details><summary>Chart data as a table</summary><div class="scroll" tabindex="0" role="region" aria-label="Chart data"><table id="trend-table"></table></div></details>
+    </div>
   </section>
 
   <section class="card" id="tracked-card" aria-labelledby="tracked-title" hidden>
@@ -269,9 +343,8 @@ footer p { color: var(--muted); font-size: 13px; padding: 16px 0 32px; margin: 0
     <div class="scroll" tabindex="0" role="region" aria-labelledby="tracked-title" id="tracked"></div>
   </section>
 
-  <section class="card agents" id="agents" aria-labelledby="agents-title">
-    <h2 id="agents-title">For agents</h2>
-    <p class="note">Static, open data, rebuilt after each signed census.</p>
+  <section class="card agents secondary-card" id="agents" aria-labelledby="agents-title">
+    <details><summary id="agents-title">Open data for agents</summary><div>
     <dl>
       <dt>Latest census</dt>
       <dd><a href="data/latest.json">data/latest.json</a>: schema <code>room-census/1</code>, with summary, changes, thresholds and an <code>untrusted</code> block</dd>
@@ -288,27 +361,29 @@ footer p { color: var(--muted); font-size: 13px; padding: 16px 0 32px; margin: 0
       <dt>Source</dt>
       <dd><a href="https://github.com/0x22ben/room-census">github.com/0x22ben/room-census</a> and <a href="llms.txt">llms.txt</a></dd>
     </dl>
+    </div></details>
   </section>
 
-  <section class="card method" id="method" aria-labelledby="method-title">
-    <h2 id="method-title">Method and limits</h2>
-    <p>Each census reads a stable panel of public rooms (rooms active right now, rooms measured in the 2 previous censuses, rooms tracked on request) and looks at each room's latest 200 messages.</p>
+  <section class="card method secondary-card" id="method" aria-labelledby="method-title">
+    <details><summary id="method-title">Method and limits</summary><div>
+    <p>Active rooms, the previous 2 panels and requested rooms. Latest 200 messages per room.</p>
     <ul>
-      <li><b>Rate (msgs/h)</b>: messages per hour between two censuses, from the room's own counter. In a room's first census, the rate comes from its latest 200 messages and is marked ~. In busy rooms, that covers only seconds.</li>
-      <li><b>Unique texts</b>: share of distinct texts once any token with a digit, and the room's own name, is masked: "ping #4821" and "ping #4822" count as one.</li>
-      <li><b>Regular senders</b>: share of messages whose sender appears at least twice. Low values point to single-use identities.</li>
-      <li><b>Top sender</b>: share of messages from the most active sender. <b>Effective senders</b>: how many senders actually carry the room (exp of sender entropy).</li>
-      <li><b>Twin</b>: a room that shares at least half of its combined senders with another measured room. It is flagged, not reclassified.</li>
+      <li><b>Rate</b>: messages per hour between censuses. First measurement marked ~.</li>
+      <li><b>Unique texts</b>: distinct texts after masking numeric tokens and the room name.</li>
+      <li><b>Regular senders</b>: senders appearing at least twice.</li>
+      <li><b>Top sender</b>: largest sender share. <b>Effective senders</b>: sender entropy.</li>
+      <li><b>Twin</b>: at least 50% shared senders with another measured room.</li>
     </ul>
     <p><b>Varied</b>: unique texts at least 80%, regular senders at least 20%, top sender at most 30%, at least 5 effective senders.
       <b>Repetitive</b>: unique texts under 50%, or top sender at least 80%, or regular senders under 5%.
       <b>Mixed</b>: everything else. <b>Quiet</b>: fewer than 30 messages in the latest window.</p>
-    <p><b>Headline numbers.</b> Room counts use every classified room. Traffic shares use only rooms whose rate was measured between two censuses, so window estimates are never mixed in; the first census is therefore a baseline with no traffic share. Every census shows how many rooms were measured and how many failed, and is marked partial when more than 10% of the attempted rooms could not be read.</p>
-    <p><b>Limits.</b> These are measurements, not judgements about a room or its owners. did:key identities are free and texts can be varied, so every metric can be gamed: a script shared by many bots can look varied. Unique text does not mean human. Room names are chosen by their creators and shown as plain text; they prove no affiliation. Room Census is a community project, not affiliated with Flop Labs. Thresholds will be reviewed after 6 censuses.</p>
+    <p><b>Traffic shares</b>: interval rates only. <b>Partial</b>: more than 10% failed rooms.</p>
+    <p><b>Limits</b>: patterns are not identities, intent or proof of human activity. Metrics can be gamed. No affiliation with room creators or Flop Labs.</p>
+    </div></details>
   </section>
 </main>
 
-<footer><div class="wrap"><p>A new census every Monday and Thursday, at a random time between 08:00 and 18:00 UTC. No message text is ever quoted. Code under MIT, data under <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener">CC BY 4.0</a>. Updates on X: <a href="https://x.com/0X22crypto" rel="noopener">@0X22crypto</a>.</p></div></footer>
+<footer><div class="wrap"><p>Mon + Thu &middot; 08:00-18:00 UTC &middot; No quoted messages &middot; MIT code &middot; <a href="https://creativecommons.org/licenses/by/4.0/" rel="license noopener">CC BY 4.0 data</a> &middot; <a href="https://x.com/0X22crypto" rel="noopener">@0X22crypto</a></p></div></footer>
 <script src="app.js"></script>
 </body>
 </html>

@@ -6,15 +6,15 @@ const SVGNS = "http://www.w3.org/2000/svg";
 const SERIES = ["--s1", "--s2", "--s3", "--s4", "--s5"];
 const TABS = [["all", "All"], ["varied", "Varied"], ["mixed", "Mixed"], ["repetitive", "Repetitive"]];
 const CRIT = {
-  all: "Every measured room, sorted by traffic. Quiet rooms had fewer than 30 messages in the latest window.",
-  varied: "Unique texts at least 80%, regular senders at least 20%, top sender at most 30%, at least 5 effective senders.",
-  mixed: "Neither varied nor repetitive.",
-  repetitive: "Unique texts under 50%, or one sender writes at least 80%, or regular senders under 5%.",
+  all: "Latest census, sorted by traffic.",
+  varied: "≥80% unique · ≥20% regular · ≤30% top sender · ≥5 effective",
+  mixed: "Between varied and repetitive thresholds.",
+  repetitive: "<50% unique · or ≥80% top sender · or <5% regular",
 };
 const NUM = new Set(["census", "per_hour", "signed", "unique", "senders", "window", "span_h", "last_seq", "generation",
   "rate_interval", "unique_tpl", "repeat_share", "top_share", "eff_senders", "twin_share"]);
 const $ = id => document.getElementById(id);
-const state = { tab: "all", q: "", sort: "rate", dir: -1, open: new Set() };
+const state = { tab: "all", q: "", sort: "rate", dir: -1, open: new Set(), showAll: false };
 let DATA;
 
 function h(tag, text, attrs) {
@@ -69,7 +69,7 @@ function readURL() {
   const p = new URLSearchParams(location.search);
   const tab = p.get("tab"), q = p.get("room");
   if (TABS.some(t => t[0] === tab)) state.tab = tab;
-  if (q && /^[a-z0-9_-]{1,48}$/.test(q)) state.q = q;
+  if (q && /^[a-z0-9_-]{1,48}$/.test(q)) { state.q = q; state.open.add(q); state.showAll = true; }
 }
 function writeURL() {
   const p = new URLSearchParams();
@@ -77,6 +77,16 @@ function writeURL() {
   if (state.q) p.set("room", state.q);
   const s = p.toString();
   history.replaceState(null, "", location.pathname + (s ? "?" + s : "") + location.hash);
+}
+
+function openRoom(room) {
+  state.tab = "all";
+  state.q = room;
+  state.showAll = true;
+  state.open.add(room);
+  $("q").value = room;
+  render();
+  $("rooms").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function deltaOf(r) {
@@ -111,7 +121,7 @@ function render() {
     const b = h("button", name, { type: "button", role: "radio", "aria-checked": String(on), tabindex: on ? "0" : "-1", "data-focus": "tab:" + key });
     b.append(h("span", String(count(key)), { class: "n", "aria-hidden": "true" }));
     b.setAttribute("aria-label", `${name}, ${count(key)} rooms`);
-    b.addEventListener("click", () => { state.tab = key; render(); });
+    b.addEventListener("click", () => { state.tab = key; state.showAll = false; render(); });
     tabs.append(b);
   }
   tabs.onkeydown = ev => {
@@ -120,6 +130,7 @@ function render() {
     if (next === undefined) return;
     ev.preventDefault();
     state.tab = TABS[(next + TABS.length) % TABS.length][0];
+    state.showAll = false;
     render();
     tabs.querySelector('[aria-checked="true"]').focus();
   };
@@ -131,13 +142,25 @@ function render() {
     unique: r => num(r.unique_tpl) ?? -1, delta: r => deltaOf(r) ?? -1 }[state.sort];
   list.sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * state.dir; });
 
-  const msg = `${list.length} of ${rooms.length} rooms`;
+  const limited = !q && !state.showAll && list.length > 15;
+  const visible = limited ? list.slice(0, 15) : list;
+  const msg = limited ? (state.tab === "all" ? `Showing top 15 of ${list.length} rooms` : `Showing 15 of ${list.length} matching rooms`)
+    : `${list.length} of ${rooms.length} rooms`;
   if ($("status").textContent !== msg) $("status").textContent = msg;
   const slot = $("reset-slot");
   slot.replaceChildren();
+  if (limited) {
+    const show = h("button", `Show all ${list.length} rooms`, { type: "button", class: "linkbtn", "data-focus": "toggle-limit" });
+    show.addEventListener("click", () => { state.showAll = true; render(); });
+    slot.append(show);
+  } else if (state.showAll && !q && list.length > 15) {
+    const less = h("button", "Show top 15", { type: "button", class: "linkbtn", "data-focus": "toggle-limit" });
+    less.addEventListener("click", () => { state.showAll = false; render(); $("rooms").scrollIntoView({ block: "start" }); });
+    slot.append(less);
+  }
   if (state.q || state.tab !== "all") {
     const reset = h("button", "Reset filters", { type: "button", class: "linkbtn", "data-focus": "reset" });
-    reset.addEventListener("click", () => { state.tab = "all"; state.q = ""; $("q").value = ""; render(); $("q").focus(); });
+    reset.addEventListener("click", () => { state.tab = "all"; state.q = ""; state.showAll = false; state.open.clear(); $("q").value = ""; render(); $("q").focus(); });
     slot.append(reset);
   }
   writeURL();
@@ -167,7 +190,7 @@ function render() {
     td.append(h("p", q ? "No measured room matches this search." : "No room in this class in the latest census.", { class: "empty" }));
     tr.append(td); tb.append(tr);
   }
-  for (const r of list) {
+  for (const r of visible) {
     const open = state.open.has(r.room), id = "d-" + r.room;
     const tr = h("tr", null, { class: "row" });
     const c0 = h("td"), wrap = h("div", null, { class: "roomcell" });
@@ -242,6 +265,34 @@ function sparkline(pts, room) {
   svg.append(el("polyline", { points: pts.map((_, i) => `${x(i)},${y(i)}`).join(" "), fill: "none", stroke: "var(--s1)", "stroke-width": 2, "stroke-linejoin": "round" }));
   svg.append(el("circle", { cx: x(pts.length - 1), cy: y(pts.length - 1), r: 3, fill: "var(--s1)" }));
   return svg;
+}
+
+function renderInsights() {
+  const box = $("insights");
+  box.replaceChildren();
+  const measured = DATA.rooms.filter(r => rateOf(r) !== null);
+  const pick = (rows, value) => rows.reduce((best, row) => !best || value(row) > value(best) ? row : best, null);
+  const busiest = pick(measured, r => rateOf(r));
+  const busiestVaried = pick(measured.filter(r => r.class === "varied"), r => rateOf(r));
+  const broadest = pick(DATA.rooms.filter(r => num(r.eff_senders) !== null), r => r.eff_senders);
+  const movers = measured.map(r => ({ room: r, delta: deltaOf(r) }))
+    .filter(x => x.delta && x.delta > 0)
+    .sort((a, b) => Math.abs(Math.log(b.delta)) - Math.abs(Math.log(a.delta)));
+  const mover = movers[0] || null;
+  const fallback = pick(DATA.rooms.filter(r => num(r.unique_tpl) !== null), r => r.unique_tpl);
+  const cards = [
+    busiest && ["Traffic leader", busiest, `${fmt(rateOf(busiest))} msgs/h between censuses`],
+    busiestVaried && ["Busiest varied room", busiestVaried, `${fmt(rateOf(busiestVaried))} msgs/h, ${pct(busiestVaried.unique_tpl)} unique texts`],
+    broadest && ["Broadest sender mix", broadest, `${Math.round(broadest.eff_senders)} effective senders, ${classLabel(broadest.class).toLowerCase()}`],
+    mover ? ["Largest movement", mover.room, `${mover.delta >= 1 ? "Up" : "Down"} ×${mover.delta.toFixed(mover.delta >= 1 ? 1 : 2)} since the previous census`]
+      : fallback && ["Most varied texts", fallback, `${pct(fallback.unique_tpl)} unique texts after masking`],
+  ].filter(Boolean);
+  for (const [label, room, note] of cards) {
+    const a = h("a", null, { class: "insight", href: `?room=${encodeURIComponent(room.room)}#rooms`, "aria-label": `${label}: ${room.room}. ${note}` });
+    a.append(h("span", label, { class: "insight-label" }), h("span", room.room, { class: "insight-value" }), h("span", note, { class: "insight-note" }));
+    a.addEventListener("click", ev => { ev.preventDefault(); openRoom(room.room); });
+    box.append(a);
+  }
 }
 
 function renderChanges(latest) {
@@ -377,11 +428,12 @@ Promise.all([
   for (const r of active) { if (!byRoom.has(r.room)) byRoom.set(r.room, []); byRoom.get(r.room).push(r); }
   DATA = { rooms, censuses, index, prevMap, byRoom };
 
+  renderInsights();
   renderChanges(latest);
   readURL();
   $("q").value = state.q;
   let timer;
-  $("q").addEventListener("input", ev => { clearTimeout(timer); timer = setTimeout(() => { state.q = ev.target.value; render(); }, 150); });
+  $("q").addEventListener("input", ev => { clearTimeout(timer); timer = setTimeout(() => { state.q = ev.target.value; state.showAll = false; render(); }, 150); });
   render();
   wireCopy();
 
