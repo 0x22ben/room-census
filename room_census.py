@@ -670,7 +670,9 @@ SIG_RE = re.compile(r"^[A-Za-z0-9_-]{85}[AQgw]$")
 
 
 def get_text(path: str) -> str:
-    url = f"{SERVER}{path}{'&' if '?' in path else '?'}n={int(time.time() * 1000)}"
+    """Raw GET used for /r/<room>/export. Technocore documents that endpoint as taking no query
+    parameter, so no cache-busting parameter is added here (get_json keeps its own for paged reads)."""
+    url = f"{SERVER}{path}"
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=60) as resp:
         return resp.read().decode("utf-8")

@@ -96,6 +96,7 @@ class PublicationCase(unittest.TestCase):
             (flop_did, "KEY_FILE"): self.tmp / "identity.pem", (flop_did, "PASS_FILE"): self.tmp / "passphrase.txt",
             (flop_did, "DID_FILE"): self.tmp / "did.txt", (flop_did, "PROOF_FILE"): self.tmp / "proofs.jsonl",
             (flop_did, "NONCE_FILE"): self.tmp / "nonces.json", (flop_did, "LOCK_FILE"): self.tmp / "census.lock",
+            (flop_did, "SAY_JOURNAL"): self.tmp / "say_pending.json",
         }
         for (module, name), value in patches.items():
             p = mock.patch.object(module, name, value)
@@ -110,8 +111,10 @@ class PublicationCase(unittest.TestCase):
         self.did = flop_did.DID_FILE.read_text().strip()
         self.server = FakeServer()
         install(self, self.server)
-        for target, value in ((flop_did, "post_signed"), (rc, "refresh_did_note")):
-            p = mock.patch.object(target, value, self.server.post if value == "post_signed" else lambda did: None)
+        for target, name, value in ((flop_did, "post_signed", self.server.post),
+                                    (flop_did, "fetch_export", lambda room: self.server.text(f"/r/{room}/export")),
+                                    (rc, "refresh_did_note", lambda did: None)):
+            p = mock.patch.object(target, name, value)
             p.start()
             self.addCleanup(p.stop)
 
@@ -274,6 +277,188 @@ class Publication(PublicationCase):
             flop_did.cmd_say(rc.ROOM, "About room-census")
         self.assertEqual(self.server.stored[-1]["nonce"], 10 ** 17 + 1)
         durable.ProcessLock(flop_did.LOCK_FILE).acquire().release()     # released afterwards
+
+
+class ManualSay(PublicationCase):
+    """flop_did.py say: a lost response or an interruption never leads to the same content being
+    signed again with a new nonce."""
+    TEXT = "About room-census: a twice-weekly signed census of public Technocore rooms."
+
+    def say(self, text=TEXT):
+        with mock.patch("builtins.print"):
+            try:
+                return flop_did.cmd_say(rc.ROOM, text)
+            except SystemExit as e:
+                return e
+
+    def reserved(self):
+        return json.loads(flop_did.NONCE_FILE.read_text())[rc.ROOM] if flop_did.NONCE_FILE.exists() else None
+
+    def test_message_stored_then_response_lost_is_confirmed_without_a_second_post(self):
+        self.server.plan = ["lose_response"]
+        proof = self.say()
+        self.assertIsInstance(proof, dict)
+        self.assertEqual((self.server.post_calls, len(self.server.stored)), (1, 1))
+        self.assertEqual(proof["nonce"], str(self.server.stored[0]["nonce"]))
+        self.assertFalse(flop_did.SAY_JOURNAL.exists())
+        self.assertEqual(len(flop_did.PROOF_FILE.read_text().splitlines()), 1)
+
+    def test_rerun_after_a_crash_following_storage_does_not_sign_again(self):
+        self.server.plan = ["crash_after"]
+        with self.assertRaises(Crash):
+            self.say()
+        self.assertTrue(flop_did.SAY_JOURNAL.exists())
+        nonce_before = self.reserved()
+        self.assertIsInstance(self.say(), dict)               # the same command again
+        self.assertEqual((self.server.post_calls, len(self.server.stored)), (1, 1))
+        self.assertEqual(self.reserved(), nonce_before)       # no new nonce reserved
+        self.assertFalse(flop_did.SAY_JOURNAL.exists())
+
+    def test_rerun_after_a_crash_before_sending_resends_the_same_signature(self):
+        self.server.plan = ["crash_before"]
+        with self.assertRaises(Crash):
+            self.say()
+        pending = json.loads(flop_did.SAY_JOURNAL.read_text())
+        self.assertIsInstance(self.say(), dict)
+        self.assertEqual(len(self.server.stored), 1)
+        landed = self.server.stored[0]
+        self.assertEqual((str(landed["nonce"]), landed["sig"]), (pending["nonce"], pending["sig"]))
+        self.assertEqual(self.reserved(), int(pending["nonce"]))
+
+    def test_lost_response_with_unreachable_export_keeps_the_journal_then_confirms(self):
+        self.server.plan = ["lose_response"]
+        self.server.export_fails = True
+        self.assertIsInstance(self.say(), SystemExit)
+        self.assertTrue(flop_did.SAY_JOURNAL.exists())
+        self.server.export_fails = False
+        self.assertIsInstance(self.say(), dict)
+        self.assertEqual((self.server.post_calls, len(self.server.stored)), (1, 1))
+
+    def test_a_different_message_after_an_interruption_finishes_the_first_one_first(self):
+        self.server.plan = ["crash_after"]
+        with self.assertRaises(Crash):
+            self.say()
+        self.assertIsInstance(self.say("A second, different message."), dict)
+        self.assertEqual([m["text"] for m in self.server.stored], [self.TEXT, "A second, different message."])
+        self.assertLess(self.server.stored[0]["nonce"], self.server.stored[1]["nonce"])
+
+    def test_request_lost_before_storage_is_reported_and_not_retried_with_a_new_nonce(self):
+        self.server.plan = ["lose_request"]
+        self.assertIsInstance(self.say(), SystemExit)
+        self.assertEqual((self.server.post_calls, self.server.stored), (1, []))
+        self.assertFalse(flop_did.SAY_JOURNAL.exists())       # proven absent: nothing left to finish
+
+    def test_unusable_journal_blocks_sending(self):
+        flop_did.SAY_JOURNAL.write_text("{broken")
+        self.assertIsInstance(self.say(), SystemExit)
+        self.assertEqual(self.server.post_calls, 0)
+        self.assertEqual(flop_did.SAY_JOURNAL.read_text(), "{broken")
+
+    # crashes around the final acknowledgement
+
+    def crash_on_journal_unlink(self, after_unlink: bool):
+        """Kills the process when the say journal is dropped, just after (or just before) the unlink."""
+        journal, original = flop_did.SAY_JOURNAL, Path.unlink
+
+        def unlink(path, *a, **kw):
+            if path == journal and not after_unlink:
+                raise Crash("killed just before the journal was dropped")
+            original(path, *a, **kw)
+            if path == journal and after_unlink:
+                raise Crash("killed just after the journal was dropped, before cmd_say returned")
+        return mock.patch.object(Path, "unlink", unlink)
+
+    def test_crash_right_after_confirmation_and_before_return_publishes_nothing_on_rerun(self):
+        with self.crash_on_journal_unlink(after_unlink=True), self.assertRaises(Crash):
+            self.say()
+        self.assertFalse(flop_did.SAY_JOURNAL.exists())       # no journal left: only the receipt remains
+        nonce_before = self.reserved()
+        proof = self.say()                                    # the user runs the same command again
+        self.assertIsInstance(proof, dict)
+        self.assertEqual(proof["nonce"], str(self.server.stored[0]["nonce"]))
+        self.assertEqual((self.server.post_calls, len(self.server.stored)), (1, 1))
+        self.assertEqual(self.reserved(), nonce_before)       # no nonce reserved by the rerun
+
+    def test_crash_after_the_receipt_but_before_dropping_the_journal(self):
+        with self.crash_on_journal_unlink(after_unlink=False), self.assertRaises(Crash):
+            self.say()
+        self.assertTrue(flop_did.SAY_JOURNAL.exists())
+        nonce_before = self.reserved()
+        self.assertIsInstance(self.say(), dict)
+        self.assertEqual((self.server.post_calls, len(self.server.stored), self.reserved()), (1, 1, nonce_before))
+        self.assertFalse(flop_did.SAY_JOURNAL.exists())
+        self.assertEqual(len(flop_did.read_proofs()), 1)
+
+    def test_crash_in_the_recovery_path_after_dropping_the_journal(self):
+        self.server.plan = ["crash_after"]
+        with self.assertRaises(Crash):
+            self.say()                                        # stored, journal left behind
+        with self.crash_on_journal_unlink(after_unlink=True), self.assertRaises(Crash):
+            self.say("Another message")                       # recovery confirms the first, then dies
+        self.assertFalse(flop_did.SAY_JOURNAL.exists())
+        nonce_before = self.reserved()
+        self.assertIsInstance(self.say(), dict)               # the first text again: receipt, nothing sent
+        self.assertEqual((self.server.post_calls, len(self.server.stored), self.reserved()), (1, 1, nonce_before))
+
+    def test_repeat_is_the_only_way_to_publish_the_same_text_again(self):
+        first = self.say()
+        again = self.say()                                    # no intent: the receipt is returned
+        self.assertEqual((again["nonce"], self.server.post_calls), (first["nonce"], 1))
+        with mock.patch("builtins.print"):
+            repeated = flop_did.cmd_say(rc.ROOM, self.TEXT, repeat=True)
+        self.assertEqual(len(self.server.stored), 2)
+        self.assertGreater(int(repeated["nonce"]), int(first["nonce"]))
+
+    def test_command_line_repeat_flag(self):
+        with mock.patch.object(flop_did, "cmd_say") as say:
+            for argv in (["say", rc.ROOM, "hello", "world"], ["say", "--repeat", rc.ROOM, "hello", "world"]):
+                with mock.patch.object(sys, "argv", ["flop_did.py", *argv]):
+                    flop_did.main()
+        self.assertEqual(say.call_args_list, [mock.call(rc.ROOM, "hello world"),
+                                              mock.call(rc.ROOM, "hello world", repeat=True)])
+
+    def test_receipts_are_written_atomically_after_an_old_truncated_line(self):
+        flop_did.PROOF_FILE.write_text('{"room": "x", "nonce": "1"}\n{"trunc')    # legacy partial append
+        self.say()
+        lines = flop_did.PROOF_FILE.read_text().splitlines()
+        self.assertEqual(lines[1], '{"trunc')
+        self.assertEqual(json.loads(lines[2])["text"], self.TEXT)             # complete, on its own line
+        self.assertEqual(len(list(self.tmp.glob(".proofs.jsonl.*.tmp"))), 0)
+
+
+class ExportRequests(unittest.TestCase):
+    """Point 2: /r/<room>/export is requested without any query parameter."""
+
+    def captured_url(self, call):
+        seen = []
+
+        class Response:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def read(self):
+                return b'{"seq": 1, "ts": "2026-09-22T00:00:00Z", "from": "x", "text": "t"}\n'
+        with mock.patch("urllib.request.urlopen", lambda req, timeout: seen.append(req.full_url) or Response()):
+            call()
+        return seen
+
+    def test_census_export_has_no_query_parameter(self):
+        self.assertEqual(self.captured_url(lambda: rc.room_export(rc.ROOM)), [f"{rc.SERVER}/r/{rc.ROOM}/export"])
+
+    def test_manual_say_export_has_no_query_parameter(self):
+        self.assertEqual(self.captured_url(lambda: flop_did.fetch_export(rc.ROOM)),
+                         [f"{flop_did.SERVER}/r/{rc.ROOM}/export"])
+
+    def test_paged_reads_keep_their_cache_busting_parameter(self):
+        with mock.patch("urllib.request.urlopen") as urlopen:
+            urlopen.return_value.__enter__.return_value.read.return_value = b"{}"
+            rc.get_json(f"/r/{rc.ROOM}?format=json&limit=200")
+        self.assertIn("&n=", urlopen.call_args[0][0].full_url)
 
 
 class CorruptArchive(PublicationCase):

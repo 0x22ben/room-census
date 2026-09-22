@@ -9,3 +9,9 @@ census.jsonl
 deploy_key*
 __pycache__/
 *.pyc
+# runtime files of the census and of manual messages (server side, never published)
+nonces.json
+pending_publication.json
+say_pending.json
+census.lock
+abandoned/
