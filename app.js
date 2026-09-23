@@ -14,7 +14,7 @@ const CRIT = {
 const NUM = new Set(["census", "per_hour", "signed", "unique", "senders", "window", "span_h", "last_seq", "generation",
   "rate_interval", "unique_tpl", "repeat_share", "top_share", "eff_senders", "twin_share"]);
 const $ = id => document.getElementById(id);
-const state = { tab: "all", q: "", sort: "rate", dir: -1, open: new Set(), showAll: false };
+const state = { tab: "all", q: "", sort: "rate", dir: -1, showAll: false };
 let DATA;
 
 function h(tag, text, attrs) {
@@ -73,7 +73,7 @@ function readURL() {
   const p = new URLSearchParams(location.search);
   const tab = p.get("tab"), q = p.get("room");
   if (TABS.some(t => t[0] === tab)) state.tab = tab;
-  if (q && /^[a-z0-9_-]{1,48}$/.test(q)) { state.q = q; state.open.add(q); state.showAll = true; }
+  if (q && /^[a-z0-9_-]{1,48}$/.test(q)) { state.q = q; state.showAll = true; }
 }
 function writeURL() {
   const p = new URLSearchParams();
@@ -87,7 +87,6 @@ function openRoom(room) {
   state.tab = "all";
   state.q = room;
   state.showAll = true;
-  state.open.add(room);
   $("q").value = room;
   render();
   $("rooms").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -107,10 +106,27 @@ function deltaCell(k) {
   } else td.textContent = "stable";
   return td;
 }
-function chevron() {
-  const s = el("svg", { width: 12, height: 12, viewBox: "0 0 12 12", "aria-hidden": "true" });
-  s.append(el("path", { d: "M4 2l4 4-4 4", fill: "none", stroke: "currentColor", "stroke-width": 1.8, "stroke-linecap": "round", "stroke-linejoin": "round" }));
-  return s;
+// A click or tap anywhere on a room row opens its room page. Links and buttons keep their native
+// behaviour, so the room link never navigates twice, and ending a text selection is not a click.
+function rowTarget(ev) {
+  if (!ev || ev.defaultPrevented || ev.button > 0) return null;
+  const t = ev.target;
+  if (!t || typeof t.closest !== "function" || t.closest("a, button, input, select, textarea, summary")) return null;
+  const row = t.closest("tr.row.nav");
+  const href = row ? row.getAttribute("data-href") : null;
+  if (!href || !/^rooms\/[a-z0-9][a-z0-9_-]{0,47}\/$/.test(href)) return null;
+  const selected = typeof getSelection === "function" ? String(getSelection() || "") : "";
+  return selected ? null : href;
+}
+// decorative: the row's accessible target is the room link. Only a row that opens a room page shows
+// the arrow; any other row keeps an empty cell so the columns stay aligned.
+function arrowCell(navigates) {
+  const td = h("td", null, { class: "go", "aria-hidden": "true" });
+  if (!navigates) return td;
+  const s = el("svg", { width: 14, height: 14, viewBox: "0 0 14 14", focusable: "false" });
+  s.append(el("path", { d: "M3 7h8M8 4l3 3-3 3", fill: "none", stroke: "currentColor", "stroke-width": 1.6, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+  td.append(s);
+  return td;
 }
 
 function render() {
@@ -164,7 +180,7 @@ function render() {
   }
   if (state.q || state.tab !== "all") {
     const reset = h("button", "Reset filters", { type: "button", class: "linkbtn", "data-focus": "reset" });
-    reset.addEventListener("click", () => { state.tab = "all"; state.q = ""; state.showAll = false; state.open.clear(); $("q").value = ""; render(); $("q").focus(); });
+    reset.addEventListener("click", () => { state.tab = "all"; state.q = ""; state.showAll = false; $("q").value = ""; render(); $("q").focus(); });
     slot.append(reset);
   }
   writeURL();
@@ -186,30 +202,27 @@ function render() {
     });
     th.append(b); hr.append(th);
   }
+  hr.append(h("th", null, { class: "go", "aria-hidden": "true" }));
   thead.append(hr); t.append(thead);
 
   const tb = h("tbody");
   if (!list.length) {
-    const tr = h("tr"), td = h("td", null, { colspan: String(cols.length) });
+    const tr = h("tr"), td = h("td", null, { colspan: String(cols.length + 1) });
     td.append(h("p", q ? "No measured room matches this search." : "No room in this class in the latest census.", { class: "empty" }));
     tr.append(td); tb.append(tr);
   }
   for (const r of visible) {
-    const open = state.open.has(r.room), id = "d-" + r.room;
-    const tr = h("tr", null, { class: "row" });
-    const c0 = h("td"), wrap = h("div", null, { class: "roomcell" });
-    const tg = h("button", null, { type: "button", class: "toggle", "aria-expanded": String(open), "aria-label": `Details of ${r.room}`, "data-focus": "toggle:" + r.room });
-    if (open) tg.setAttribute("aria-controls", id);
-    tg.append(chevron());
-    tg.addEventListener("click", () => { open ? state.open.delete(r.room) : state.open.add(r.room); render(); });
-    const name = h("div");
-    name.append(h("a", r.room, { href: pageOf(r.room) || technocore(r.room) }));
+    // the room name is the row's only keyboard target: a native link to the room page
+    const page = pageOf(r.room);
+    const tr = h("tr", null, page ? { class: "row nav", "data-href": page } : { class: "row" });
+    const c0 = h("td");
+    c0.append(h("a", r.room, { href: page || technocore(r.room), class: "room-link", "data-focus": "room:" + r.room }));
     const badge = h("span", classLabel(r.class), { class: "badge" });
     badge.style.setProperty("--c", classVar(r.class));
-    name.append(badge);
+    c0.append(badge);
     const why = [r.reason, r.twin ? `shares ${pct(r.twin_share)} of senders with ${r.twin}` : null].filter(Boolean).join("; ");
-    if (why) name.append(h("span", why, { class: "why" }));
-    wrap.append(tg, name); c0.append(wrap); tr.append(c0);
+    if (why) c0.append(h("span", why, { class: "why" }));
+    tr.append(c0);
 
     const rate = h("td"), rv = rateOf(r);
     if (rv !== null && num(r.rate_interval) === null) {
@@ -222,58 +235,21 @@ function render() {
     fill.style.width = Math.round((num(r.unique_tpl) || 0) * 100) + "%";
     fill.style.setProperty("--c", classVar(r.class));
     bar.append(fill); m.append(h("span", pct(r.unique_tpl)), bar); u.append(m); tr.append(u);
+    tr.append(arrowCell(Boolean(page)));
     tb.append(tr);
-    if (open) tb.append(detailRow(r, id, cols.length));
   }
   t.append(tb);
+  t.onclick = ev => {
+    const href = rowTarget(ev);
+    if (!href) return;
+    if (ev.ctrlKey || ev.metaKey || ev.shiftKey) window.open(href, "_blank", "noopener");
+    else location.assign(href);
+  };
 
   if (focusKey) {
     const target = document.querySelector(`[data-focus="${CSS.escape(focusKey)}"]`);
     (target || $("q")).focus();
   }
-}
-
-function detailRow(r, id, span) {
-  const tr = h("tr", null, { class: "detail", id }), td = h("td", null, { colspan: String(span) });
-  const dl = h("dl");
-  const add = (k, v) => dl.append(h("dt", k), h("dd", v));
-  add("Class", classLabel(r.class));
-  add("Rate between censuses", num(r.rate_interval) === null ? "from the next census" : fmt(r.rate_interval) + " msgs/h");
-  const span_h = num(r.span_h);
-  add("Rate, latest 200 messages", num(r.per_hour) === null ? "–"
-    : `${fmt(r.per_hour)} msgs/h over ${span_h === null ? "?" : span_h < 1 ? Math.max(1, Math.round(span_h * 60)) + " min" : span_h.toFixed(1) + " h"}`);
-  const k = deltaOf(r);
-  add("Change since last census", k === null ? "–" : "×" + k.toFixed(2));
-  add("Unique texts (raw / masked)", `${pct(r.unique)} / ${pct(r.unique_tpl)}`);
-  add("Regular senders", pct(r.repeat_share));
-  add("Top sender", pct(r.top_share));
-  add("Distinct / effective senders", `${num(r.senders) ?? "–"} / ${num(r.eff_senders) === null ? "–" : Math.round(r.eff_senders)}`);
-  add("Signed messages", pct(r.signed));
-  const hist = DATA.byRoom.get(r.room) || [];
-  add("First measured", hist.length ? when(hist[0].at_utc) : "–");
-  add("Censuses measured", String(hist.length));
-  td.append(dl);
-  const links = h("p", null, { class: "note" });
-  const page = pageOf(r.room);
-  if (page) links.append(h("a", "Room page", { href: page }), " · ");
-  links.append(h("a", "Open in Technocore", { href: technocore(r.room), rel: "noopener" }));
-  td.append(links);
-  const pts = hist.filter(x => rateOf(x) !== null);
-  if (pts.length >= 2) td.append(sparkline(pts, r.room));
-  tr.append(td);
-  return tr;
-}
-
-function sparkline(pts, room) {
-  const W = 160, H = 32, t0 = Date.parse(pts[0].at_utc), t1 = Date.parse(pts[pts.length - 1].at_utc) || t0 + 1;
-  const v = pts.map(p => Math.log10(Math.max(rateOf(p), 0.1)));
-  const lo = Math.min(...v), spanV = Math.max(...v) - lo || 1, spanT = t1 - t0 || 1;
-  const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img",
-    "aria-label": `Rate of ${room} over ${pts.length} censuses: ` + pts.map(p => fmt(rateOf(p)) + " msgs/h").join(", ") });
-  const x = i => 2 + (Date.parse(pts[i].at_utc) - t0) / spanT * (W - 4), y = i => H - 3 - (v[i] - lo) / spanV * (H - 6);
-  svg.append(el("polyline", { points: pts.map((_, i) => `${x(i)},${y(i)}`).join(" "), fill: "none", stroke: "var(--s1)", "stroke-width": 2, "stroke-linejoin": "round" }));
-  svg.append(el("circle", { cx: x(pts.length - 1), cy: y(pts.length - 1), r: 3, fill: "var(--s1)" }));
-  return svg;
 }
 
 function renderInsights() {
@@ -435,11 +411,9 @@ Promise.all([
   const index = new Map(active.map(r => [r.at_utc + "|" + r.room, r]));
   const prevAt = censuses.length > 1 ? censuses[censuses.length - 2] : null;
   const prevMap = new Map(active.filter(r => r.at_utc === prevAt).map(r => [r.room, r]));
-  const byRoom = new Map();
-  for (const r of active) { if (!byRoom.has(r.room)) byRoom.set(r.room, []); byRoom.get(r.room).push(r); }
   const pages = new Set((roomIndex && Array.isArray(roomIndex.rooms) ? roomIndex.rooms : [])
     .map(x => x && x.room).filter(x => typeof x === "string" && SLUG.test(x)));
-  DATA = { rooms, censuses, index, prevMap, byRoom, pages };
+  DATA = { rooms, censuses, index, prevMap, pages };
 
   renderInsights();
   renderChanges(latest);

@@ -320,9 +320,10 @@ class Dashboard(unittest.TestCase):
     def test_room_links_go_to_the_room_page_when_it_exists(self):
         code = (REPO / "app.js").read_text(encoding="utf-8")
         self.assertIn('getText("data/rooms/index.json")', code)
-        self.assertEqual(code.count("pageOf(r.room) || technocore(r.room)"), 2)      # rooms table and tracked table
+        self.assertEqual(code.count("pageOf(r.room) || technocore(r.room)"), 1)      # tracked table
+        self.assertIn("href: page || technocore(r.room)", code)                         # rooms table (see test_dashboard)
         self.assertIn("href: page || `?room=", code)                                 # top insights
-        self.assertIn('"Open in Technocore"', code)
+        self.assertIn('class: "room-link"', code)            # the room name stays a native link
 
 
 ROOM_JS_HARNESS = r"""

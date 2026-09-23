@@ -151,14 +151,22 @@ p { margin: 0 0 10px; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 th, td { text-align: right; padding: 10px 9px; border-bottom: 1px solid var(--grid); white-space: nowrap; vertical-align: top; }
 th:first-child, td:first-child { text-align: left; white-space: normal; overflow-wrap: anywhere; min-width: 170px; }
-th { color: var(--muted); font-weight: 600; font-size: 12px; background: var(--surface); position: sticky; top: 64px; z-index: 1; }
+/* not sticky: inside the horizontal scroller it stuck to the scroller, 64px down, over the first row */
+th { color: var(--muted); font-weight: 600; font-size: 12px; background: var(--surface); }
 th button { font: inherit; color: inherit; background: none; border: 0; padding: 4px 0; cursor: pointer; min-height: 28px; }
 th .arrow { color: var(--ink); margin-left: 3px; }
 tbody tr.row:hover { background: var(--hover); }
-.roomcell { display: flex; gap: 6px; align-items: flex-start; }
-.toggle { font: inherit; background: none; border: 0; color: var(--muted); cursor: pointer; min-width: 28px; min-height: 28px; padding: 0; line-height: 1; }
-.toggle svg { transition: transform .15s; }
-.toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+/* rows open their room page: whole-row states, colours only, so nothing moves */
+tbody tr.row.nav { cursor: pointer; }
+tbody tr.row.nav:active { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+tbody tr.row:has(.room-link:focus-visible) { background: var(--hover); }
+tbody tr.row:has(.room-link:focus-visible) td:first-child { box-shadow: inset 3px 0 0 var(--focus); }
+.room-link { color: var(--ink); font-weight: 650; text-decoration: none; scroll-margin: 80px 0 16px; }   /* focus stops below the sticky top bar */
+.room-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+th.go, td.go { width: 30px; padding-left: 0; padding-right: 10px; }
+td.go { color: var(--muted); vertical-align: middle; }
+td.go svg { display: block; margin-left: auto; }
+tbody tr.row.nav:hover td.go, tbody tr.row:has(.room-link:focus-visible) td.go { color: var(--ink); }
 .why { display: block; color: var(--muted); font-size: 11px; }
 .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink-2); border: 1px solid var(--ring);
   border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 1px; }
@@ -167,10 +175,6 @@ tbody tr.row:hover { background: var(--hover); }
 .meter { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
 .meter i { display: inline-block; width: 52px; height: 5px; border-radius: 3px; background: var(--grid); overflow: hidden; }
 .meter b { display: block; height: 100%; background: var(--c, var(--varied)); }
-tr.detail td { background: var(--surface-2); white-space: normal; text-align: left; }
-.detail dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 7px 18px; margin: 4px 0 10px; font-size: 12px; }
-.detail dt { color: var(--muted); }
-.detail dd { margin: 0; font-variant-numeric: tabular-nums; }
 .empty { color: var(--muted); font-size: 14px; margin: 8px 0; }
 
 /* verification and chart */
@@ -221,15 +225,15 @@ footer p { color: var(--muted); font-size: 12px; padding: 18px 0 34px; margin: 0
   .tabs button { min-height: 44px; }
   .hide-sm { display: none; }
   .meter i { display: none; }
-  th { top: 104px; }
   th, td { padding: 9px 5px; } table { font-size: 12px; }
   th:first-child, td:first-child { min-width: 0; }
-  .badge { margin-left: 0; }
+  .badge { margin-left: 5px; }
   .roomgrid { grid-template-columns: repeat(auto-fill, 13px); gap: 5px; }
   .roomgrid i { width: 13px; height: 13px; }
   .agents dl { grid-template-columns: 1fr; }
   .agents dd { margin-bottom: 6px; }
-  .toggle { min-width: 34px; min-height: 34px; }
+  th.go, td.go { width: 22px; padding-right: 4px; }
+  .room-link { scroll-margin-top: 120px; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
 </style>
