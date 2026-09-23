@@ -539,13 +539,23 @@ class RecordIntegrity(unittest.TestCase):
                     self.assertEqual(archive.read_bytes(), before)
 
     def test_published_censuses_still_pass(self):
-        """The two censuses already public, rebuilt from their public snapshots, hold."""
-        for name in sorted((REPO / "data" / "snapshots").glob("*.json")):
+        """Every public census, rebuilt from its public files, holds. A snapshot never contains the
+        manifest document (the archive keeps it), so a census with provenance is rebuilt with the
+        manifest published under data/manifests/, which must exist and be named after its own bytes."""
+        snapshots = sorted((REPO / "data" / "snapshots").glob("*.json"))
+        self.assertTrue(snapshots)
+        for name in snapshots:
             with self.subTest(snapshot=name.name):
                 data = name.read_bytes()
                 rec = json.loads(data)
                 rec.update(snapshot=f"data/snapshots/{name.name}", sha256=hashlib.sha256(data).hexdigest())
                 self.assertEqual(rc.snapshot_bytes(rec), data)
+                self.assertNotIn("deploy_manifest", rec)
+                if "provenance" in rec:
+                    published = REPO / rec["provenance"]["manifest"]
+                    body = published.read_bytes()
+                    self.assertEqual(hashlib.sha256(body).hexdigest(), published.stem)
+                    rec["deploy_manifest"] = manifest.parse(body)
                 rc.check_record(rec)
 
 
