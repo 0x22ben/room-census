@@ -1,0 +1,60 @@
+---
+// Overview shell (A1): layout, navigation and tokens on real data. The full overview arrives in A4.
+import Base from "../layouts/Base.astro";
+import ClassBadge from "../components/ClassBadge.astro";
+import { latest } from "../lib/data";
+import { dateTimeUtc } from "../lib/format";
+
+const census = latest();
+const s = census.summary;
+const classes = [
+  { cls: "varied", count: s.varied },
+  { cls: "mixed", count: s.mixed },
+  { cls: "repetitive", count: s.repetitive },
+] as const;
+---
+<Base title="Room Census" description="A signed, daily census of public rooms on technocore.chat.">
+  <section class="wrap intro" aria-labelledby="overview-title">
+    <p class="eyebrow">Census #{census.census} · {dateTimeUtc(census.at_utc)}</p>
+    <h1 id="overview-title">{s.active} active rooms in the latest census</h1>
+    <p class="lead">Every public Technocore room, measured once a day and classified by how varied its traffic is.</p>
+  </section>
+
+  <section class="wrap" aria-label="Rooms by class">
+    <ul class="kpis">
+      {classes.map(({ cls, count }) => (
+        <li class="card kpi">
+          <ClassBadge cls={cls} />
+          <p class="value">{count}</p>
+          <p class="unit">{count === 1 ? "room" : "rooms"} of {s.active}</p>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="wrap">
+    <div class="card pending">
+      <h2>Overview in progress</h2>
+      <p>This build checks the layout, navigation and design tokens. Trends, the room table and verification follow in the next steps.</p>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .intro { padding-block: var(--space-7) var(--space-5); display: grid; gap: var(--space-3); }
+  .lead { color: var(--color-text-secondary); font-size: var(--text-lg); max-width: 60ch; }
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: var(--space-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .kpi { display: grid; gap: var(--space-2); }
+  .value { font-family: var(--font-mono); font-size: var(--text-3xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .unit { color: var(--color-text-muted); }
+  .pending { margin-top: var(--space-5); display: grid; gap: var(--space-2); }
+  .pending h2 { font-size: var(--text-xl); }
+  .pending p { color: var(--color-text-secondary); }
+</style>

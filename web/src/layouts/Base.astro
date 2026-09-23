@@ -1,0 +1,43 @@
+---
+import "../styles/global.css";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import { CSP, SITE_NAME } from "../lib/site";
+import { latest } from "../lib/data";
+
+// indexable: false for pages served at any missing address (404), which have no canonical URL
+interface Props { title: string; description: string; indexable?: boolean }
+const { title, description, indexable = true } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const fullTitle = title === SITE_NAME ? title : `${title} | ${SITE_NAME}`;
+const favicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0D10'/%3E%3Cpath d='M9 8v16M14 8v16M19 8v16M24 8v16M6 21l22-10' stroke='%232EC4A6' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E";
+const schedule = latest().next;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content={CSP} />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    {indexable ? <link rel="canonical" href={canonical} /> : <meta name="robots" content="noindex" />}
+    <link rel="icon" href={favicon} />
+    <meta name="theme-color" content="#090c0f" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f5f2" media="(prefers-color-scheme: light)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE_NAME} />
+    {indexable && <meta property="og:url" content={canonical} />}
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <Header />
+    <main id="main" tabindex="-1">
+      <slot />
+    </main>
+    <Footer schedule={schedule} />
+  </body>
+</html>

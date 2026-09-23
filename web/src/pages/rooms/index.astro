@@ -1,0 +1,19 @@
+---
+// Rooms shell (A1): the room index and the room pages arrive in A5.
+import Base from "../../layouts/Base.astro";
+import { roomCount } from "../../lib/data";
+
+const rooms = roomCount();
+---
+<Base title="Rooms" description="Every public Technocore room Room Census has measured.">
+  <section class="wrap intro" aria-labelledby="rooms-title">
+    <p class="eyebrow">Rooms</p>
+    <h1 id="rooms-title">{rooms} rooms measured so far</h1>
+    <p class="lead">The searchable room index follows in the next steps.</p>
+  </section>
+</Base>
+
+<style>
+  .intro { padding-block: var(--space-7) var(--space-5); display: grid; gap: var(--space-3); }
+  .lead { color: var(--color-text-secondary); font-size: var(--text-lg); max-width: 60ch; }
+</style>

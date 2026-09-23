@@ -1,0 +1,6 @@
+# installed and generated, never committed
+node_modules/
+dist/
+.astro/
+# staged copy of the public data, rebuilt before every build
+.public/

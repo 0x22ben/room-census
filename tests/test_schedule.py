@@ -23,11 +23,12 @@ OLD = {                                               # pattern -> an example it
     r"08:00\s*-\s*18:00\s*utc": "08:00-18:00 UTC",
     r"between\s+08:00\s+and\s+18:00": "random time between 08:00 and 18:00 UTC",
 }
-TEXT_SUFFIXES = {".py", ".js", ".html", ".txt", ".md", ".css", ".yml", ".json"}
+TEXT_SUFFIXES = {".py", ".js", ".mjs", ".ts", ".astro", ".html", ".txt", ".md", ".css", ".yml", ".json"}
 # rebuilt from the archive by every census, never edited by hand: checked through the generator below
 GENERATED_DIRS = {"data", "rooms"}
 GENERATED_FILES = {"identity.json"}
-SKIP_DIRS = {".git", "__pycache__", ".codex-test-tmp", ".claude"}
+# installed packages, build output and the staged data copy of web/ are not sources
+SKIP_DIRS = {".git", "__pycache__", ".codex-test-tmp", ".claude", "node_modules", "dist", ".astro", ".public"}
 
 
 def old_wording(text):
@@ -55,7 +56,7 @@ class OldWording(unittest.TestCase):
     def test_no_source_file_keeps_the_old_schedule(self):
         files = list(source_files())
         self.assertGreater(len(files), 20)
-        for must in ("room_census.py", "census_render.py", "index.html", "llms.txt", "README.md", "app.js"):
+        for must in ("room_census.py", "census_render.py", "index.html", "llms.txt", "README.md", "app.js", "Footer.astro"):
             self.assertIn(must, {p.name for p in files})
         for path in files:
             with self.subTest(file=str(path.relative_to(REPO))):
