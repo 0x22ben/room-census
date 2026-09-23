@@ -9,7 +9,7 @@ import RoomTable, { type Row } from "../components/RoomTable.astro";
 import Activity from "@lucide/astro/icons/activity";
 import ArrowRight from "@lucide/astro/icons/arrow-right";
 import ArrowUpRight from "@lucide/astro/icons/arrow-up-right";
-import MessagesSquare from "@lucide/astro/icons/messages-square";
+import ChartBarDecreasing from "@lucide/astro/icons/chart-bar-decreasing";
 import Repeat from "@lucide/astro/icons/repeat";
 import ShieldCheck from "@lucide/astro/icons/shield-check";
 import Sparkles from "@lucide/astro/icons/sparkles";
@@ -48,7 +48,7 @@ const views = [
   { label: "Active", href: "/rooms/", icon: Activity, n: null },
   { label: "Biggest increases", href: "#increases", icon: TrendingUp, n: null },
   { label: "New rooms", href: "#new", icon: Sparkles, n: newRooms.length },
-  { label: "Most discussed", href: "#rooms", icon: MessagesSquare, n: null },
+  { label: "Busiest rooms", href: "#rooms", icon: ChartBarDecreasing, n: null },
   { label: "Watched", href: "/watched/", icon: Star, n: null },
   { label: "Mostly repeated", href: "/rooms/?pattern=repetitive", icon: Repeat, n: s.repetitive },
 ];
@@ -198,7 +198,7 @@ const views = [
   <section id="rooms" aria-labelledby="rooms-title" class="mt-4 scroll-mt-4 overflow-hidden rounded-lg border border-border bg-surface">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
       <div>
-        <h2 id="rooms-title" class="text-lg font-medium">Most discussed</h2>
+        <h2 id="rooms-title" class="text-lg font-medium">Busiest rooms</h2>
         <p class="text-sm text-text-muted">{s.baseline ? "Latest census · no rates between censuses yet" : "Latest census · by messages per hour"}</p>
       </div>
       <a href="/rooms/" class="inline-flex min-h-11 items-center gap-2 rounded-md border border-accent-border bg-accent-soft px-4 text-sm font-semibold text-text no-underline">
