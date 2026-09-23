@@ -260,4 +260,16 @@ if (form && result) {
 
   form.hidden = false;
   document.querySelector("[data-did-noscript]")?.remove();
+
+  // Write hands the public DID over in the address fragment, which browsers never send to a server.
+  // It only fills the field: a lookup always starts with the reader, so a link can never make this
+  // browser read the rooms for somebody else's DID. The fragment is removed so it does not linger.
+  const handed = /^#did=(did:key:z6Mk[1-9A-HJ-NP-Za-km-z]{40,50})$/.exec(decodeURIComponent(location.hash));
+  if (handed && publicKey(handed[1])) {
+    input.value = handed[1];
+    history.replaceState(null, "", location.pathname);
+    const note = document.querySelector<HTMLElement>("[data-did-handed]");
+    if (note) note.hidden = false;
+    input.focus();
+  }
 }

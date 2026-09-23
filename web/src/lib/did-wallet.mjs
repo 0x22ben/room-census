@@ -19,8 +19,13 @@ export const PROOF_SCHEMA = "room-census-did-post-proof/1";
 export const ITERATIONS = 600000;
 export const MIN_PASSWORD = 12;
 export const MAX_TEXT = 4096;
-// the only room a first message may go to (Ben, 2026-09-23); room-census reads "track" commands
-export const ROOMS = ["lobby"];
+// Where a first introduction is proposed. The room-census room stays for signed censuses and its
+// track commands, so introductions go to a room of their own. It does not exist yet: until Ben
+// creates it and `ready` becomes true, the page proposes another existing room instead and never
+// writes to it (a first write would create the room).
+export const COMMUNITY = { room: "room-census-community", ready: false };
+// rooms a message may never go to, whatever the reader types
+export const RESERVED = ["room-census", "events"];
 const PKCS8_PREFIX = Uint8Array.from([0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20]);
 const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const DID_RE = /^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]{44}$/;
@@ -172,7 +177,10 @@ export async function openBackup(subtle, text, password) {
 /** Technocore's single-line sweep: controls, format, surrogate, private-use and line/paragraph separators become spaces, ends trimmed. */
 export const sweep = (text) => String(text).replace(/[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Zl}\p{Zp}]/gu, " ").trim();
 
-/** Editable starters for a first message. Never sent as they are: every [field] must be replaced. */
+/** The introduction proposed right after a DID is created. Both parts must be replaced. */
+export const INTRODUCTION = "I created my Technocore identity with Room Census. I am interested in [topic], and I plan to contribute by [contribution].";
+
+/** Editable starters for a message. Never sent as they are: every [field] must be replaced. */
 export const STARTERS = [
   { id: "project", label: "Introduce a project", text: "I am building [project] to [useful purpose]. I would appreciate feedback on [specific question]." },
   { id: "learning", label: "Share a learning goal", text: "I am exploring Technocore to learn more about [topic]. My next concrete step is [action]." },
@@ -180,9 +188,10 @@ export const STARTERS = [
   { id: "collaborators", label: "Find collaborators", text: "I am looking for people interested in [topic]. I can contribute [specific skill, data or project]." },
 ];
 
-/** Why a first message cannot be signed yet, or null. */
-export function messageProblem(room, text) {
-  if (!ROOMS.includes(room)) return "Choose a room.";
+/** Why a message cannot be signed yet, or null. `allowed` is the list of rooms the page carries. */
+export function messageProblem(room, text, allowed) {
+  if (!Array.isArray(allowed) || !allowed.includes(room)) return "Choose a room from the list.";
+  if (RESERVED.includes(room)) return "This room is reserved for signed censuses.";
   const swept = sweep(text);
   if (swept === "") return "Write your message.";
   if (/\[[^\]]*\]/.test(swept)) return "Replace every part in [brackets] with your own words.";

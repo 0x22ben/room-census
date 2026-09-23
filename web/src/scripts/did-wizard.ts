@@ -8,9 +8,12 @@
 // The server reply is kept in memory only to check the result; a technical receipt is optional.
 import { check, importKey, publicKey, readReply, TECHNOCORE } from "../lib/did-core.mjs";
 import {
-  createIdentity, forget, messageProblem, MIN_PASSWORD, nextNonce, openBackup, passwordProblem, proofOf, sealBackup, signMessage, WalletError,
+  COMMUNITY, createIdentity, forget, INTRODUCTION, messageProblem, MIN_PASSWORD, nextNonce, openBackup, passwordProblem, proofOf, sealBackup,
+  signMessage, WalletError,
 } from "../lib/did-wallet.mjs";
 import { dateTimeUtc } from "../lib/format";
+import { known } from "../lib/rooms.mjs";
+import { roomPicker, type Room } from "./room-picker.ts";
 
 type Identity = { did: string; privateKey: CryptoKey };
 type Signed = { room: string; nonce: string; text: string; did: string; sig: string };
@@ -26,6 +29,8 @@ const WITH_LOOKUP: Panel[] = ["start", "outcome"];
 
 if (root) {
   const q = <T extends Element>(sel: string) => root.querySelector<T>(sel)!;
+  const rooms = (JSON.parse(root.dataset.rooms ?? "[]") as Room[]).filter((r) => typeof r.room === "string");
+  const names = rooms.map((r) => r.room);
   let identity: Identity | null = null;
   let pkcs8: Uint8Array | null = null; // only between creation and the recovery file download
   let backup: { name: string; file: object } | null = null; // sealed, waiting for the reader to save it
@@ -247,7 +252,15 @@ if (root) {
   const understand = q<HTMLInputElement>("[data-understand]");
   const publish = q<HTMLButtonElement>("[data-action=publish]");
   const status = q<HTMLElement>("[data-publish-status]");
-  const room = () => root!.querySelector<HTMLInputElement>("input[name=room]:checked")?.value ?? "";
+  // the community room is proposed but cannot be written to until it exists; any measured room can
+  const picker = roomPicker(q<HTMLElement>("[data-room-area]"), rooms, () => {
+    signed = null;
+    invalidate();
+    // the list is rebuilt on every pick, so the focus is moved on instead of being lost
+    q<HTMLTextAreaElement>("[data-message]").focus();
+  });
+  if (COMMUNITY.ready && known(rooms, COMMUNITY.room)) picker.set(COMMUNITY.room);
+  const room = () => picker.selected;
 
   /** A fresh composer: nothing signed, nothing attempted. */
   function compose() {
@@ -255,7 +268,7 @@ if (root) {
     attempted = false;
     unconfirmed = false;
     result = null;
-    text.value = "";
+    text.value = sent === 0 ? INTRODUCTION : "";
     text.disabled = false;
     understand.checked = false;
     understand.disabled = false;
@@ -283,7 +296,6 @@ if (root) {
     if (start >= 0) text.setSelectionRange(start, text.value.indexOf("]", start) + 1);
   }));
   text.addEventListener("input", invalidate);
-  root.querySelectorAll<HTMLInputElement>("input[name=room]").forEach((r) => r.addEventListener("change", invalidate));
   understand.addEventListener("change", () => { publish.disabled = !(understand.checked && signed && !attempted); });
 
   q<HTMLFormElement>("[data-compose]").addEventListener("submit", (e) => {
@@ -292,7 +304,7 @@ if (root) {
       clearErrors();
       if (attempted) return;
       if (!identity) return error("compose", "This DID is no longer unlocked in this tab. Open your recovery file to publish.");
-      const problem = messageProblem(room(), text.value);
+      const problem = messageProblem(room(), text.value, names);
       if (problem) return error("compose", problem);
       try {
         signed = await signMessage(crypto.subtle, identity, room(), nextNonce(), text.value);
@@ -412,6 +424,22 @@ if (root) {
     compose();
     text.value = kept;
   });
+  // skipping publishes nothing: the identity stays unlocked and the activity lookup opens
+  q<HTMLButtonElement>("[data-action=skip]").addEventListener("click", () => {
+    if (attempted || !identity) return;
+    signed = null;
+    q<HTMLElement>("[data-panel=message]").hidden = true;
+    const area = document.querySelector<HTMLElement>("[data-lookup-area]");
+    const input = document.querySelector<HTMLInputElement>("#did-input");
+    const lookup = document.querySelector<HTMLFormElement>("form[data-did-form]");
+    if (area) area.hidden = false;
+    if (input && lookup) {
+      input.value = identity.did;
+      lookup.requestSubmit();
+      lookup.scrollIntoView({ block: "start" });
+    }
+  });
+
   q<HTMLButtonElement>("[data-action=another]").addEventListener("click", () => {
     if (result?.kind === "published") compose();
   });

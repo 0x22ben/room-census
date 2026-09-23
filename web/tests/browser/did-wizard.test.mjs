@@ -138,8 +138,11 @@ const stored = (post, seq = 42) => {
     .replace(/"nonce":"(\d+)"/, '"nonce":$1');
 };
 
-async function compose(message = MESSAGE) {
-  await page(`document.querySelector('input[name=room][value=lobby]').click()`);
+/** Picks a room in the shared picker, writes the message and opens the review. */
+async function compose(message = MESSAGE, room = "lobby") {
+  await fill("[data-room-search]", room);
+  await until(`[...document.querySelectorAll('[data-room]')].some(b => b.dataset.room === ${JSON.stringify(room)})`, `the room ${room}`);
+  await click(`[data-room="${room}"]`);
   await fill("[data-message]", message);
   await submit("[data-compose]");
   await until("!document.querySelector('[data-preview]').hidden", "the review", 5000);
@@ -237,12 +240,18 @@ test("the happy path: create, save the recovery file once, write, publish, and s
   assert.equal(await unloadWarns(), false);
   assert.equal(log.requests.length, log.loaded, "creating, sealing and downloading made no request");
 
-  // a starter is only a prompt, and the reader picks the room
-  await click("[data-starter=project]");
-  assert.equal(await page("document.querySelector('[data-message]').value"), "I am building [project] to [useful purpose]. I would appreciate feedback on [specific question].");
+  // the introduction is proposed, in a room that does not exist yet
+  assert.equal(await page("document.querySelector('[data-message]').value"), "I created my Technocore identity with Room Census. I am interested in [topic], and I plan to contribute by [contribution].");
+  assert.match(await text("[data-proposed]"), /room-census-community/);
+  assert.match(await text("[data-proposed]"), /Not created yet/);
+  assert.match(await text("[data-proposed]"), /This room does not exist yet/);
+  assert.equal(await page(`[...document.querySelectorAll('[data-room]')].some(b => b.dataset.room === "room-census-community")`), false, "a room that does not exist is never offered");
+  assert.equal(await page(`[...document.querySelectorAll('[data-room]')].some(b => b.dataset.room === "room-census")`), false, "the census room is never offered");
   await submit("[data-compose]");
-  assert.equal(await errorOf("compose"), "Choose a room.");
-  await page(`document.querySelector('input[name=room][value=lobby]').click()`);
+  assert.equal(await errorOf("compose"), "Choose a room from the list.");
+  await fill("[data-room-search]", "lobby");
+  await until(`[...document.querySelectorAll('[data-room]')].some(b => b.dataset.room === "lobby")`, "the lobby row");
+  await click(`[data-room="lobby"]`);
   await submit("[data-compose]");
   assert.equal(await errorOf("compose"), "Replace every part in [brackets] with your own words.");
   assert.match(await text("[data-panel=message]"), /Tip from Coin Academy \(third-party guidance, not an official Flop Labs rule\)/);
@@ -431,13 +440,15 @@ test("Lock my DID forgets the unlocked key; publishing again needs the recovery 
   assert.equal(await hidden("[data-panel=start]"), false);
   assert.equal(await hidden("[data-action=start-over]"), true);
   assert.equal(await page("[...document.querySelectorAll('[data-did-value]')].map(e => e.textContent).join('')"), "");
-  // the composer cannot sign without an identity
+  // the composer cannot sign once the key is forgotten
   await page("document.querySelector('[data-panel=message]').hidden = false");
-  await page(`document.querySelector('input[name=room][value=lobby]').click()`);
+  await fill("[data-room-search]", "lobby");
+  await click(`[data-room="lobby"]`);
   await fill("[data-message]", MESSAGE);
   await submit("[data-compose]");
   await sleep(300);
   assert.equal(await hidden("[data-preview]"), true, "nothing can be signed once locked");
+  assert.match(await errorOf("compose"), /no longer unlocked in this tab/);
   assert.equal(log.posts.length, 1);
 });
 

@@ -1,0 +1,224 @@
+---
+// Write: publish a signed message to a room that already exists, without a terminal. Laid out as the
+// approved Pencil screens (Write locked, Write compose, Review, Message published).
+// Publishing needs the encrypted recovery file and its passphrase: the signing DID is derived from the
+// unlocked key and shown read-only, and can never be typed or pasted. The key lives in this tab's
+// memory only. Rooms come from the Room Census index carried by this page, so a name that does not
+// exist can never be created by mistake.
+import Base from "../layouts/Base.astro";
+import Help from "../components/Help.astro";
+import ArrowRight from "@lucide/astro/icons/arrow-right";
+import BadgeCheck from "@lucide/astro/icons/badge-check";
+import Download from "@lucide/astro/icons/download";
+import Info from "@lucide/astro/icons/info";
+import KeyRound from "@lucide/astro/icons/key-round";
+import Lock from "@lucide/astro/icons/lock";
+import LockKeyhole from "@lucide/astro/icons/lock-keyhole";
+import PenLine from "@lucide/astro/icons/pen-line";
+import RefreshCw from "@lucide/astro/icons/refresh-cw";
+import Search from "@lucide/astro/icons/search";
+import Send from "@lucide/astro/icons/send";
+import Share2 from "@lucide/astro/icons/share-2";
+import ShieldCheck from "@lucide/astro/icons/shield-check";
+import TriangleAlert from "@lucide/astro/icons/triangle-alert";
+import { site } from "../lib/data";
+import { DID_DISCLAIMER } from "../lib/patterns";
+import { TECHNOCORE_CSP } from "../lib/site";
+import { MIN_PASSWORD, RESERVED, STARTERS } from "../lib/did-wallet.mjs";
+
+const { latest, rooms } = site();
+// every room a message may go to: measured, still listed in the latest census, never reserved
+const rate = new Map(latest.rooms.map((r) => [r.room, r.rate_interval ?? null]));
+const senders = new Map(latest.rooms.map((r) => [r.room, r.eff_senders ?? null]));
+const pattern = new Map(latest.rooms.map((r) => [r.room, r.class]));
+const choices = [...rooms.values()]
+  .filter((d) => d.current && !RESERVED.includes(d.room))
+  .map((d) => ({ room: d.room, rate: rate.get(d.room) ?? null, senders: senders.get(d.room) ?? null, pattern: pattern.get(d.room) ?? d.last_class }))
+  .sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1) || a.room.localeCompare(b.room));
+
+const card = "grid grid-cols-[minmax(0,1fr)] gap-4 rounded-xl border border-border bg-surface p-5 sm:p-7";
+const tile = "grid size-12 place-items-center rounded-lg border border-accent-border bg-accent-soft text-accent";
+const title = "text-xl font-semibold tracking-tight outline-none sm:text-2xl";
+const lede = "text-text-secondary";
+const primary = "inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-accent px-5 font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-50";
+const secondary = "inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border-strong px-4 text-sm font-semibold text-text disabled:cursor-not-allowed disabled:opacity-50";
+const input = "min-h-12 w-full min-w-0 rounded-lg border border-border-strong bg-bg px-3.5 text-base text-text";
+const labelRow = "flex items-center gap-2 text-sm font-semibold";
+const foot = "flex items-start gap-2 text-sm text-text-muted";
+const alert = "text-sm font-semibold text-warning empty:hidden";
+const good = "flex items-center gap-2.5 rounded-lg border border-accent-border bg-accent-soft px-4 py-3 text-sm font-semibold";
+const warn = "flex items-center gap-2.5 rounded-lg border border-warning-border bg-warning-soft px-4 py-3 text-sm font-semibold";
+const row = "flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-border py-3 text-sm";
+const rowKey = "text-text-secondary";
+const rowValue = "font-mono break-all text-right";
+---
+<Base title="Write" csp={TECHNOCORE_CSP} local description="Publish a signed message to a public Technocore room from your browser, with the identity in your recovery file.">
+  <div class="mx-auto grid w-full max-w-3xl grid-cols-[minmax(0,1fr)] gap-6">
+    <header class="grid justify-items-center gap-2 pt-4 text-center">
+      <p class="flex items-center gap-2 font-mono text-xs font-semibold tracking-widest text-accent uppercase">
+        Publish a signed message
+        <Help term="Signed message" id="help-write-intro" ask="What is a signed message?" text="A public message on technocore.chat, signed by your key. Anyone can check that your DID wrote it, and nobody can change it afterwards." />
+      </p>
+      <h1 id="write-title" data-page-title class="text-3xl font-medium tracking-tight sm:text-4xl">Write a signed message</h1>
+      <p data-page-lede class="text-text-secondary">Unlock your DID with your recovery file. A public DID alone can never publish.</p>
+    </header>
+
+    <p data-write-noscript class="text-center text-text-muted">Writing needs JavaScript. Your key is opened and used only in this browser.</p>
+    <p data-framed hidden class="text-center font-semibold text-warning">This page is shown inside another site. Open roomcensus.xyz/write/ directly to publish.</p>
+
+    <div data-write hidden data-rooms={JSON.stringify(choices)} data-census={latest.census} class="grid grid-cols-[minmax(0,1fr)] gap-6">
+      <!-- locked: only a recovery file unlocks the key that signs -->
+      <section data-panel="locked" class={card} aria-labelledby="unlock-title">
+        <span class={tile}><LockKeyhole size={22} aria-hidden="true" /></span>
+        <h2 id="unlock-title" tabindex="-1" class={title}>Unlock your DID</h2>
+        <p class={lede}>Your encrypted recovery file and its passphrase unlock your key in this tab only.</p>
+        <form data-unlock novalidate class="grid gap-4">
+          <div class="grid gap-2">
+            <span class={labelRow}>Recovery file</span>
+            <label class="relative flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-lg border border-border-strong bg-bg py-1.5 pr-1.5 pl-3.5 focus-within:outline-2 focus-within:outline-focus">
+              <span data-unlock-file-name class="min-w-0 truncate font-mono text-sm text-text-muted">No file chosen</span>
+              <span class="shrink-0 rounded-md bg-surface-raised px-3 py-2 text-sm font-semibold">Choose file</span>
+              <input data-unlock-file type="file" accept=".json,application/json" class="absolute inset-0 cursor-pointer opacity-0" aria-label="Recovery file" />
+            </label>
+          </div>
+          <div class="grid gap-2">
+            <label for="unlock-password" class={labelRow}>Passphrase</label>
+            <span class="flex gap-2">
+              <input id="unlock-password" data-unlock-password type="password" autocomplete="current-password" spellcheck="false" autocapitalize="off" autocorrect="off" class={input} />
+              <button type="button" data-show="[data-unlock-password]" aria-pressed="false" aria-label="Show the passphrase" class={secondary}>Show</button>
+            </span>
+          </div>
+          <button type="submit" class={primary}>Unlock my DID <ArrowRight size={18} aria-hidden="true" /></button>
+          <p data-error="unlock" role="alert" class={alert}></p>
+        </form>
+        <p class={foot}><Lock size={16} aria-hidden="true" class="mt-0.5 shrink-0" />The file and the passphrase never leave your device. They are opened here, by your browser.</p>
+      </section>
+
+      <div data-panel="locked-notes" class="grid gap-3">
+        <p class={good}><ShieldCheck size={18} aria-hidden="true" class="shrink-0 text-accent" />The DID that signs always comes from the unlocked key. You cannot type or paste a DID to publish.</p>
+        <p class="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-4 py-3 text-sm">
+          <Info size={18} aria-hidden="true" class="shrink-0 text-text-muted" />
+          No recovery file yet? <a href="/did/" class="font-semibold text-link">My DID</a> walks you through creating one.
+        </p>
+      </div>
+
+      <!-- unlocked: the DID is read-only, from the key itself -->
+      <section data-signing hidden aria-labelledby="signing-title" class="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-surface px-5 py-4">
+        <KeyRound size={20} aria-hidden="true" class="shrink-0 text-accent" />
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span id="signing-title" class="text-xs font-semibold text-text-muted">Signing as</span>
+          <code data-did-value class="font-mono text-sm break-all"></code>
+        </span>
+        <span class="rounded-md border border-border-strong bg-surface-raised px-3 py-1.5 text-xs font-semibold">Read-only</span>
+        <button type="button" data-action="lock" class="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold text-link"><Lock size={15} aria-hidden="true" /> Lock</button>
+      </section>
+
+      <section data-panel="room" hidden class={card} aria-labelledby="room-title">
+        <span class={tile}><Search size={22} aria-hidden="true" /></span>
+        <h2 id="room-title" tabindex="-1" class={title}>Choose a room</h2>
+        <p class={lede}>Search the rooms Room Census has measured. Publishing never creates a room.</p>
+        <label class="grid gap-2">
+          <span class="sr-only">Search a room by name</span>
+          <input data-room-search type="search" autocomplete="off" spellcheck="false" placeholder="Search a room" aria-describedby="room-hint" class={input} />
+        </label>
+        <ul data-room-list aria-label="Rooms" class="grid gap-2"></ul>
+        <p data-room-empty hidden class={warn}><TriangleAlert size={18} aria-hidden="true" class="shrink-0 text-warning" />No measured room matches that name. A name that is not in this list cannot be published to from here.</p>
+        <p id="room-hint" class={foot}><Info size={16} aria-hidden="true" class="mt-0.5 shrink-0" />Only rooms in the latest census are offered, so a new room is never created by mistake.</p>
+      </section>
+
+      <section data-panel="message" hidden class={card} aria-labelledby="message-title">
+        <span class={tile}><PenLine size={22} aria-hidden="true" /></span>
+        <h2 id="message-title" tabindex="-1" class={title}>Your message</h2>
+        <p class={lede}>Start from an idea or write your own. Line breaks become spaces.</p>
+        <form data-compose novalidate class="grid gap-4">
+          <fieldset class="grid gap-2">
+            <legend class="mb-2 text-sm font-semibold">Start from an idea</legend>
+            <div class="flex flex-wrap gap-2">
+              {STARTERS.map((st) => <button type="button" data-starter={st.id} data-starter-text={st.text} class={secondary}>{st.label}</button>)}
+            </div>
+          </fieldset>
+          <label class="grid gap-2">
+            <span class={labelRow}>Message</span>
+            <textarea data-message rows="3" maxlength="4096" aria-describedby="write-hint" class={`${input} py-3`}></textarea>
+          </label>
+          <p id="write-hint" class="text-sm text-text-muted">Replace every part in [brackets] with your own words.</p>
+          <button type="submit" class={secondary}>Review the message</button>
+          <p data-error="compose" role="alert" class={alert}></p>
+        </form>
+      </section>
+
+      <section data-panel="review" hidden class={card} aria-labelledby="review-title">
+        <span class={tile}><Send size={22} aria-hidden="true" /></span>
+        <h2 id="review-title" tabindex="-1" class={title}>Exactly what will be published</h2>
+        <p class={lede}>Technocore stores this as it is. You cannot edit or delete it afterwards.</p>
+        <div>
+          <div class={row}><span class={rowKey}>Room</span><span data-review-room class={rowValue}></span></div>
+          <div class={row}><span class={rowKey}>Signed by</span><span data-review-did class={rowValue}></span></div>
+        </div>
+        <p data-review-text class="rounded-lg border border-border bg-bg p-4 break-words"></p>
+        <p class={warn}><TriangleAlert size={18} aria-hidden="true" class="shrink-0 text-warning" />Public and permanent from your side: anyone can read and copy it.</p>
+        <label class="inline-flex min-h-11 items-center gap-3"><input data-understand type="checkbox" class="size-5 accent-accent" /> I understand this message will be public and permanent.</label>
+        <button type="button" data-action="publish" disabled class={primary}>Publish message <Send size={18} aria-hidden="true" /></button>
+        <button type="button" data-action="edit" class={secondary}>Change the message or the room</button>
+        <p data-publish-status role="status" class="text-sm text-text-muted empty:hidden"></p>
+        <p class={foot}><ShieldCheck size={16} aria-hidden="true" class="mt-0.5 shrink-0" />The signature covers the room, the nonce and the text, and is checked here before and after sending.</p>
+      </section>
+
+      <!-- after publishing -->
+      <section data-panel="outcome" hidden class={card} aria-labelledby="outcome-title">
+        <span data-outcome-tile class={tile}><BadgeCheck data-icon-ok size={22} aria-hidden="true" /><TriangleAlert data-icon-warn size={22} aria-hidden="true" class="hidden" /></span>
+        <h2 id="outcome-title" tabindex="-1" data-outcome-title class={title}></h2>
+        <p data-outcome-lede class={lede}></p>
+        <div>
+          <div class={row}><span class={rowKey}>Room</span><span data-out-room class={rowValue}></span></div>
+          <div class={row}><span class={rowKey}>Public DID</span><code data-did-value class={rowValue}></code></div>
+        </div>
+        <p data-out-text class="rounded-lg border border-border bg-bg p-4 break-words"></p>
+        <a data-action="view" hidden href="/did/" class={primary}>View in My DID <Search size={18} aria-hidden="true" /></a>
+        <button type="button" data-action="another" hidden class={secondary}><PenLine size={16} aria-hidden="true" /> Write another message</button>
+        <button type="button" data-action="share" hidden class={secondary}><Share2 size={16} aria-hidden="true" /> Share in another room</button>
+        <button type="button" data-action="look" hidden class={primary}>Check Technocore again <RefreshCw size={18} aria-hidden="true" /></button>
+        <button type="button" data-action="edit-refused" hidden class={primary}>Edit and review again <ArrowRight size={18} aria-hidden="true" /></button>
+        <p data-outcome-foot role="status" class={`${foot} empty:hidden`}></p>
+        <p data-share-note hidden class="flex items-start gap-2.5 rounded-lg border border-border bg-bg px-4 py-3 text-sm text-text-secondary">
+          <Info size={18} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />
+          Sharing asks for another room, another review and your confirmation. Each room gets its own signature: nothing is sent to several rooms at once.
+        </p>
+        <details data-advanced class="rounded-lg border border-border bg-bg">
+          <summary class="flex min-h-11 cursor-pointer items-center px-4 text-sm font-semibold">Advanced</summary>
+          <div class="grid gap-3 border-t border-border px-4 pb-4">
+            <div>
+              <div class={row}><span class={rowKey}>Nonce</span><span data-out-nonce class={rowValue}></span></div>
+              <div class={row}><span class={rowKey}>Stored</span><span data-out-stored class={rowValue}></span></div>
+              <div class={row}><span class={rowKey}>Signature</span><span data-out-sig class={`${rowValue} text-xs`}></span></div>
+            </div>
+            <p class="text-sm text-text-muted">Technocore assigns the number and the time; the signature covers the room, the nonce and the text.</p>
+            <button type="button" data-action="download-proof" class={secondary}><Download size={16} aria-hidden="true" /> Download technical receipt</button>
+          </div>
+        </details>
+      </section>
+
+      <p class="flex items-start gap-2.5 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-text-secondary">
+        <Info size={18} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />
+        <span>{DID_DISCLAIMER}</span>
+      </p>
+    </div>
+
+    <template data-room-template>
+      <li>
+        <button type="button" data-room class="flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-lg border border-border bg-bg px-4 text-left aria-pressed:border-accent-border aria-pressed:bg-accent-soft" aria-pressed="false">
+          <span data-room-mark class="grid size-4 shrink-0 place-items-center rounded-full border border-border-strong"></span>
+          <span data-room-name class="font-mono text-sm font-semibold"></span>
+          <span class="flex-1"></span>
+          <span data-room-meta class="font-mono text-xs text-text-muted"></span>
+          <span data-room-pattern class="rounded-md border border-border-strong bg-surface-raised px-2.5 py-1 text-xs font-semibold"></span>
+        </button>
+      </li>
+    </template>
+    <p class="text-center text-sm text-text-muted">Your key never leaves this browser unencrypted. No account, no email, no tracking. Census #{latest.census}.</p>
+  </div>
+</Base>
+
+<script>
+  import "../scripts/write.ts";
+</script>

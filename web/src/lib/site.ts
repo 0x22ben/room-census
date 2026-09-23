@@ -15,10 +15,11 @@ const policy = (connect: string) => [
   "object-src 'none'",
 ].join("; ");
 export const CSP = policy("'self'");
-// My DID and Verify read public room messages from Technocore in the browser; no other page may connect out
+// My DID, Write and Verify read or write public room messages on Technocore from the browser;
+// no other page may connect out
 export const TECHNOCORE_CSP = policy("'self' https://technocore.chat");
 
-export type Icon = "discover" | "rooms" | "watched" | "did" | "verify" | "data" | "method" | "source";
+export type Icon = "discover" | "rooms" | "watched" | "did" | "write" | "verify" | "data" | "method" | "source";
 export type NavItem = { label: string; href: string; icon: Icon; ready: boolean; external?: boolean };
 export type NavSection = { label: string; items: NavItem[] };
 
@@ -35,7 +36,10 @@ export const NAV: NavSection[] = [
   },
   {
     label: "You",
-    items: [{ label: "My DID", href: "/did/", icon: "did", ready: true }],
+    items: [
+      { label: "My DID", href: "/did/", icon: "did", ready: true },
+      { label: "Write", href: "/write/", icon: "write", ready: true },
+    ],
   },
   {
     label: "Evidence",

@@ -31,9 +31,17 @@ import { site } from "../lib/data";
 import { DID_DISCLAIMER } from "../lib/patterns";
 import { TECHNOCORE_CSP } from "../lib/site";
 import { WINDOW } from "../lib/did-core.mjs";
-import { MIN_PASSWORD, ROOMS, STARTERS } from "../lib/did-wallet.mjs";
+import { COMMUNITY, INTRODUCTION, MIN_PASSWORD, RESERVED } from "../lib/did-wallet.mjs";
 
 const { latest, identity, rooms } = site();
+// rooms a first message may go to: measured, still listed, never a reserved one
+const rate = new Map(latest.rooms.map((r) => [r.room, r.rate_interval ?? null]));
+const senders = new Map(latest.rooms.map((r) => [r.room, r.eff_senders ?? null]));
+const pattern = new Map(latest.rooms.map((r) => [r.room, r.class]));
+const choices = [...rooms.values()]
+  .filter((d) => d.current && !RESERVED.includes(d.room))
+  .map((d) => ({ room: d.room, rate: rate.get(d.room) ?? null, senders: senders.get(d.room) ?? null, pattern: pattern.get(d.room) ?? d.last_class }))
+  .sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1) || a.room.localeCompare(b.room));
 // the rooms of the latest census, then the room where Room Census signs its own messages
 const measured = latest.rooms.map((r) => r.room);
 const ownRoomExtra = !measured.includes(identity.room);
@@ -75,7 +83,7 @@ const steps = ["Create", "Protect", "Write", "Publish"];
     <p data-wizard-noscript class="text-center text-text-muted">Creating or restoring an identity needs JavaScript. It runs only in this browser.</p>
     <p data-framed hidden class="text-center font-semibold text-warning">This page is shown inside another site. Open roomcensus.xyz/did/ directly to create or restore a DID.</p>
 
-    <div data-wizard hidden class="grid grid-cols-[minmax(0,1fr)] gap-6">
+    <div data-wizard hidden data-rooms={JSON.stringify(choices)} class="grid grid-cols-[minmax(0,1fr)] gap-6">
       <ol data-stepper hidden aria-label="Steps" class="flex items-center gap-2 text-sm sm:gap-3">
         {steps.map((s, i) => (
           <li data-step={i} data-step-label={s} class="group flex min-w-0 items-center gap-2 text-text-muted last:flex-none sm:flex-1 aria-[current=step]:font-semibold aria-[current=step]:text-text data-[done]:text-text">
@@ -206,25 +214,39 @@ const steps = ["Create", "Protect", "Write", "Publish"];
         <p data-saved-note hidden class={good}><CircleCheck size={18} aria-hidden="true" class="shrink-0 text-accent" />You saved your recovery file. Keep it and the passphrase in two separate safe places.</p>
         <h2 id="message-title" tabindex="-1" data-message-title class={title}>Publish your first message</h2>
         <p class={lede}>This writes to Technocore and cannot be undone. Check what becomes public.</p>
+        <div data-proposed class="grid gap-3">
+          <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-bg px-4 py-3">
+            <span class="grid gap-0.5">
+              <span class="text-xs font-semibold text-text-muted">Proposed room</span>
+              <code class="font-mono text-base font-semibold">{COMMUNITY.room}</code>
+            </span>
+            {!COMMUNITY.ready && <span class="rounded-md border border-warning-border bg-warning-soft px-3 py-1.5 text-xs font-semibold text-warning">Not created yet</span>}
+          </div>
+          {!COMMUNITY.ready && (
+            <p class={warn}>
+              <TriangleAlert size={18} aria-hidden="true" class="shrink-0 text-warning" />
+              This room does not exist yet, so nothing can be published to it. Choose another room below, or skip this step. The {identity.room} room stays for signed censuses only.
+            </p>
+          )}
+        </div>
+        <div data-room-area class="grid gap-3">
+          <label class="grid gap-2">
+            <span class={labelRow}>Room</span>
+            <input data-room-search type="search" autocomplete="off" spellcheck="false" placeholder="Search a room" class={input} />
+          </label>
+          <ul data-room-list aria-label="Rooms" class="grid gap-2"></ul>
+          <p data-room-empty hidden class="text-sm font-semibold text-warning">No measured room matches that name. A name that is not in this list cannot be published to from here.</p>
+        </div>
         <form data-compose novalidate class="grid gap-4">
-          <fieldset class="grid gap-2">
-            <legend class="mb-2 text-sm font-semibold">Room</legend>
-            {ROOMS.map((r) => <label class="inline-flex min-h-11 items-center gap-2 font-mono text-sm"><input type="radio" name="room" value={r} class="size-4 accent-accent" /> {r}</label>)}
-          </fieldset>
-          <fieldset class="grid gap-2">
-            <legend class="mb-2 text-sm font-semibold">Start from an idea</legend>
-            <div class="flex flex-wrap gap-2">
-              {STARTERS.map((st) => <button type="button" data-starter={st.id} data-starter-text={st.text} class={secondary}>{st.label}</button>)}
-            </div>
-          </fieldset>
           <p class="text-sm text-text-muted"><span class="font-semibold text-text-secondary">Tip from Coin Academy</span> (third-party guidance, not an official Flop Labs rule): publish a real first message about what you want to build, learn or test. Official contest requirements come only from the current Flop Labs rules.</p>
           <label class="grid gap-2">
             <span class={labelRow}>Message</span>
-            <textarea data-message rows="3" maxlength="4096" aria-describedby="text-hint" class={`${input} py-3`}></textarea>
+            <textarea data-message rows="3" maxlength="4096" aria-describedby="text-hint" class={`${input} py-3`}>{INTRODUCTION}</textarea>
           </label>
           <p id="text-hint" class="text-sm text-text-muted">Replace every part in [brackets] with your own words. Line breaks become spaces.</p>
           <button type="submit" class={secondary}>Review the message</button>
           <p data-error="compose" role="alert" class={alert}></p>
+          <button type="button" data-action="skip" class="inline-flex min-h-11 cursor-pointer items-center justify-center text-sm font-semibold text-link">Skip for now</button>
         </form>
         <section data-preview hidden aria-labelledby="preview-title" class="grid gap-3 rounded-lg border border-border-strong bg-bg p-4">
           <h3 id="preview-title" tabindex="-1" class="font-semibold outline-none">Exactly what will be published</h3>
@@ -298,6 +320,7 @@ const steps = ["Create", "Protect", "Write", "Publish"];
         </button>
       </div>
       <p id="did-hint" class="text-sm text-text-muted">An Ed25519 did:key, starting with did:key:z6Mk.</p>
+      <p data-did-handed hidden role="status" class="text-sm font-semibold">This DID came from the page you arrived from. Choose Look up to read its public activity.</p>
       <p id="did-error" data-did-error role="alert" class="text-sm font-semibold text-warning empty:hidden"></p>
     </form>
     <p class="text-sm text-text-muted">
@@ -369,6 +392,17 @@ const steps = ["Create", "Protect", "Write", "Publish"];
     </div>
     <p class="text-center text-sm text-text-muted">Your key never leaves this browser unencrypted, and your watched rooms stay in it. No account, no email, no tracking.</p>
   </div>
+  <template data-room-template>
+    <li>
+      <button type="button" data-room class="flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-lg border border-border bg-bg px-4 text-left aria-pressed:border-accent-border aria-pressed:bg-accent-soft" aria-pressed="false">
+        <span data-room-mark class="grid size-4 shrink-0 place-items-center rounded-full border border-border-strong"></span>
+        <span data-room-name class="font-mono text-sm font-semibold"></span>
+        <span class="flex-1"></span>
+        <span data-room-meta class="font-mono text-xs text-text-muted"></span>
+        <span data-room-pattern class="rounded-md border border-border-strong bg-surface-raised px-2.5 py-1 text-xs font-semibold"></span>
+      </button>
+    </li>
+  </template>
 </Base>
 
 <script>

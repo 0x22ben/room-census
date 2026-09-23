@@ -22,7 +22,7 @@ PAGE_CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self'; script-
             "base-uri 'none'; form-action 'none'; object-src 'none'")
 # My DID and Verify are the only pages that may connect out, and only to Technocore's public read API
 DID_CSP = PAGE_CSP.replace("connect-src 'self'", "connect-src 'self' https://technocore.chat")
-CONNECTS = ("/did/", "/verify/")
+CONNECTS = ("/did/", "/verify/", "/write/")
 DID_DISCLAIMER = ("This page summarizes public Technocore activity. It does not determine ownership, reputation or "
                   "eligibility for any reward.")
 # the wizard's own result for a signature it checked itself (ROOM_CENSUS_UX_SPEC.md, exceptions): only in the My DID script
@@ -207,17 +207,17 @@ class Artifact(unittest.TestCase):
             for label in ("Primary", "Menu"):
                 links = self.nav_links(text, label)
                 with self.subTest(page=route, nav=label):
-                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "My DID", "Verify", "Data",
-                                                                "Method", "Source code"])
+                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "My DID", "Write", "Verify",
+                                                                "Data", "Method", "Source code"])
                     for href, _, _ in links:
                         if href.startswith("/"):
                             self.assertTrue(contract.resolve(DIST, route, href).is_file(), href)
                     current = [h for h, _, on in links if on]
-                    own = ("/watched/", "/did/", "/verify/", "/open-data/", "/method/")
+                    own = ("/watched/", "/did/", "/write/", "/verify/", "/open-data/", "/method/")
                     expected = (["/"] if route == "/" else ["/rooms/"] if route.startswith("/rooms/")
                                 else [route] if route in own else [])
                     self.assertEqual(current, expected)
-        for page in ("did", "verify", "open-data", "method"):
+        for page in ("did", "write", "verify", "open-data", "method"):
             self.assertTrue((DIST / page / "index.html").is_file())
 
     def test_the_overview_keeps_the_anchors_signed_messages_link_to(self):
@@ -248,7 +248,7 @@ class Artifact(unittest.TestCase):
                 for attrs in scripts:
                     self.assertRegex(attrs, r'type="module" src="/_astro/[\w.-]+\.js"')
                 needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched ", "data-did-form ",
-                                                       "data-verify-summary "))
+                                                       "data-verify-summary ", "data-write "))
                 self.assertEqual(len(scripts), needed)
 
     def test_the_built_site_meets_the_legacy_route_contract(self):
@@ -389,7 +389,8 @@ class Artifact(unittest.TestCase):
         self.assertIn("never sent anywhere", visible)
         self.assertIn("Runs locally on this device", visible)
         # the rooms read are exactly the latest census plus the room where Room Census signs
-        rooms = json.loads(html.unescape(re.search(r'data-rooms="([^"]+)"', text).group(1)))
+        form = re.search(r"<form data-did-form [^>]*>", text).group(0)
+        rooms = json.loads(html.unescape(re.search(r'data-rooms="([^"]+)"', form).group(1)))
         self.assertEqual(rooms, [r["room"] for r in latest["rooms"]] + [identity["room"]])
         self.assertIn(f'the newest 200 messages of each of the {len(latest["rooms"])} rooms in census #{latest["census"]}', visible)
         self.assertIn("Older messages, other rooms and private rooms are not inspected", visible)
@@ -488,6 +489,50 @@ class Artifact(unittest.TestCase):
         identity = json.loads((DIST / "identity.json").read_text(encoding="utf-8"))
         self.assertIn(identity["schedule"].lower(), visible)
 
+    def test_write_publishes_only_with_an_unlocked_key_and_a_room_that_exists(self):
+        text = (DIST / "write" / "index.html").read_text(encoding="utf-8")
+        visible = self.visible_text(DIST / "write" / "index.html")
+        latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
+        # publishing needs the recovery file: the page offers no way to type a DID
+        self.assertRegex(text, r"<div data-write [^>]*hidden")
+        self.assertIn("needs JavaScript", visible)
+        self.assertIn("A public DID alone can never publish", visible)
+        self.assertIn("You cannot type or paste a DID to publish", visible)
+        self.assertEqual(len(re.findall(r"<input[^>]*", text)), len(re.findall(r'<input[^>]*(?:data-unlock-file|data-unlock-password|data-room-search|data-understand)', text)),
+                         "every input belongs to the recovery file, the passphrase, the room search or the confirmation")
+        self.assertNotRegex(text, r'contenteditable')
+        # the rooms offered are the measured ones of the latest census, never a reserved room
+        carried = json.loads(html.unescape(re.search(r'data-rooms="([^"]+)"', text).group(1)))
+        measured = {r["room"] for r in latest["rooms"]}
+        self.assertTrue(carried)
+        for entry in carried:
+            with self.subTest(room=entry["room"]):
+                self.assertIn(entry["room"], measured)
+                self.assertNotIn(entry["room"], ("room-census", "events"))
+        self.assertIn("Publishing never creates a room", visible)
+        # the community room is never offered here, and is not created
+        self.assertNotIn("room-census-community", [e["room"] for e in carried])
+        self.assertIn(DID_DISCLAIMER, html.unescape(text))
+        script = next(DIST.glob("_astro/write.astro*.js")).read_text(encoding="utf-8")
+        self.assertNotRegex(script, r"localStorage|sessionStorage|indexedDB|document\.cookie")
+
+    def test_the_first_message_offers_the_community_room_without_creating_it(self):
+        text = (DIST / "did" / "index.html").read_text(encoding="utf-8")
+        visible = self.visible_text(DIST / "did" / "index.html")
+        identity = json.loads((DIST / "identity.json").read_text(encoding="utf-8"))
+        self.assertIn("room-census-community", visible)
+        self.assertIn("Not created yet", visible)
+        self.assertIn("This room does not exist yet", visible)
+        self.assertIn(f"The {identity['room']} room stays for signed censuses only", visible)
+        # the proposed room is never in the list a message can be sent to
+        carried = json.loads(html.unescape(re.search(r'<div data-wizard [^>]*data-rooms="([^"]+)"', text).group(1)))
+        names = [e["room"] for e in carried]
+        self.assertNotIn("room-census-community", names)
+        self.assertNotIn(identity["room"], names)
+        self.assertIn("I am interested in [topic]", visible)
+        self.assertIn("I plan to contribute by [contribution]", visible)
+        self.assertIn("Skip for now", visible)
+
     def test_the_rooms_index_lists_every_room_with_filters_that_need_script(self):
         text = (DIST / "rooms" / "index.html").read_text(encoding="utf-8")
         index = json.loads((DIST / "data" / "rooms" / "index.json").read_text(encoding="utf-8"))["rooms"]
@@ -502,8 +547,9 @@ class Artifact(unittest.TestCase):
         for page in self.html_pages():
             text = page.read_text(encoding="utf-8")
             with self.subTest(page=self.route(page)):
-                # My DID runs on the reader's device and says so in the top bar instead (its mockup)
-                self.assertIn("Runs locally on this device" if self.route(page) == "/did/" else expected, text)
+                # My DID and Write run on the reader's device and say so in the top bar instead
+                local = self.route(page) in ("/did/", "/write/")
+                self.assertIn("Runs locally on this device" if local else expected, text)
                 self.assertNotRegex(text, r"(?i)census #\d+ verified")
                 self.assertNotIn("passed every public check", text)
 

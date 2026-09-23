@@ -12,7 +12,7 @@ import { CSP, SITE_NAME } from "../lib/site";
 import { censusStatus, latest } from "../lib/data";
 
 // indexable: false for pages served at any missing address (404), which have no canonical URL
-// csp: My DID and Verify pass their own policy (they may connect to Technocore)
+// csp: My DID, Write and Verify pass their own policy (they may connect to Technocore)
 // local: a page that runs on the reader's device (My DID) shows that in the top bar, as its mockup
 interface Props { title: string; description: string; indexable?: boolean; csp?: string; local?: boolean }
 const { title, description, indexable = true, csp = CSP, local = false } = Astro.props;

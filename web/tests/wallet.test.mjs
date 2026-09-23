@@ -6,8 +6,8 @@ import { test } from "node:test";
 
 import { check, publicKey } from "../src/lib/did-core.mjs";
 import {
-  BACKUP_SCHEMA, createIdentity, didOf, forget, ITERATIONS, messageProblem, nextNonce, openBackup, passwordProblem, proofOf, ROOMS,
-  sealBackup, signMessage, STARTERS, sweep, WalletError,
+  BACKUP_SCHEMA, COMMUNITY, createIdentity, didOf, forget, INTRODUCTION, ITERATIONS, messageProblem, nextNonce, openBackup, passwordProblem,
+  proofOf, RESERVED, sealBackup, signMessage, STARTERS, sweep, WalletError,
 } from "../src/lib/did-wallet.mjs";
 
 const subtle = globalThis.crypto.subtle;
@@ -142,19 +142,34 @@ test("the text signed is the text Technocore stores, after its single-line sweep
   assert.equal(await check(subtle, key, id.did, "lobby", { from: id.did, ...s, text: " line one\nline two " }), "bad");
 });
 
-test("starters are editable prompts: every bracket must be filled, only lobby is allowed", () => {
-  assert.deepEqual(ROOMS, ["lobby"]);
-  assert.equal(STARTERS.length, 4);
-  for (const s of STARTERS) {
-    assert.match(messageProblem("lobby", s.text), /\[brackets\]/);
-    assert.doesNotMatch(s.text, /airdrop|eligib|\bgm\b|present/i);
-  }
+test("a message only goes to a room the page carries, and never to a reserved one", () => {
+  const allowed = ["lobby", "flop-commerce"];
   const filled = "I am building a room map to help newcomers. I would appreciate feedback on the layout.";
-  assert.equal(messageProblem("lobby", filled), null);
-  assert.equal(messageProblem("room-census", filled), "Choose a room.");
-  assert.equal(messageProblem("lobby", " \n "), "Write your message.");
-  assert.match(messageProblem("lobby", "x".repeat(4097)), /4096/);
-  assert.match(messageProblem("lobby", "I am building [project] now"), /\[brackets\]/);
+  assert.equal(messageProblem("lobby", filled, allowed), null);
+  assert.equal(messageProblem("not-listed", filled, allowed), "Choose a room from the list.");
+  assert.equal(messageProblem("", filled, allowed), "Choose a room from the list.");
+  assert.equal(messageProblem("lobby", filled, undefined), "Choose a room from the list.");
+  assert.deepEqual(RESERVED, ["room-census", "events"]);
+  assert.equal(messageProblem("room-census", filled, ["room-census"]), "This room is reserved for signed censuses.");
+  assert.equal(messageProblem("lobby", " \n ", allowed), "Write your message.");
+  assert.match(messageProblem("lobby", "x".repeat(4097), allowed), /4096/);
+  assert.match(messageProblem("lobby", "I am building [project] now", allowed), /\[brackets\]/);
+});
+
+test("starters and the introduction are editable prompts, with no reward claim", () => {
+  const allowed = ["lobby"];
+  assert.equal(STARTERS.length, 4);
+  for (const s of [...STARTERS.map((x) => x.text), INTRODUCTION]) {
+    assert.match(messageProblem("lobby", s, allowed), /\[brackets\]/, s);
+    assert.doesNotMatch(s, /airdrop|eligib|gm|present|reward/i);
+  }
+  assert.match(INTRODUCTION, /\[topic\][\s\S]*\[contribution\]/);
+});
+
+test("the community room is named but stays closed until it is created", () => {
+  assert.equal(COMMUNITY.room, "room-census-community");
+  assert.equal(COMMUNITY.ready, false, "nothing may publish there while it does not exist");
+  assert.ok(!RESERVED.includes(COMMUNITY.room));
 });
 
 test("nonces are digit strings from the millisecond clock, and proofs keep the full reply", () => {
