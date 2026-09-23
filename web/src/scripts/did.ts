@@ -14,6 +14,7 @@ type Coverage = ReturnType<typeof roomCoverage> | { room: string; status: "not r
 const form = document.querySelector<HTMLFormElement>("form[data-did-form]");
 const result = document.querySelector<HTMLElement>("[data-did-result]");
 const $ = <T extends HTMLElement>(sel: string) => result!.querySelector<T>(sel)!;
+// at most this many room reads at once, far below Technocore's 600 reads per minute
 const PARALLEL = 4;
 const TIMES = "Times are as reported by technocore.chat: a signature covers the room, the nonce and the text, not the time.";
 
@@ -45,6 +46,7 @@ if (form && result) {
   const heading = $<HTMLElement>("[data-did-heading]");
   const status = $<HTMLElement>("[data-did-status]");
   const progress = $<HTMLProgressElement>("[data-did-progress]");
+  const count = $<HTMLElement>("[data-did-count]");
   const cancel = $<HTMLButtonElement>("[data-did-cancel]");
   const proofButton = $<HTMLButtonElement>("[data-did-proof]");
   let running: AbortController | null = null;
@@ -99,7 +101,16 @@ if (form && result) {
     proof = null;
     reset(did);
     let done = 0;
+    let failed = 0;
     let next = 0;
+    // visible progress after every room; the status region only speaks at the start and the end
+    const tick = () => {
+      const text = `${done} of ${rooms.length} rooms read${failed > 0 ? ` · ${failed} could not be read` : ""}`;
+      count.textContent = text;
+      progress.value = done / rooms.length;
+      progress.setAttribute("aria-valuetext", text);
+    };
+    tick();
 
     const worker = async () => {
       while (next < rooms.length && !controller.signal.aborted) {
@@ -116,10 +127,13 @@ if (form && result) {
             if (r) found.push({ room, message: m, result: r });
           }
         } catch (e) {
-          coverage.push({ room, status: "not read", reason: controller.signal.aborted ? "stopped" : e instanceof Error ? e.message : "read failed" });
+          const stoppedHere = controller.signal.aborted;
+          coverage.push({ room, status: "not read", reason: stoppedHere ? "stopped" : e instanceof Error ? e.message : "read failed" });
+          if (stoppedHere) break;
+          failed += 1;
         }
         done += 1;
-        progress.value = done / rooms.length;
+        tick();
       }
     };
     await Promise.all(Array.from({ length: PARALLEL }, worker));
@@ -162,7 +176,7 @@ if (form && result) {
     result!.hidden = false;
     heading.textContent = "Looking up this DID";
     $<HTMLElement>("[data-did-for]").textContent = did;
-    status.textContent = `Reading ${rooms.length} rooms from technocore.chat.`;
+    status.textContent = `Reading ${rooms.length} rooms from technocore.chat, ${PARALLEL} at a time.`;
     progress.hidden = false;
     progress.value = 0;
     cancel.hidden = false;

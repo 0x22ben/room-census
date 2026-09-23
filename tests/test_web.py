@@ -76,6 +76,13 @@ class Project(unittest.TestCase):
                 with self.subTest(workflow=wf.name, pattern=pattern):
                     self.assertIsNone(re.search(pattern, text, re.I))
 
+    def test_ci_runs_the_did_page_in_a_real_browser(self):
+        """The /did/ script is tested as shipped; in CI a missing browser fails instead of skipping."""
+        wf = (REPO / ".github" / "workflows" / "web.yml").read_text(encoding="utf-8")
+        self.assertIn("npm run test:browser", wf)
+        self.assertRegex(wf, r'REQUIRE_BROWSER:\s*"1"')
+        self.assertTrue((WEB / "tests" / "browser" / "did-page.test.mjs").is_file())
+
     def test_the_deployment_guard_catches_each_form(self):
         for example in ("uses: actions/deploy-pages@v4", "pages: 'write'", "permissions: write-all",
                         "contents: write", "id-token: \"write\"", "run: git push origin HEAD:gh-pages"):

@@ -37,6 +37,11 @@ jobs:
       - name: Production build
         working-directory: web
         run: npm run build
+      - name: The My DID page in a headless browser (Technocore answered by the test, no network)
+        working-directory: web
+        env:
+          REQUIRE_BROWSER: "1"
+        run: npm run test:browser
       - name: A second build gives the same bytes
         working-directory: web
         run: |
