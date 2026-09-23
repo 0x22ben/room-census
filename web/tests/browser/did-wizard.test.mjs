@@ -547,3 +547,16 @@ test("My DID opens an identity.pem too, and says plainly what never leaves the d
     assert.equal(await hidden("[data-panel=message]"), true);
   }
 });
+
+test("the landing sends the reader to the lookup without reading anything", { skip }, async () => {
+  const log = await open();
+  await click("[data-action=go-lookup]");
+  await until("document.activeElement.id === 'did-input'", "the lookup field");
+  assert.equal(await page("document.querySelector('#did-input').value"), "", "nothing is filled in for the reader");
+  await sleep(1200);
+  assert.equal(log.requests.filter((r) => r.url.startsWith("https://technocore.chat/")).length, 0, "a lookup started by itself");
+  assert.equal(await hidden("[data-did-result]"), true);
+  // the DID a reader already has is still one click away
+  await click("[data-action=begin-restore]");
+  await until("!document.querySelector('[data-panel=restore]').hidden", "the open panel");
+});

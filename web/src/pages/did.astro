@@ -26,7 +26,6 @@ import Search from "@lucide/astro/icons/search";
 import Send from "@lucide/astro/icons/send";
 import ShieldCheck from "@lucide/astro/icons/shield-check";
 import TriangleAlert from "@lucide/astro/icons/triangle-alert";
-import Upload from "@lucide/astro/icons/upload";
 import { site } from "../lib/data";
 import { DID_DISCLAIMER } from "../lib/patterns";
 import { TECHNOCORE_CSP } from "../lib/site";
@@ -112,12 +111,16 @@ const steps = ["Create", "Protect", "Write", "Publish"];
           <button type="button" data-action="begin" class={primary}>Create my DID <ArrowRight size={18} aria-hidden="true" /></button>
         </div>
         <div class={card}>
-          <span class={tile}><Upload size={22} aria-hidden="true" /></span>
-          <h2 class="text-lg font-semibold">I already have a DID</h2>
-          <p class={lede}>Open your Room Census recovery file (.json) or your identity.pem. Both hold the same kind of key.</p>
-          <button type="button" data-action="begin-restore" class={secondary}><FolderOpen size={18} aria-hidden="true" /> Open my DID</button>
+          <span class={tile}><Search size={22} aria-hidden="true" /></span>
+          <h2 class="text-lg font-semibold">Look up a public DID</h2>
+          <p class={lede}>Read the recent signed activity of any public DID in the measured rooms. No file, no key, nothing to install.</p>
+          <button type="button" data-action="go-lookup" class={secondary}><Search size={18} aria-hidden="true" /> Look up a DID</button>
         </div>
       </div>
+
+      <p data-restore-entry class="text-center text-sm text-text-secondary">
+        Already have a DID? <button type="button" data-action="begin-restore" class="cursor-pointer font-semibold text-link">Open your Room Census recovery file (.json) or your identity.pem</button>
+      </p>
 
       <!-- what Room Census can see: shown on the landing, before anything is created -->
       <section data-sees aria-labelledby="sees-title" class={card}>

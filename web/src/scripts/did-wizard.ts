@@ -128,6 +128,13 @@ if (root) {
   q<HTMLButtonElement>("[data-action=begin]").addEventListener("click", () => show("create"));
   q<HTMLButtonElement>("[data-action=begin-restore]").addEventListener("click", () => show("restore"));
 
+  // the lookup lives further down the page: this only takes the reader there, and never reads anything
+  q<HTMLButtonElement>("[data-action=go-lookup]").addEventListener("click", () => {
+    const area = document.querySelector<HTMLElement>("[data-lookup-area]");
+    area?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.querySelector<HTMLInputElement>("#did-input")?.focus({ preventScroll: true });
+  });
+
   // ---------- 1. create ----------
   q<HTMLButtonElement>("[data-action=create]").addEventListener("click", (e) => guard(e.currentTarget as HTMLButtonElement, async () => {
     clearErrors();
