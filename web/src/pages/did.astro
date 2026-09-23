@@ -109,19 +109,24 @@ const steps = ["Create", "Protect", "Write", "Publish"];
         <div class={card}>
           <span class={tile}><Upload size={22} aria-hidden="true" /></span>
           <h2 class="text-lg font-semibold">I already have a DID</h2>
-          <p class={lede}>Open your recovery file and enter your passphrase.</p>
-          <button type="button" data-action="begin-restore" class={secondary}><FolderOpen size={18} aria-hidden="true" /> Restore my DID</button>
+          <p class={lede}>Open your Room Census recovery file (.json) or your identity.pem. Both hold the same kind of key.</p>
+          <button type="button" data-action="begin-restore" class={secondary}><FolderOpen size={18} aria-hidden="true" /> Open my DID</button>
         </div>
       </div>
 
       <!-- what Room Census can see: shown on the landing, before anything is created -->
       <section data-sees aria-labelledby="sees-title" class={card}>
-        <h2 id="sees-title" class="text-lg font-semibold">What Room Census can see</h2>
+        <h2 id="sees-title" class="text-lg font-semibold">What becomes public, and what never leaves your device</h2>
         <div>
-          <div class={row}><span class={rowKey}>Your DID and the messages you publish</span><span class={rowValue}>public</span></div>
-          <div class={row}><span class={rowKey}>Your private key</span><span class={rowValue}>held by this tab in memory, saved only encrypted</span></div>
-          <div class={row}><span class={rowKey}>Your passphrase and recovery file</span><span class={rowValue}>never sent anywhere</span></div>
+          <p class="pb-1 text-sm font-semibold text-text-secondary">Public on Technocore</p>
+          <div class={row}><span class={rowKey}>Your public DID</span><span class={rowValue}>public</span></div>
+          <div class={row}><span class={rowKey}>The messages you choose to publish</span><span class={rowValue}>public</span></div>
+          <p class="pt-4 pb-1 text-sm font-semibold text-text-secondary">Never sent to Room Census or to Technocore</p>
+          <div class={row}><span class={rowKey}>Your private key</span><span class={rowValue}>stays on this device</span></div>
+          <div class={row}><span class={rowKey}>Your passphrase</span><span class={rowValue}>stays on this device</span></div>
+          <div class={row}><span class={rowKey}>Your recovery files</span><span class={rowValue}>stay on this device</span></div>
         </div>
+        <p class={foot}><ShieldCheck size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-accent" />Your private key exists decrypted only in this tab's memory while the DID is unlocked. It never leaves your device.</p>
         <p class={foot}><Info size={16} aria-hidden="true" class="mt-0.5 shrink-0" />This site is static files: it has no server that could receive a key, a passphrase or a file.</p>
       </section>
 
@@ -143,19 +148,20 @@ const steps = ["Create", "Protect", "Write", "Publish"];
       <!-- restore -->
       <section data-panel="restore" hidden class={card} aria-labelledby="restore-title">
         <span class={tile}><FolderOpen size={22} aria-hidden="true" /></span>
-        <h2 id="restore-title" tabindex="-1" class={title}>Restore your DID</h2>
-        <p class={lede}>Select your recovery file and enter its passphrase. It is opened here, on this device.</p>
+        <h2 id="restore-title" tabindex="-1" class={title}>Open my DID</h2>
+        <p class={lede}>Select your .json recovery file or your identity.pem and enter its passphrase. It is opened here, on this device.</p>
         <form data-restore novalidate class="grid gap-4">
           <div class="grid gap-2">
-            <span class={labelRow}>Recovery file</span>
+            <span class={labelRow}>Your DID file</span>
             <label class="relative flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-lg border border-border-strong bg-bg py-1.5 pr-1.5 pl-3.5 focus-within:outline-2 focus-within:outline-focus">
               <span data-restore-file-name class="min-w-0 truncate font-mono text-sm text-text-muted">No file chosen</span>
               <span class="shrink-0 rounded-md bg-surface-raised px-3 py-2 text-sm font-semibold">Choose file</span>
-              <input data-restore-file type="file" accept=".json,application/json" class="absolute inset-0 cursor-pointer opacity-0" aria-label="Recovery file" />
+              <input data-restore-file type="file" multiple accept=".json,.pem,.txt,application/json,application/x-pem-file,text/plain" class="absolute inset-0 cursor-pointer opacity-0" aria-label="Your DID file" />
             </label>
+            <p class="text-sm text-text-muted">A .json recovery file or an identity.pem. If the Python tool also wrote passphrase.txt or did.txt, you can add them in the same selection.</p>
           </div>
           <label class="grid gap-2"><span class={labelRow}>Passphrase</span><input data-restore-password type="password" autocomplete="current-password" spellcheck="false" autocapitalize="off" autocorrect="off" class={input} /></label>
-          <button type="submit" data-action="restore" class={primary}>Restore my DID <ArrowRight size={18} aria-hidden="true" /></button>
+          <button type="submit" data-action="restore" class={primary}>Open my DID <ArrowRight size={18} aria-hidden="true" /></button>
           <p data-error="restore" role="alert" class={alert}></p>
         </form>
         <p class={foot}><Lock size={16} aria-hidden="true" class="mt-0.5 shrink-0" />The file and the passphrase are never sent anywhere.</p>
@@ -214,28 +220,28 @@ const steps = ["Create", "Protect", "Write", "Publish"];
         <p data-saved-note hidden class={good}><CircleCheck size={18} aria-hidden="true" class="shrink-0 text-accent" />You saved your recovery file. Keep it and the passphrase in two separate safe places.</p>
         <h2 id="message-title" tabindex="-1" data-message-title class={title}>Publish your first message</h2>
         <p class={lede}>This writes to Technocore and cannot be undone. Check what becomes public.</p>
-        <div data-proposed class="grid gap-3">
-          <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-bg px-4 py-3">
-            <span class="grid gap-0.5">
-              <span class="text-xs font-semibold text-text-muted">Proposed room</span>
-              <code class="font-mono text-base font-semibold">{COMMUNITY.room}</code>
-            </span>
-            {!COMMUNITY.ready && <span class="rounded-md border border-warning-border bg-warning-soft px-3 py-1.5 text-xs font-semibold text-warning">Not created yet</span>}
-          </div>
-          {!COMMUNITY.ready && (
-            <p class={warn}>
-              <TriangleAlert size={18} aria-hidden="true" class="shrink-0 text-warning" />
-              This room does not exist yet, so nothing can be published to it. Choose another room below, or skip this step. The {identity.room} room stays for signed censuses only.
-            </p>
-          )}
-        </div>
         <div data-room-area class="grid gap-3">
           <label class="grid gap-2">
-            <span class={labelRow}>Room</span>
+            <span class={labelRow}>Choose a room that exists</span>
             <input data-room-search type="search" autocomplete="off" spellcheck="false" placeholder="Search a room" class={input} />
           </label>
           <ul data-room-list aria-label="Rooms" class="grid gap-2"></ul>
           <p data-room-empty hidden class="text-sm font-semibold text-warning">No measured room matches that name. A name that is not in this list cannot be published to from here.</p>
+        </div>
+        <div data-proposed class="grid gap-3">
+          <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-bg px-4 py-3 opacity-80">
+            <span class="grid gap-0.5">
+              <span class="text-xs font-semibold text-text-muted">Community room (coming soon)</span>
+              <code class="font-mono text-base font-semibold">{COMMUNITY.room}</code>
+            </span>
+            {!COMMUNITY.ready && <span class="rounded-md border border-border-strong bg-surface-raised px-3 py-1.5 text-xs font-semibold text-text-secondary">Not created yet</span>}
+          </div>
+          {!COMMUNITY.ready && (
+            <p class={foot}>
+              <Info size={16} aria-hidden="true" class="mt-0.5 shrink-0" />
+              This room does not exist yet, so nothing can be published to it. It is not offered above until it is created. The {identity.room} room stays for signed censuses only.
+            </p>
+          )}
         </div>
         <form data-compose novalidate class="grid gap-4">
           <p class="text-sm text-text-muted"><span class="font-semibold text-text-secondary">Tip from Coin Academy</span> (third-party guidance, not an official Flop Labs rule): publish a real first message about what you want to build, learn or test. Official contest requirements come only from the current Flop Labs rules.</p>

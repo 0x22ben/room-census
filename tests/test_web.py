@@ -385,8 +385,17 @@ class Artifact(unittest.TestCase):
         self.assertIn("form-action 'none'", DID_CSP)
         self.assertIn("The lookup needs JavaScript", text)
         self.assertIn(DID_DISCLAIMER, html.unescape(text))
-        self.assertIn("What Room Census can see", visible)
-        self.assertIn("never sent anywhere", visible)
+        # what is public and what never leaves the device are two separate lists
+        self.assertIn("What becomes public, and what never leaves your device", visible)
+        public = visible.split("Public on Technocore")[1].split("Never sent to Room Census or to Technocore")[1]
+        for kept in ("Your private key", "Your passphrase", "Your recovery files"):
+            self.assertIn(kept, public)
+        self.assertNotIn("Your private key", visible.split("Public on Technocore")[1].split("Never sent")[0])
+        self.assertIn("Your private key exists decrypted only in this tab's memory while the DID is unlocked. It never leaves your device.", visible)
+        # one way in for an identity that already exists, whichever local backup holds it
+        self.assertIn("Open your Room Census recovery file (.json) or your identity.pem", visible)
+        self.assertIn("A .json recovery file or an identity.pem", visible)
+        self.assertRegex(text, r'<input data-restore-file type="file" multiple accept="\.json,\.pem,\.txt')
         self.assertIn("Runs locally on this device", visible)
         # the rooms read are exactly the latest census plus the room where Room Census signs
         form = re.search(r"<form data-did-form [^>]*>", text).group(0)
@@ -528,7 +537,12 @@ class Artifact(unittest.TestCase):
         identity = json.loads((DIST / "identity.json").read_text(encoding="utf-8"))
         self.assertIn("room-census-community", visible)
         self.assertIn("Not created yet", visible)
+        self.assertIn("Community room (coming soon)", visible)
+        self.assertNotIn("Proposed room", visible)
+        # the rooms that exist come first, and the one that does not comes after them
+        self.assertLess(visible.index("Choose a room that exists"), visible.index("Community room (coming soon)"))
         self.assertIn("This room does not exist yet", visible)
+        self.assertIn("It is not offered above until it is created", visible)
         self.assertIn(f"The {identity['room']} room stays for signed censuses only", visible)
         # the proposed room is never in the list a message can be sent to
         carried = json.loads(html.unescape(re.search(r'<div data-wizard [^>]*data-rooms="([^"]+)"', text).group(1)))

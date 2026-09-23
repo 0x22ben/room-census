@@ -4,13 +4,10 @@
 // module's memory, for this tab, and the DID that signs is always derived from it: nothing here reads
 // a DID typed by the reader, and did.txt is only ever a check. Opening a file makes no request.
 // Publishing sends one message, after a review and a confirmation, and never resends it.
-import {
-  backupFromPem, didFromText, messageProblem, MIN_PASSWORD, nextNonce, openBackup, openIdentityPem,
-  passphraseFromText, PemError, proofOf, signMessage, WalletError,
-} from "../lib/did-wallet.mjs";
+import { backupFromPem, messageProblem, MIN_PASSWORD, nextNonce, proofOf, signMessage, WalletError } from "../lib/did-wallet.mjs";
 import { dateTimeUtc } from "../lib/format";
 import { lookFor, publish } from "../lib/publish.mjs";
-import { sortFiles } from "../lib/did-files.mjs";
+import { openChosen } from "../lib/did-open.mjs";
 import { known } from "../lib/rooms.mjs";
 import { roomPicker, type Room } from "./room-picker.ts";
 
@@ -38,7 +35,7 @@ if (root) {
 
   const error = (name: string, text: string) => { q<HTMLElement>(`[data-error="${name}"]`).textContent = text; };
   const clearErrors = () => root.querySelectorAll<HTMLElement>("[data-error]").forEach((e) => { e.textContent = ""; });
-  const safe = (e: unknown, fallback: string) => (e instanceof WalletError || e instanceof PemError ? e.message : fallback);
+  const safe = (e: unknown, fallback: string) => (e instanceof WalletError ? e.message : fallback);
   const short = (did: string) => did.slice(-8);
   const stamp = () => new Date().toISOString().slice(0, 19).replace(/:/g, "").replace("T", "-");
   const download = (name: string, data: object) => {
@@ -122,37 +119,18 @@ if (root) {
       clearErrors();
       if (identity) return;
       const pw = q<HTMLInputElement>("[data-unlock-password]");
-      // each file is taken for what its name says it is, and the selection is checked before it is read
-      const sorted = sortFiles([...(file.files ?? [])]);
-      if (sorted.problem) return error("unlock", sorted.problem);
-      const keyText = await sorted.key.text();
-      const didText = sorted.did ? (await sorted.did.text()).trim() : "";
-      // a did.txt must hold one DID and nothing else, whichever format the key comes in
-      const named = didText === "" ? null : didFromText(didText);
-      if (sorted.did && !named) return error("unlock", "This did.txt does not hold one did:key value and nothing else. Nothing was unlocked.");
-      // a passphrase.txt only fills in for the field, and never overrides what was typed
-      const passphrase = pw.value || passphraseFromText(sorted.passphrase ? await sorted.passphrase.text() : "");
-      if (!passphrase) return error("unlock", "Enter the passphrase that protects this file.");
-      try {
-        // the DID always comes from the key in the file, whichever format it is
-        if (/-----BEGIN/.test(keyText)) {
-          identity = await openIdentityPem(crypto.subtle, keyText, passphrase, sorted.did ? didText : undefined);
-          pem = keyText;
-          offered = true;
-        } else {
-          const opened = await openBackup(crypto.subtle, keyText, passphrase);
-          if (named && named !== opened.did) {
-            return error("unlock", "This did.txt names a different DID than the recovery file. Nothing was unlocked.");
-          }
-          identity = opened;
-        }
-        pw.value = "";
-        show("compose");
-      } catch (err) {
+      // My DID and Write open a file the same way: lib/did-open.mjs
+      const opened = await openChosen(crypto.subtle, [...(file.files ?? [])], pw.value);
+      if (opened.problem) {
         pem = null;
         offered = false;
-        error("unlock", safe(err, "This file could not be opened."));
+        return error("unlock", opened.problem);
       }
+      identity = opened.identity!;
+      pem = opened.pem;
+      offered = Boolean(opened.pem);
+      pw.value = "";
+      show("compose");
     });
   });
 

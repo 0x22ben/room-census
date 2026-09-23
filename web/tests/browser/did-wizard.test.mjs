@@ -8,14 +8,14 @@
 // message or an offered file.
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { mkdtempSync, promises as fs, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, promises as fs, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { after, before, test } from "node:test";
 
 import { check, publicKey, readReply } from "../../src/lib/did-core.mjs";
 import { backupHeader, createIdentity, sealBackup } from "../../src/lib/did-wallet.mjs";
-import { listeners, navigate, page, send, skip, sleep, start, stop, until } from "./harness.mjs";
+import { listeners, navigate, page, send, skip, sleep, start, stop, until, WEB } from "./harness.mjs";
 
 const subtle = globalThis.crypto.subtle;
 const PASSWORD = "correct horse battery staple";
@@ -23,6 +23,11 @@ const MESSAGE = "I am building a room map to help newcomers find active rooms. I
 const files = mkdtempSync(join(tmpdir(), "rc-backups-"));
 let fileNo = 0;
 const saveFile = (text) => { const p = join(files, `backup-${++fileNo}.json`); writeFileSync(p, text); return p; };
+const saveAs = (name, text) => { const dir = mkdtempSync(join(files, "sel-")); const p = join(dir, name); writeFileSync(p, text); return p; };
+// the identity.pem the Python tool writes, with the DID it prints for that same key
+const PEM_TEXT = readFileSync(resolve(WEB, "tests", "fixtures", "identity-test-key.pem.txt"), "utf8");
+const PEM_PASSPHRASE = "correct horse battery staple";
+const PEM_DID = "did:key:z6MkehRgf7yJbgaGfYsdoAsKdBPE3dj2CYhowQdcjqSJgvVd";
 
 // in the page: keep each download (blob and name) instead of saving it; the page code is untouched
 const CATCH_DOWNLOADS = `
@@ -87,10 +92,10 @@ const step = () => page("(() => { const li = document.querySelector('[aria-curre
 const downloads = () => page("Promise.all(window.__downloads.map(async (d) => ({ name: d.name, text: await d.blob.text() })))");
 const unloadWarns = () => page("(() => { const e = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; })()");
 const outcome = (kind) => until(`document.querySelector('[data-panel=outcome]').dataset.outcome === '${kind}' && !document.querySelector('[data-panel=outcome]').hidden`, `the ${kind} outcome`);
-async function setFile(selector, path) {
+async function setFile(selector, ...paths) {
   const { root } = await send("DOM.getDocument", { depth: 1 });
   const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector });
-  await send("DOM.setFileInputFiles", { nodeId, files: [path] });
+  await send("DOM.setFileInputFiles", { nodeId, files: paths });
 }
 const errorOf = (name) => text(`[data-error="${name}"]`);
 const waitError = (name) => until(`document.querySelector('[data-error="${name}"]').textContent !== ''`, `the ${name} error`);
@@ -498,4 +503,46 @@ test("inside another site's frame the wizard stays closed", { skip }, async () =
     return { wizard: d.querySelector("[data-wizard]").hidden, framed: d.querySelector("[data-framed]").hidden };
   })()`);
   assert.deepEqual(state, { wizard: true, framed: false });
+});
+
+test("My DID opens an identity.pem too, and says plainly what never leaves the device", { skip }, async () => {
+  const log = await open();
+  // the two lists are separate, and the private key is only ever in the second one
+  const seen = await page("document.querySelector('[data-sees]').innerText");
+  const [, publicPart, keptPart] = seen.split(/Public on Technocore|Never sent to Room Census or to Technocore/);
+  assert.match(publicPart, /Your public DID/);
+  assert.match(publicPart, /The messages you choose to publish/);
+  assert.doesNotMatch(publicPart, /private key/i);
+  for (const kept of ["Your private key", "Your passphrase", "Your recovery files"]) assert.match(keptPart, new RegExp(kept));
+  assert.match(seen, /Your private key exists decrypted only in this tab's memory while the DID is unlocked\. It never leaves your device\./);
+
+  // the same entry point takes the other local backup format, with its two optional files
+  await click("[data-action=begin-restore]");
+  await setFile("[data-restore-file]", saveAs("identity.pem", PEM_TEXT), saveAs("passphrase.txt", `${PEM_PASSPHRASE}
+`), saveAs("did.txt", `${PEM_DID}
+`));
+  await submit("[data-restore]");
+  await until("!document.querySelector('[data-panel=message]').hidden", "the composer");
+  assert.equal(log.requests.length, log.loaded, "opening a DID made no request");
+  await compose();
+  assert.equal(await text("[data-preview-did]"), PEM_DID, "the DID comes from the key in the PEM");
+  const haystack = await exposure(log);
+  assert.ok(!haystack.includes(PEM_PASSPHRASE), "the passphrase leaked");
+
+  // and it refuses the same selections the Write page refuses
+  await click("[data-action=start-over]");
+  await click("[data-action=over-yes]");
+  await until("!document.querySelector('[data-panel=start]').hidden", "the landing");
+  await click("[data-action=begin-restore]");
+  for (const [paths, expected] of [
+    [[saveAs("identity.pem", PEM_TEXT), saveAs("did.txt", "hello")], /did\.txt does not hold one did:key value/],
+    [[saveAs("identity.pem", PEM_TEXT), saveAs("notes.md", "x")], /does not know what to do with notes\.md/],
+  ]) {
+    await setFile("[data-restore-file]", ...paths);
+    await fill("[data-restore-password]", PEM_PASSPHRASE);
+    await submit("[data-restore]");
+    await waitError("restore");
+    assert.match(await errorOf("restore"), expected);
+    assert.equal(await hidden("[data-panel=message]"), true);
+  }
 });

@@ -6,6 +6,7 @@
 // The only requests this file makes are the publication of one reviewed, confirmed message and reads
 // of the room to find it again. Nothing is stored, logged or put in a URL; errors carry no key material.
 // The server reply is kept in memory only to check the result; a technical receipt is optional.
+import { openChosen } from "../lib/did-open.mjs";
 import { lookFor, publish as publishMessage } from "../lib/publish.mjs";
 import {
   COMMUNITY, createIdentity, forget, INTRODUCTION, messageProblem, MIN_PASSWORD, nextNonce, openBackup, passwordProblem, proofOf, sealBackup,
@@ -119,8 +120,8 @@ if (root) {
   });
 
   q<HTMLInputElement>("[data-restore-file]").addEventListener("change", (e) => {
-    const f = (e.currentTarget as HTMLInputElement).files?.[0];
-    q<HTMLElement>("[data-restore-file-name]").textContent = f ? f.name : "No file chosen";
+    const names = [...((e.currentTarget as HTMLInputElement).files ?? [])].map((f) => f.name);
+    q<HTMLElement>("[data-restore-file-name]").textContent = names.join(", ") || "No file chosen";
   });
 
   // ---------- landing ----------
@@ -230,18 +231,17 @@ if (root) {
     return guard((e.currentTarget as HTMLFormElement).querySelector("button[type=submit]"), async () => {
       clearErrors();
       if (identity) return;
-      const file = q<HTMLInputElement>("[data-restore-file]").files?.[0];
+      const chosen = [...(q<HTMLInputElement>("[data-restore-file]").files ?? [])];
       const pw = q<HTMLInputElement>("[data-restore-password]");
-      if (!file) return error("restore", "Choose your recovery file.");
-      try {
-        identity = await openBackup(crypto.subtle, await file.text(), pw.value);
-        backedUp = true;
-        pw.value = "";
-        q<HTMLElement>("[data-saved-note]").hidden = true;
-        compose();
-      } catch (err) {
-        error("restore", safe(err, "This file could not be opened."));
-      }
+      // the same opening as the Write page: lib/did-open.mjs
+      const opened = await openChosen(crypto.subtle, chosen, pw.value);
+      if (opened.problem) return error("restore", opened.problem);
+      identity = opened.identity!;
+      // a DID that was already saved somewhere does not have to be saved again here
+      backedUp = true;
+      pw.value = "";
+      q<HTMLElement>("[data-saved-note]").hidden = true;
+      compose();
     });
   });
 
