@@ -70,7 +70,7 @@ const title = `${doc.room} room`;
     </a>
   </section>
 
-  <dl class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+  <dl class="mt-5 grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-3">
     <div class={kpi}>
       <dt class={kpiLabel}>Messages / hour <Help term="Messages per hour" ask="What is messages per hour?" text="Messages posted in the room between two censuses, per hour. The first census has no previous one, so no rate." /></dt>
       <dd class="flex flex-wrap items-baseline gap-x-2"><span class="font-mono text-2xl font-bold">{rate(m.rate_interval)}</span>{rateChange && prevRated && <span class="font-mono text-xs text-text-muted">{rateChange} vs #{prevRated.census}</span>}</dd>
@@ -89,8 +89,8 @@ const title = `${doc.room} room`;
     </div>
   </dl>
 
-  <div class="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-    <section aria-labelledby="activity-title" class="grid content-start gap-3 rounded-lg border border-border bg-surface p-5">
+  <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+    <section aria-labelledby="activity-title" class="grid min-w-0 content-start gap-3 rounded-lg border border-border bg-surface p-5">
       <h2 id="activity-title" class="flex items-center gap-2 text-lg font-medium">
         Activity history
         <Help term="Activity history" ask="How do I read this chart?" text="One point per census. A census without a rate (the first one, or one that missed the room) is a gap, never a zero." />

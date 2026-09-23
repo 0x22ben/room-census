@@ -9,8 +9,8 @@ const { labels, series, unit = "", min, summary, caption } = Astro.props;
 const spec = JSON.stringify({ labels, series, unit, min });
 const cell = (v: number | null) => (v === null ? "no value" : `${rate(v)}${unit}`);
 ---
-<figure class="grid gap-3">
-  <div class="relative h-64 sm:h-72">
+<figure class="grid min-w-0 gap-3">
+  <div class="relative h-64 min-w-0 sm:h-72">
     <canvas data-chart={spec} role="img" aria-label={summary} tabindex="0" class="rounded-md"></canvas>
   </div>
   <figcaption class="text-sm text-text-muted">{caption} Use the left and right arrow keys on the chart to read each census.</figcaption>

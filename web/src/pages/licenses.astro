@@ -17,13 +17,13 @@ const sections: [string, string, Entry[]][] = [
   </section>
 
   {sections.map(([id, title, entries]) => (
-    <section aria-labelledby={id} class="mt-6 grid gap-3">
+    <section aria-labelledby={id} class="mt-6 grid min-w-0 grid-cols-1 gap-3">
       <h2 id={id} class="text-xl font-medium">{title}</h2>
       <ul class="grid gap-3">
         {entries.map((e) => (
-          <li class="rounded-lg border border-border bg-surface p-5">
+          <li class="min-w-0 rounded-lg border border-border bg-surface p-5 break-words">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 class="font-semibold">{e.name}{e.version && <span class="ml-2 font-mono text-xs font-normal text-text-muted">{e.version}</span>}</h3>
+              <h3 class="min-w-0 font-semibold break-all">{e.name}{e.version && <span class="ml-2 font-mono text-xs font-normal text-text-muted">{e.version}</span>}</h3>
               <span class="font-mono text-sm text-text-secondary">{e.license}</span>
             </div>
             <p class="mt-1 text-text-secondary">{e.use}</p>
