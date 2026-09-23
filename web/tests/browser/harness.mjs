@@ -123,8 +123,13 @@ export async function start() {
 
 export async function stop() {
   ws?.close();
-  browser?.kill();
+  if (browser && browser.exitCode === null) {
+    // the browser keeps writing its profile until it has really exited
+    const exited = new Promise((r) => browser.once("exit", r));
+    browser.kill();
+    await Promise.race([exited, sleep(10000)]);
+  }
   await new Promise((r) => (server ? server.close(r) : r()));
-  await sleep(300);
-  if (profile) rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  // a leftover temporary profile is not a test failure
+  if (profile) try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }); } catch {}
 }
