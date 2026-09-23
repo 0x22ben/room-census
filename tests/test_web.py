@@ -25,6 +25,8 @@ DID_CSP = PAGE_CSP.replace("connect-src 'self'", "connect-src 'self' https://tec
 CONNECTS = ("/did/", "/verify/")
 DID_DISCLAIMER = ("This page summarizes public Technocore activity. It does not determine ownership, reputation or "
                   "eligibility for any reward.")
+# the wizard's own result for a signature it checked itself (ROOM_CENSUS_UX_SPEC.md, exceptions): only in the My DID script
+WIZARD_VERIFIED = ('"Verified"', "`Verified`", "`Verified. The signature matches ")
 BUILT = (DIST / "index.html").is_file()
 
 
@@ -339,6 +341,9 @@ class Artifact(unittest.TestCase):
         claims = [p for p in self.FORBIDDEN if p not in (r"\bvaried\b", r"\brepetitive\b")]
         for script in DIST.glob("_astro/*.js"):
             code = script.read_text(encoding="utf-8")
+            if script.name.startswith("did.astro"):
+                for allowed in WIZARD_VERIFIED:
+                    code = code.replace(allowed, " ")
             strings = " ".join(a or b for a, b in re.findall(r'"([^"\n]*)"|`([^`]*)`', code)).replace(DID_DISCLAIMER, " ")
             for pattern in claims + list(self.OVERCLAIM):
                 with self.subTest(script=script.name, pattern=pattern):
@@ -380,7 +385,9 @@ class Artifact(unittest.TestCase):
         self.assertIn("form-action 'none'", DID_CSP)
         self.assertIn("The lookup needs JavaScript", text)
         self.assertIn(DID_DISCLAIMER, html.unescape(text))
-        self.assertIn("not sent to Room Census and is not stored", visible)
+        self.assertIn("What Room Census can see", visible)
+        self.assertIn("never sent anywhere", visible)
+        self.assertIn("Runs locally on this device", visible)
         # the rooms read are exactly the latest census plus the room where Room Census signs
         rooms = json.loads(html.unescape(re.search(r'data-rooms="([^"]+)"', text).group(1)))
         self.assertEqual(rooms, [r["room"] for r in latest["rooms"]] + [identity["room"]])
@@ -495,7 +502,8 @@ class Artifact(unittest.TestCase):
         for page in self.html_pages():
             text = page.read_text(encoding="utf-8")
             with self.subTest(page=self.route(page)):
-                self.assertIn(expected, text)
+                # My DID runs on the reader's device and says so in the top bar instead (its mockup)
+                self.assertIn("Runs locally on this device" if self.route(page) == "/did/" else expected, text)
                 self.assertNotRegex(text, r"(?i)census #\d+ verified")
                 self.assertNotIn("passed every public check", text)
 
