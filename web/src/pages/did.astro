@@ -174,16 +174,36 @@ const steps = ["Create", "Protect", "Write", "Publish"];
           <div aria-hidden="true" class="grid grid-cols-4 gap-1.5">{[0, 1, 2, 3].map((i) => <span data-bar={i} class="h-1.5 rounded-full bg-border-strong data-[on]:bg-accent"></span>)}</div>
           <p id="seal-strength" data-strength class="text-sm text-text-muted">At least {MIN_PASSWORD} characters.</p>
           <label class="grid gap-2"><span class={labelRow}>Type it again</span><input data-seal-confirm type="password" autocomplete="new-password" spellcheck="false" autocapitalize="off" autocorrect="off" class={input} /></label>
-          <button type="submit" class={primary}>Download recovery file <Download size={18} aria-hidden="true" /></button>
+          <button type="submit" class={primary}>Encrypt my recovery file <ArrowRight size={18} aria-hidden="true" /></button>
           <p data-error="seal" role="alert" class={alert}></p>
         </form>
-        <p class={foot}><Info size={16} aria-hidden="true" class="mt-0.5 shrink-0" />Next, you write your first message. Your DID stays unlocked in this tab until you close it or lock it.</p>
+        <p class={foot}><Info size={16} aria-hidden="true" class="mt-0.5 shrink-0" />Next, you download that file and keep it safe. Then you write your first message.</p>
+      </section>
+
+      <!-- step 2, second part: the file must be downloaded on purpose before anything else -->
+      <section data-panel="save" hidden class={card} aria-labelledby="save-title">
+        <span class={tile}><FileLock size={22} aria-hidden="true" /></span>
+        <h2 id="save-title" tabindex="-1" class={title}>Save your recovery file</h2>
+        <p class={lede}>Your recovery file is encrypted and ready. It is the only way to use this DID again on any device, and nobody can rebuild it for you.</p>
+        <div>
+          <div class={row}><span class={rowKey}>File</span><span data-file-name class={`${rowValue} text-xs`}></span></div>
+          <div class={row}><span class={rowKey}>Holds</span><span class={rowValue}>your private key, encrypted with your passphrase</span></div>
+          <div class={row}><span class={rowKey}>Needed to</span><span class={rowValue}>publish again later, or on another device</span></div>
+        </div>
+        <button type="button" data-action="download-backup" class={primary}><span data-download-label>Download recovery file</span> <Download size={18} aria-hidden="true" /></button>
+        <div data-after-download hidden class="grid gap-4">
+          <p role="status" class={good}><CircleCheck size={18} aria-hidden="true" class="shrink-0 text-accent" />Your browser was asked to save the file. Check your downloads, and keep the file and the passphrase in two separate safe places.</p>
+          <label id="saved-check-label" class="inline-flex min-h-11 items-start gap-3"><input data-saved-check type="checkbox" class="mt-1 size-5 accent-accent" /> I have saved this file somewhere I can find it again.</label>
+          <button type="button" data-action="continue" disabled aria-describedby="saved-check-label" class={primary}>Write my first message <ArrowRight size={18} aria-hidden="true" /></button>
+          <p data-error="save" role="alert" class={alert}></p>
+        </div>
+        <p class={foot}><Lock size={16} aria-hidden="true" class="mt-0.5 shrink-0" />The file never leaves your device: it is made and saved here, by your browser.</p>
       </section>
 
       <!-- steps 3 and 4: write and publish (mockup "Publish your first message") -->
       <section data-panel="message" hidden class={card} aria-labelledby="message-title">
         <span class={tile}><Send size={22} aria-hidden="true" /></span>
-        <p data-saved-note hidden class={good}><CircleCheck size={18} aria-hidden="true" class="shrink-0 text-accent" />Your browser should now have saved the recovery file. Keep it and the passphrase in two separate safe places.</p>
+        <p data-saved-note hidden class={good}><CircleCheck size={18} aria-hidden="true" class="shrink-0 text-accent" />You saved your recovery file. Keep it and the passphrase in two separate safe places.</p>
         <h2 id="message-title" tabindex="-1" data-message-title class={title}>Publish your first message</h2>
         <p class={lede}>This writes to Technocore and cannot be undone. Check what becomes public.</p>
         <form data-compose novalidate class="grid gap-4">

@@ -15,19 +15,21 @@ import { dateTimeUtc } from "../lib/format";
 type Identity = { did: string; privateKey: CryptoKey };
 type Signed = { room: string; nonce: string; text: string; did: string; sig: string };
 type Stored = { seq?: number; ts?: string; from?: string; text?: string; nonce?: string; sig?: string };
-type Panel = "start" | "create" | "restore" | "protect" | "message" | "outcome";
+type Panel = "start" | "create" | "restore" | "protect" | "save" | "message" | "outcome";
 type Kind = "published" | "unconfirmed" | "refused";
 
 const root = document.querySelector<HTMLElement>("[data-wizard]");
 const TIMEOUT_MS = 20000;
-const PANELS: Panel[] = ["start", "create", "restore", "protect", "message", "outcome"];
-const STEP: Record<Panel, number> = { start: -1, create: 0, restore: -1, protect: 1, message: 2, outcome: 3 };
+const PANELS: Panel[] = ["start", "create", "restore", "protect", "save", "message", "outcome"];
+const STEP: Record<Panel, number> = { start: -1, create: 0, restore: -1, protect: 1, save: 1, message: 2, outcome: 3 };
 const WITH_LOOKUP: Panel[] = ["start", "outcome"];
 
 if (root) {
   const q = <T extends Element>(sel: string) => root.querySelector<T>(sel)!;
   let identity: Identity | null = null;
   let pkcs8: Uint8Array | null = null; // only between creation and the recovery file download
+  let backup: { name: string; file: object } | null = null; // sealed, waiting for the reader to save it
+  let downloaded = false; // the reader asked for the file, whether or not they confirmed keeping it
   let backedUp = false;
   let busy = false;
   let signed: Signed | null = null;
@@ -108,6 +110,8 @@ if (root) {
     forget(pkcs8);
     pkcs8 = null;
     identity = null;
+    backup = null;
+    downloaded = false;
   });
 
   q<HTMLInputElement>("[data-restore-file]").addEventListener("change", (e) => {
@@ -128,6 +132,7 @@ if (root) {
       identity = { did: made.did, privateKey: made.privateKey };
       pkcs8 = made.pkcs8;
       backedUp = false;
+      downloaded = false;
       created = true;
       show("protect");
     } catch (err) {
@@ -177,19 +182,42 @@ if (root) {
       if (problem) return error("seal", problem);
       if (!identity || !pkcs8) return error("seal", "There is no DID to protect in this tab.");
       try {
-        const backup = await sealBackup(crypto.subtle, (n: number) => crypto.getRandomValues(new Uint8Array(n)), { did: identity.did, pkcs8 }, pw.value);
-        download(`room-census-did-recovery-${short(identity.did)}-${stamp()}.json`, backup);
-        backedUp = true;
+        const file = await sealBackup(crypto.subtle, (n: number) => crypto.getRandomValues(new Uint8Array(n)), { did: identity.did, pkcs8 }, pw.value);
+        backup = { name: `room-census-did-recovery-${short(identity.did)}-${stamp()}.json`, file };
         forget(pkcs8);
         pkcs8 = null;
         pw.value = "";
         again.value = "";
-        q<HTMLElement>("[data-saved-note]").hidden = false;
-        compose();
+        q<HTMLElement>("[data-file-name]").textContent = backup.name;
+        q<HTMLElement>("[data-after-download]").hidden = true;
+        q<HTMLInputElement>("[data-saved-check]").checked = false;
+        q<HTMLButtonElement>("[data-action=continue]").disabled = true;
+        q<HTMLElement>("[data-download-label]").textContent = "Download recovery file";
+        show("save");
       } catch (err) {
         error("seal", safe(err, "The recovery file could not be made. Nothing was saved."));
       }
     });
+  });
+
+  // ---------- 2b. save: nothing continues until the reader downloads the file on purpose ----------
+  const savedCheck = q<HTMLInputElement>("[data-saved-check]");
+  q<HTMLButtonElement>("[data-action=download-backup]").addEventListener("click", () => {
+    if (!backup) return;
+    download(backup.name, backup.file);
+    downloaded = true;
+    q<HTMLElement>("[data-after-download]").hidden = false;
+    q<HTMLElement>("[data-download-label]").textContent = "Download it again";
+    savedCheck.focus();
+  });
+  savedCheck.addEventListener("change", () => { q<HTMLButtonElement>("[data-action=continue]").disabled = !savedCheck.checked; });
+  q<HTMLButtonElement>("[data-action=continue]").addEventListener("click", () => {
+    if (!backup || !savedCheck.checked) return;
+    if (!identity) return error("save", "This DID is no longer unlocked in this tab. Open your recovery file to publish.");
+    backedUp = true;
+    backup = null;
+    q<HTMLElement>("[data-saved-note]").hidden = false;
+    compose();
   });
 
   // ---------- restore (a later visit) ----------
@@ -262,7 +290,8 @@ if (root) {
     e.preventDefault();
     return guard(null, async () => {
       clearErrors();
-      if (attempted || !identity) return;
+      if (attempted) return;
+      if (!identity) return error("compose", "This DID is no longer unlocked in this tab. Open your recovery file to publish.");
       const problem = messageProblem(room(), text.value);
       if (problem) return error("compose", problem);
       try {
@@ -408,6 +437,7 @@ if (root) {
   q<HTMLButtonElement>("[data-action=start-over]").addEventListener("click", () => {
     q<HTMLElement>("[data-confirm-over-text]").textContent = [
       backedUp ? "Lock and forget your DID in this tab? To publish again, open your recovery file."
+        : downloaded ? "Lock and forget this DID? You downloaded its recovery file but did not confirm keeping it: without that file the DID is lost for good."
         : "Lock and forget this DID? Its recovery file is not saved yet, so it will be lost for good.",
       attempted && unconfirmed ? "Your last message could not be confirmed and may already be public: check the room before writing it again." : "",
     ].filter(Boolean).join(" ");
@@ -421,6 +451,8 @@ if (root) {
     pkcs8 = null;
     identity = null;
     backedUp = false;
+    downloaded = false;
+    backup = null;
     signed = null;
     attempted = false;
     unconfirmed = false;
@@ -434,6 +466,9 @@ if (root) {
     });
     q<HTMLElement>("[data-restore-file-name]").textContent = "No file chosen";
     q<HTMLElement>("[data-saved-note]").hidden = true;
+    q<HTMLElement>("[data-after-download]").hidden = true;
+    q<HTMLButtonElement>("[data-action=continue]").disabled = true;
+    q<HTMLElement>("[data-download-label]").textContent = "Download recovery file";
     preview.hidden = true;
     clearErrors();
     show("start");

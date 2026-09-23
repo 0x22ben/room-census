@@ -1,8 +1,8 @@
 // The My DID identity wizard, as shipped, in a real headless browser. Every Technocore request is
 // answered by the test (no network, never a real publication). Downloads are caught in the page.
-// The primary flow under test (Ben, 2026-09-23): Create DID -> Download the encrypted recovery file
-// once -> Write a message -> Publish -> Message published, with "View in My DID" and "Write another
-// message". The tests also prove: creating, sealing, downloading and restoring make zero requests; no
+// The primary flow under test (Ben, 2026-09-23): Create DID -> save the encrypted recovery file, with
+// a download the reader asks for -> Write a message -> Publish -> Message published, with "View in My
+// DID" and "Write another message". The tests also prove: creating, sealing, downloading and restoring make zero requests; no
 // receipt is forced on the reader; a message is published only after a review and a confirmation, at
 // most once; and no secret appears in any request, console line, storage, the page's HTML, an error
 // message or an offered file.
@@ -180,7 +180,7 @@ test("the happy path: create, save the recovery file once, write, publish, and s
   assert.equal(await page("document.activeElement.id"), "protect-title", "focus moves to the new step");
   assert.equal(await unloadWarns(), true, "leaving before the recovery file is saved warns");
 
-  // protect: one passphrase, one download
+  // protect: one passphrase, then the recovery file is prepared
   await fill("[data-seal-password]", "short");
   await fill("[data-seal-confirm]", "short");
   await submit("[data-seal]");
@@ -192,6 +192,41 @@ test("the happy path: create, save the recovery file once, write, publish, and s
   await fill("[data-seal-confirm]", PASSWORD);
   await page("document.querySelector('[data-seal]').requestSubmit(); document.querySelector('[data-seal]').requestSubmit();");
 
+  // save: nothing moves on until the reader asks for the download and says they kept it
+  await until("!document.querySelector('[data-panel=save]').hidden", "the save step");
+  assert.equal(await step(), "2. Protect");
+  assert.equal(await unloadWarns(), true, "the DID is still only in this tab");
+  assert.equal((await downloads()).length, 0, "the file is never downloaded on its own");
+  assert.equal(await hidden("[data-after-download]"), true);
+  assert.match(await text("[data-file-name]"), /^room-census-did-recovery-[1-9A-HJ-NP-Za-km-z]{8}-\d{4}-\d{2}-\d{2}-\d{6}\.json$/);
+  // a click on Continue before the download does nothing
+  await click("[data-action=continue]");
+  assert.equal(await hidden("[data-panel=save]"), false);
+  await click("[data-action=download-backup]");
+  const saved = await downloads();
+  assert.equal(saved.length, 1, "one download, and only when asked");
+  assert.equal(saved[0].name, await text("[data-file-name]"));
+  assert.equal(JSON.parse(saved[0].text).did, did);
+  assert.equal(await hidden("[data-after-download]"), false);
+  assert.equal(await text("[data-download-label]"), "Download it again");
+  // the file is saved, but the reader must still say so
+  assert.equal(await page("document.querySelector('[data-action=continue]').disabled"), true);
+  await click("[data-action=continue]");
+  assert.equal(await hidden("[data-panel=save]"), false, "Continue stays closed until the box is ticked");
+  // even with the button forced open, the tick is still required
+  await page("document.querySelector('[data-action=continue]').disabled = false");
+  await click("[data-action=continue]");
+  assert.equal(await hidden("[data-panel=save]"), false, "the tick itself is the gate");
+  assert.equal(await unloadWarns(), true);
+  // a second download is allowed, and locking here says what is at stake
+  await click("[data-action=download-backup]");
+  assert.equal((await downloads()).length, 2, "the file can be downloaded again");
+  await click("[data-action=start-over]");
+  assert.match(await text("[data-confirm-over-text]"), /^Lock and forget this DID\? You downloaded its recovery file but did not confirm keeping it/);
+  await click("[data-action=over-no]");
+  await click("[data-saved-check]");
+  await click("[data-action=continue]");
+
   // write: straight to the composer, never an import of the file just saved
   await until("!document.querySelector('[data-panel=message]').hidden", "the composer");
   assert.equal(await step(), "3. Write");
@@ -201,10 +236,6 @@ test("the happy path: create, save the recovery file once, write, publish, and s
   assert.equal(await visible("[data-restore-file]"), false);
   assert.equal(await unloadWarns(), false);
   assert.equal(log.requests.length, log.loaded, "creating, sealing and downloading made no request");
-  const saved = await downloads();
-  assert.equal(saved.length, 1, "one recovery file, even after a double submit");
-  assert.match(saved[0].name, /^room-census-did-recovery-[1-9A-HJ-NP-Za-km-z]{8}-\d{4}-\d{2}-\d{2}-\d{6}\.json$/);
-  assert.equal(JSON.parse(saved[0].text).did, did);
 
   // a starter is only a prompt, and the reader picks the room
   await click("[data-starter=project]");
@@ -251,7 +282,7 @@ test("the happy path: create, save the recovery file once, write, publish, and s
   assert.equal(await visible("[data-action=another]"), true);
   assert.equal(await step(), "4. Publish");
   assert.equal(await page("document.querySelector('[data-advanced]').open"), false, "technical details stay folded");
-  assert.equal((await downloads()).length, 1, "no receipt was downloaded");
+  assert.equal((await downloads()).length, 2, "no receipt was downloaded: only the recovery files the reader asked for");
   await shot("did-5-published-1440");
 
   // the optional technical receipt, inside Advanced
@@ -408,6 +439,39 @@ test("Lock my DID forgets the unlocked key; publishing again needs the recovery 
   await sleep(300);
   assert.equal(await hidden("[data-preview]"), true, "nothing can be signed once locked");
   assert.equal(log.posts.length, 1);
+});
+
+test("locking from the save step drops the file and starts the next DID clean", { skip }, async () => {
+  const log = await open();
+  await click("[data-action=begin]");
+  await click("[data-action=create]");
+  await until("!document.querySelector('[data-panel=protect]').hidden", "the protect step");
+  await fill("[data-seal-password]", PASSWORD);
+  await fill("[data-seal-confirm]", PASSWORD);
+  await submit("[data-seal]");
+  await until("!document.querySelector('[data-panel=save]').hidden", "the save step");
+  const first = await text("[data-file-name]");
+  await click("[data-action=download-backup]");
+  await click("[data-saved-check]");
+  await click("[data-action=start-over]");
+  await click("[data-action=over-yes]");
+  assert.equal(await hidden("[data-panel=start]"), false);
+
+  // a second DID starts from a clean save step: nothing downloaded, nothing ticked
+  await click("[data-action=begin]");
+  await click("[data-action=create]");
+  await until("!document.querySelector('[data-panel=protect]').hidden", "the protect step again");
+  await fill("[data-seal-password]", PASSWORD);
+  await fill("[data-seal-confirm]", PASSWORD);
+  await submit("[data-seal]");
+  await until("!document.querySelector('[data-panel=save]').hidden", "the save step again");
+  assert.notEqual(await text("[data-file-name]"), first, "a new DID, a new file");
+  assert.equal(await hidden("[data-after-download]"), true);
+  assert.equal(await page("document.querySelector('[data-saved-check]').checked"), false);
+  assert.equal(await page("document.querySelector('[data-action=continue]').disabled"), true);
+  assert.equal(await text("[data-download-label]"), "Download recovery file");
+  assert.equal((await downloads()).length, 1, "the first file, and no second one on its own");
+  assert.equal(log.requests.length, log.loaded, "none of this made a request");
 });
 
 test("inside another site's frame the wizard stays closed", { skip }, async () => {
