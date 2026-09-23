@@ -4,23 +4,26 @@ export const SITE_NAME = "Room Census";
 export const REPOSITORY = "https://github.com/0x22ben/room-census";
 
 // scripts, styles and fonts come from the site itself only; nothing inline, nothing embedded
-export const CSP = [
+const policy = (connect: string) => [
   "default-src 'self'",
   "img-src 'self' data:",
   "style-src 'self'",
   "script-src 'self'",
-  "connect-src 'self'",
+  `connect-src ${connect}`,
   "base-uri 'none'",
   "form-action 'none'",
   "object-src 'none'",
 ].join("; ");
+export const CSP = policy("'self'");
+// My DID reads public room messages from Technocore in the browser; no other page may connect out
+export const DID_CSP = policy("'self' https://technocore.chat");
 
 export type Icon = "discover" | "rooms" | "watched" | "did" | "verify" | "data" | "method" | "source";
 export type NavItem = { label: string; href: string; icon: Icon; ready: boolean; external?: boolean };
 export type NavSection = { label: string; items: NavItem[] };
 
 // the sidebar of the approved mockup; a destination stays out of the navigation until its page
-// exists (My DID also waits for its recovery tests and security review)
+// exists (My DID ships with the public lookup; Create and Restore wait for their security review)
 export const NAV: NavSection[] = [
   {
     label: "Explore",
@@ -32,7 +35,7 @@ export const NAV: NavSection[] = [
   },
   {
     label: "You",
-    items: [{ label: "My DID", href: "/did/", icon: "did", ready: false }],
+    items: [{ label: "My DID", href: "/did/", icon: "did", ready: true }],
   },
   {
     label: "Evidence",

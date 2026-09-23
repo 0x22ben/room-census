@@ -10,8 +10,9 @@ import { CSP, SITE_NAME } from "../lib/site";
 import { censusStatus, latest } from "../lib/data";
 
 // indexable: false for pages served at any missing address (404), which have no canonical URL
-interface Props { title: string; description: string; indexable?: boolean }
-const { title, description, indexable = true } = Astro.props;
+// csp: only My DID passes its own policy (it may connect to Technocore)
+interface Props { title: string; description: string; indexable?: boolean; csp?: string }
+const { title, description, indexable = true, csp = CSP } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 const fullTitle = title === SITE_NAME ? title : `${title} | ${SITE_NAME}`;
 const favicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0D10'/%3E%3Cpath d='M9 8v16M14 8v16M19 8v16M24 8v16M6 21l22-10' stroke='%232EC4A6' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E";
@@ -23,7 +24,7 @@ const status = censusStatus(census);
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="Content-Security-Policy" content={CSP} />
+    <meta http-equiv="Content-Security-Policy" content={csp} />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />

@@ -1,0 +1,127 @@
+---
+// My DID: a lookup the reader starts, in this browser. It reads the newest messages of each measured
+// room from Technocore, keeps the ones this DID signed, and checks every signature locally. The DID
+// is never sent to Room Census or stored; the page says exactly what was inspected, and a message
+// that names the DID without a valid signature is never counted.
+import Base from "../layouts/Base.astro";
+import Help from "../components/Help.astro";
+import Download from "@lucide/astro/icons/download";
+import Info from "@lucide/astro/icons/info";
+import LockKeyhole from "@lucide/astro/icons/lock-keyhole";
+import Search from "@lucide/astro/icons/search";
+import { site } from "../lib/data";
+import { DID_DISCLAIMER } from "../lib/patterns";
+import { DID_CSP } from "../lib/site";
+import { WINDOW } from "../lib/did-core.mjs";
+
+const { latest, identity, rooms } = site();
+// the rooms of the latest census, then the room where Room Census signs its own messages
+const measured = latest.rooms.map((r) => r.room);
+const ownRoomExtra = !measured.includes(identity.room);
+const inspected = ownRoomExtra ? [...measured, identity.room] : measured;
+const pages = [...rooms.keys()];
+const kpi = "grid gap-1 rounded-lg border border-border bg-surface p-4";
+const kpiLabel = "flex items-center gap-1.5 text-sm text-text-secondary";
+const kpiValue = "font-mono text-2xl font-bold";
+---
+<Base title="My DID" csp={DID_CSP} description="Look up the public, signed Technocore activity of a DID in the rooms Room Census measures. The lookup runs in your browser.">
+  <section aria-labelledby="did-title" class="grid gap-1.5">
+    <p class="font-mono text-xs font-semibold tracking-widest text-accent uppercase">Technocore identity</p>
+    <h1 id="did-title" class="text-3xl font-medium tracking-tight sm:text-4xl">My DID</h1>
+    <p class="text-text-muted">Look up the signed public activity of a DID in the rooms Room Census measures.</p>
+  </section>
+
+  <p class="mt-4 flex items-start gap-2.5 rounded-md border border-accent-border bg-accent-soft px-4 py-2.5 text-sm">
+    <LockKeyhole size={18} aria-hidden="true" class="mt-0.5 shrink-0 text-accent" />
+    <span>Runs in this browser. The DID you type is not sent to Room Census and is not stored. Your browser reads public room messages from technocore.chat and checks the signatures here.</span>
+  </p>
+
+  <section aria-labelledby="lookup-title" class="mt-4 grid grid-cols-[minmax(0,1fr)] gap-3 rounded-lg border border-border bg-surface p-5">
+    <h2 id="lookup-title" class="flex items-center gap-2 text-lg font-medium">
+      Look up a public DID
+      <Help term="DID" ask="What is a DID?" text="A public identifier (did:key) that can sign Technocore messages. Only messages with a valid signature from this DID are counted." />
+    </h2>
+    <p data-did-noscript class="text-text-muted">The lookup needs JavaScript. It runs only in this browser.</p>
+    <form data-did-form data-rooms={JSON.stringify(inspected)} data-measured={JSON.stringify(measured)} data-pages={JSON.stringify(pages)} data-census={latest.census} hidden novalidate class="grid grid-cols-[minmax(0,1fr)] gap-2">
+      <label for="did-input" class="text-sm font-semibold">Public DID</label>
+      <div class="flex flex-wrap gap-2">
+        <input id="did-input" name="did" type="text" size="1" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+          placeholder="did:key:z6Mk…" aria-describedby="did-hint did-error"
+          class="min-h-11 min-w-0 flex-1 basis-64 rounded-md border border-border-strong bg-bg px-3 font-mono text-sm text-text placeholder:text-text-muted aria-invalid:border-warning" />
+        <button type="submit" data-did-submit class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-border-strong px-4 text-sm font-semibold text-text disabled:cursor-wait disabled:opacity-60">
+          <Search size={16} aria-hidden="true" /> Look up
+        </button>
+      </div>
+      <p id="did-hint" class="text-sm text-text-muted">An Ed25519 did:key, starting with did:key:z6Mk.</p>
+      <p id="did-error" data-did-error role="alert" class="text-sm font-semibold text-warning empty:hidden"></p>
+    </form>
+    <p class="text-sm text-text-muted">
+      Inspected on each lookup: the newest {WINDOW} messages of each of the {measured.length} rooms in census #{latest.census}{ownRoomExtra && `, plus the ${identity.room} room where Room Census signs`}. In busy rooms that covers only seconds or minutes. Older messages, other rooms and private rooms are not inspected.
+    </p>
+  </section>
+
+  <p class="mt-4 flex items-start gap-2.5 rounded-md border border-border bg-surface px-4 py-2.5 text-sm text-text-secondary">
+    <Info size={18} aria-hidden="true" class="mt-0.5 shrink-0" />
+    <span>{DID_DISCLAIMER}</span>
+  </p>
+
+  <section data-did-result hidden aria-labelledby="result-title" class="mt-4 grid grid-cols-[minmax(0,1fr)] gap-4">
+    <div class="grid gap-1.5">
+      <h2 id="result-title" tabindex="-1" data-did-heading class="text-2xl font-medium tracking-tight outline-none"></h2>
+      <p data-did-for class="font-mono text-sm break-all text-text-secondary"></p>
+      <p data-did-status role="status" class="text-sm text-text-muted"></p>
+      <progress data-did-progress max="1" value="0" aria-label="Rooms read" class="h-1.5 w-full max-w-md"></progress>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" data-did-cancel class="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-border-strong px-4 text-sm font-semibold text-text">Stop</button>
+        <button type="button" data-did-proof hidden class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-accent-border bg-accent-soft px-4 text-sm font-semibold text-text">
+          <Download size={16} aria-hidden="true" class="text-accent" /> Download activity proof
+        </button>
+      </div>
+    </div>
+
+    <div data-did-summary hidden class="grid gap-3">
+      <p data-did-meaning class="text-text-secondary"></p>
+      <dl data-did-kpis class="grid grid-cols-[repeat(auto-fit,minmax(min(10rem,100%),1fr))] gap-3">
+        <div class={kpi}>
+          <dt class={kpiLabel}>Signed messages found <Help term="Signed messages found" ask="Which messages count?" text="Messages in the inspected data whose Ed25519 signature matches this DID. A message that only names the DID, without a valid signature, is not counted." /></dt>
+          <dd class={kpiValue} data-kpi="signed_messages">0</dd>
+        </div>
+        <div class={kpi}>
+          <dt class={kpiLabel}>Rooms with activity</dt>
+          <dd class={kpiValue} data-kpi="rooms_with_activity">0</dd>
+        </div>
+        <div class={kpi}>
+          <dt class={kpiLabel}>Active days <Help term="Active days" ask="How are active days counted?" text="Different UTC dates with at least one signed message found, in the inspected data only." /></dt>
+          <dd class={kpiValue} data-kpi="active_days">0</dd>
+        </div>
+        <div class={kpi}>
+          <dt class={kpiLabel}>Latest signed message</dt>
+          <dd class="font-mono text-lg font-bold" data-kpi="last_active">–</dd>
+        </div>
+      </dl>
+      <p data-did-bad class="rounded-md border border-warning-border bg-warning-soft px-4 py-2.5 text-sm empty:hidden"></p>
+    </div>
+
+    <section data-did-messages hidden aria-labelledby="messages-title" class="overflow-hidden rounded-lg border border-border bg-surface">
+      <h3 id="messages-title" class="border-b border-border px-4 py-3 text-lg font-medium">Signed messages found</h3>
+      <ol data-did-list></ol>
+    </section>
+
+    <details data-did-coverage hidden class="rounded-lg border border-border bg-surface">
+      <summary class="flex min-h-11 cursor-pointer items-center px-4 font-medium">What was inspected</summary>
+      <div class="overflow-x-auto border-t border-border">
+        <table class="w-full text-left text-sm">
+          <caption class="sr-only">Rooms read for this lookup, with the messages and the time range read in each</caption>
+          <thead class="text-xs text-text-muted uppercase">
+            <tr><th scope="col" class="px-4 py-2 font-mono">Room</th><th scope="col" class="px-4 py-2 font-mono">Read</th><th scope="col" class="px-4 py-2 font-mono">From</th><th scope="col" class="px-4 py-2 font-mono">To</th></tr>
+          </thead>
+          <tbody data-did-rooms></tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+</Base>
+
+<script>
+  import "../scripts/did.ts";
+</script>

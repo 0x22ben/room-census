@@ -15,3 +15,7 @@ export const DISCLAIMER =
 
 export const PATTERN_HELP =
   `How different or repeated a room's recent public messages are, once numbers are masked. Different: most messages differ. Mixed: some repeat. Repeated: most messages repeat. Low activity: too few messages to describe. ${DISCLAIMER}`;
+
+// shown on My DID and written into every activity proof, word for word (approved by Ben)
+export const DID_DISCLAIMER =
+  "This page summarizes public Technocore activity. It does not determine ownership, reputation or eligibility for any reward.";

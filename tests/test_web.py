@@ -20,6 +20,10 @@ DIST = WEB / "dist"
 DOMAIN = "https://roomcensus.xyz"
 PAGE_CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; "
             "base-uri 'none'; form-action 'none'; object-src 'none'")
+# My DID is the only page that may connect out, and only to Technocore's public read API
+DID_CSP = PAGE_CSP.replace("connect-src 'self'", "connect-src 'self' https://technocore.chat")
+DID_DISCLAIMER = ("This page summarizes public Technocore activity. It does not determine ownership, reputation or "
+                  "eligibility for any reward.")
 BUILT = (DIST / "index.html").is_file()
 
 
@@ -143,9 +147,10 @@ class Artifact(unittest.TestCase):
         for page in self.html_pages():
             text = page.read_text(encoding="utf-8")
             p = contract.parse(page)
-            with self.subTest(page=self.route(page)):
-                self.assertEqual(p.csp, PAGE_CSP)
-                self.assertIsNone(contract.csp_problem(p.csp))
+            route = self.route(page)
+            with self.subTest(page=route):
+                self.assertEqual(p.csp, DID_CSP if route == "/did/" else PAGE_CSP)
+                self.assertIsNone(contract.csp_problem(p.csp.replace(" https://technocore.chat", "") if route == "/did/" else p.csp))
                 self.assertEqual(p.inline_scripts, 0)
                 self.assertNotRegex(text, r"<style[\s>]")
                 self.assertNotRegex(text, r"\sstyle=")
@@ -192,19 +197,19 @@ class Artifact(unittest.TestCase):
             for label in ("Primary", "Menu"):
                 links = self.nav_links(text, label)
                 with self.subTest(page=route, nav=label):
-                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "Source code"])
+                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "My DID", "Source code"])
                     for href, _, _ in links:
                         if href.startswith("/"):
                             self.assertTrue(contract.resolve(DIST, route, href).is_file(), href)
                     current = [h for h, _, on in links if on]
                     expected = (["/"] if route == "/" else ["/rooms/"] if route.startswith("/rooms/")
-                                else ["/watched/"] if route == "/watched/" else [])
+                                else ["/watched/"] if route == "/watched/" else ["/did/"] if route == "/did/" else [])
                     self.assertEqual(current, expected)
             with self.subTest(page=route):
                 # pages that do not exist yet are never linked, in any form (data files under /data/ are)
-                self.assertIsNone(re.search(r'href="(https?://[^"/]+)?/(did|verify|method)(/[^"]*)?"', text))
+                self.assertIsNone(re.search(r'href="(https?://[^"/]+)?/(verify|method)(/[^"]*)?"', text))
                 self.assertIsNone(re.search(r'href="(https?://[^"/]+)?/data/?"', text))
-        for gated in ("did", "verify", "method"):
+        for gated in ("verify", "method"):
             self.assertFalse((DIST / gated).exists())
 
     def test_the_overview_keeps_the_anchors_signed_messages_link_to(self):
@@ -234,7 +239,7 @@ class Artifact(unittest.TestCase):
             with self.subTest(page=self.route(page)):
                 for attrs in scripts:
                     self.assertRegex(attrs, r'type="module" src="/_astro/[\w.-]+\.js"')
-                needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched "))
+                needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched ", "data-did-form "))
                 self.assertEqual(len(scripts), needed)
 
     def test_the_built_site_meets_the_legacy_route_contract(self):
@@ -314,7 +319,7 @@ class Artifact(unittest.TestCase):
         # words a reader or a search engine gets from attributes: descriptions, titles, alt texts, accessible names
         said = re.findall(r'\b(?:aria-label|content|title|alt|placeholder)="([^"]*)"', text)
         text = re.sub(r"<[^>]*>", " ", text)                     # other tags and attributes are data, not words
-        return html.unescape(text + " " + " ".join(said))
+        return html.unescape(text + " " + " ".join(said)).replace(DID_DISCLAIMER, " ")
 
     def test_no_forbidden_or_internal_wording_reaches_a_reader(self):
         for page in self.html_pages():
@@ -327,7 +332,7 @@ class Artifact(unittest.TestCase):
         claims = [p for p in self.FORBIDDEN if p not in (r"\bvaried\b", r"\brepetitive\b")]
         for script in DIST.glob("_astro/*.js"):
             code = script.read_text(encoding="utf-8")
-            strings = " ".join(a or b for a, b in re.findall(r'"([^"\n]*)"|`([^`]*)`', code))
+            strings = " ".join(a or b for a, b in re.findall(r'"([^"\n]*)"|`([^`]*)`', code)).replace(DID_DISCLAIMER, " ")
             for pattern in claims + list(self.OVERCLAIM):
                 with self.subTest(script=script.name, pattern=pattern):
                     self.assertIsNone(re.search(pattern, strings, re.I))
@@ -357,6 +362,38 @@ class Artifact(unittest.TestCase):
         store = next(DIST.glob("_astro/watch-store*.js")).read_text(encoding="utf-8")
         self.assertIn("localStorage", store)
         self.assertNotRegex(store, r"fetch\(|XMLHttpRequest|sendBeacon|navigator\.send")
+
+    def test_my_did_runs_in_the_browser_and_says_what_it_inspected(self):
+        text = (DIST / "did" / "index.html").read_text(encoding="utf-8")
+        latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
+        identity = json.loads((DIST / "identity.json").read_text(encoding="utf-8"))
+        visible = self.visible_text(DIST / "did" / "index.html")
+        # the lookup needs script: without it the form stays hidden, and the policy blocks any submit
+        self.assertRegex(text, r"<form data-did-form [^>]*hidden")
+        self.assertIn("form-action 'none'", DID_CSP)
+        self.assertIn("The lookup needs JavaScript", text)
+        self.assertIn(DID_DISCLAIMER, html.unescape(text))
+        self.assertIn("not sent to Room Census and is not stored", visible)
+        # the rooms read are exactly the latest census plus the room where Room Census signs
+        rooms = json.loads(html.unescape(re.search(r'data-rooms="([^"]+)"', text).group(1)))
+        self.assertEqual(rooms, [r["room"] for r in latest["rooms"]] + [identity["room"]])
+        self.assertIn(f'the newest 200 messages of each of the {len(latest["rooms"])} rooms in census #{latest["census"]}', visible)
+        self.assertIn("Older messages, other rooms and private rooms are not inspected", visible)
+        # it never claims a full history, and it keeps "not found" apart from "no activity"
+        script = next(DIST.glob("_astro/did.astro*.js")).read_text(encoding="utf-8")
+        for claim in ("Total messages", "First seen", "Rooms visited", "Contest"):
+            self.assertNotIn(claim, script + text)
+        for phrase in ("Recent activity found in measured rooms", "Not found in the inspected data",
+                       "This does not mean the DID has no activity"):
+            self.assertIn(phrase, script)
+        # it reads Technocore and nothing else, and keeps nothing
+        self.assertIn("https://technocore.chat", script + "".join(p.read_text(encoding="utf-8") for p in DIST.glob("_astro/did-core*.js")))
+        self.assertNotRegex(script, r"localStorage|sessionStorage|indexedDB|sendBeacon|XMLHttpRequest|document\.cookie")
+        for page in self.html_pages():
+            if self.route(page) != "/did/":
+                with self.subTest(page=self.route(page)):
+                    self.assertNotIn("technocore.chat https", contract.parse(page).csp or "")
+                    self.assertNotIn("connect-src 'self' https", contract.parse(page).csp or "")
 
     def test_the_rooms_index_lists_every_room_with_filters_that_need_script(self):
         text = (DIST / "rooms" / "index.html").read_text(encoding="utf-8")
