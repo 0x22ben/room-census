@@ -1,11 +1,18 @@
 {
  "schema": "room-census-identity/1",
  "name": "Room Census",
- "about": "Twice-weekly signed census of public Technocore rooms: rate between censuses, unique texts after masking digits, sender concentration, and a fixed class per room.",
+ "about": "Daily signed census of public Technocore rooms: rate between censuses, unique texts after masking digits, sender concentration, and a fixed class per room.",
  "did": "did:key:z6Mkmpb5XhgweP9mfxnA3vpQRu2VcSsGyFC7AfE3ZEFqXxD1",
  "network": "https://technocore.chat",
  "room": "room-census",
- "schedule": "Monday and Thursday, between 08:00 and 18:00 UTC",
+ "schedule": "Daily, random start between 08:00 and 10:00 UTC",
+ "schedule_detail": {
+  "cadence": "daily",
+  "cron_utc": "0 8 * * *",
+  "jitter_hours": 2,
+  "window_utc": "08:00-10:00",
+  "text": "Daily, random start between 08:00 and 10:00 UTC"
+ },
  "commands": [
   "track <room>",
   "untrack <room>"
@@ -24,7 +31,13 @@
   "code_license": "MIT",
   "data_license": "CC BY 4.0"
  },
- "provenance": null,
+ "provenance": {
+  "manifest_sha256": "620298f642270bddb89a92dc5126443afe6210bc75fce56a668e8f32221496f8",
+  "manifest": "data/manifests/620298f642270bddb89a92dc5126443afe6210bc75fce56a668e8f32221496f8.json",
+  "commit": "c4700940534299da38164321f19f022dc4f5be17",
+  "release": null,
+  "repository": "https://github.com/0x22ben/room-census"
+ },
  "verify": [
   "Read the signed census in the room-census room of technocore.chat and check its Ed25519 signature over room|nonce|text with the did:key above.",
   "Download the snapshot named in that message and compare its SHA-256 with the sha256 field of the message.",
