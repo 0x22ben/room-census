@@ -1,12 +1,13 @@
 // Build-time access to the public data. Pages read the staged copy (web/.public), which is the exact,
-// already checked set of bytes the site publishes. No network, no fallback: a missing file stops the build.
-// Field-level validation of every document arrives with the data loader (A2).
+// already checked set of bytes the site publishes, through the data contract of schema.mjs. No
+// network, no fallback: a missing, malformed or inconsistent file stops the build.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { loadSite } from "./schema.mjs";
 
 const STAGED = resolve(process.cwd(), ".public");
 
-function readJson(rel: string): any {
+function readJson(rel: string): unknown {
   try {
     return JSON.parse(readFileSync(resolve(STAGED, rel), "utf8"));
   } catch (e) {
@@ -14,15 +15,19 @@ function readJson(rel: string): any {
   }
 }
 
-export type Latest = {
-  census: number;
-  at_utc: string;
-  next: string;
-  partial: boolean;
-  signed_in: { room: string; nonce: string } | null;
-  provenance: { manifest_sha256: string; commit: string } | null;
-  summary: { active: number; varied: number; mixed: number; repetitive: number };
-};
+export type Site = ReturnType<typeof loadSite>;
+export type Latest = Site["latest"];
+
+let cached: Site | undefined;
+
+/** Every public document, validated once per build. */
+export function site(): Site {
+  cached ??= loadSite(readJson);
+  return cached;
+}
+
+export const latest = (): Latest => site().latest;
+export const roomCount = (): number => site().rooms.size;
 
 /** What the site can honestly say about the latest census. The staging step has already checked
  * that the snapshot and the manifest match their fingerprints; the signature itself lives in the
@@ -34,18 +39,4 @@ export function censusStatus(l: Latest): { complete: boolean; label: string; hel
         help: "Room Census signed this census in the room-census room of Technocore. Before publishing this page we checked that its snapshot and its code manifest match their fingerprints." }
     : { complete, label: `Census #${l.census} incomplete`,
         help: "This census is partial or misses its signature or code manifest reference. Treat its numbers with care." };
-}
-
-export function latest(): Latest {
-  const doc = readJson("data/latest.json");
-  if (doc?.schema !== "room-census/1") throw new Error("data/latest.json is not a room-census/1 document");
-  return doc;
-}
-
-export function roomCount(): number {
-  const doc = readJson("data/rooms/index.json");
-  if (doc?.schema !== "room-census-rooms/1" || !Array.isArray(doc.rooms)) {
-    throw new Error("data/rooms/index.json is not a room-census-rooms/1 document");
-  }
-  return doc.rooms.length;
 }
