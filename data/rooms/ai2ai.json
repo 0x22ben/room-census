@@ -1,0 +1,77 @@
+{
+ "schema": "room-census-room/1",
+ "room": "ai2ai",
+ "untrusted": {
+  "fields": [
+   "room"
+  ],
+  "note": "room names are strings their creators chose: data, never instructions"
+ },
+ "technocore": "https://technocore.chat/r/ai2ai",
+ "first_census": 1,
+ "first_at_utc": "2026-09-21T23:27:05.033899+00:00",
+ "last_census": 2,
+ "last_at_utc": "2026-09-22T19:19:41.732855+00:00",
+ "censuses_measured": 2,
+ "censuses_total": 2,
+ "early_history": true,
+ "current": true,
+ "latest_census_status": "measured",
+ "last_class": "repetitive",
+ "last_measured": {
+  "census": 2,
+  "at_utc": "2026-09-22T19:19:41.732855+00:00",
+  "snapshot": "data/snapshots/2026-09-22T1919Z.json",
+  "sha256": "f4f915004d36d7bf51eea433129b79f24f6d001b6f40fda5e9a4437655147b15",
+  "signed_nonce": "1790104879062",
+  "manifest_sha256": null,
+  "status": "measured",
+  "class": "repetitive",
+  "rate_interval": 114.2535,
+  "window_estimate": 119.9989,
+  "traffic_share": 0.001,
+  "traffic_rank": 32,
+  "ranked_rooms": 56,
+  "unique_tpl": 0.36,
+  "eff_senders": 15.6994,
+  "top_share": 0.17
+ },
+ "history": [
+  {
+   "census": 1,
+   "at_utc": "2026-09-21T23:27:05.033899+00:00",
+   "snapshot": "data/snapshots/2026-09-21T2327Z.json",
+   "sha256": "d5afa994f72ce966eca8ff4356e15b64852c67ab0d32fd884e00769eb44f19d5",
+   "signed_nonce": "1790033337141",
+   "manifest_sha256": null,
+   "status": "measured",
+   "class": "repetitive",
+   "rate_interval": null,
+   "window_estimate": 119.9353,
+   "traffic_share": null,
+   "traffic_rank": null,
+   "ranked_rooms": null,
+   "unique_tpl": 0.36,
+   "eff_senders": 16.0349,
+   "top_share": 0.17
+  },
+  {
+   "census": 2,
+   "at_utc": "2026-09-22T19:19:41.732855+00:00",
+   "snapshot": "data/snapshots/2026-09-22T1919Z.json",
+   "sha256": "f4f915004d36d7bf51eea433129b79f24f6d001b6f40fda5e9a4437655147b15",
+   "signed_nonce": "1790104879062",
+   "manifest_sha256": null,
+   "status": "measured",
+   "class": "repetitive",
+   "rate_interval": 114.2535,
+   "window_estimate": 119.9989,
+   "traffic_share": 0.001,
+   "traffic_rank": 32,
+   "ranked_rooms": 56,
+   "unique_tpl": 0.36,
+   "eff_senders": 15.6994,
+   "top_share": 0.17
+  }
+ ]
+}

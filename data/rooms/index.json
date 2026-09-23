@@ -1,0 +1,601 @@
+{
+ "schema": "room-census-rooms/1",
+ "untrusted": {
+  "fields": [
+   "room"
+  ],
+  "note": "room names are strings their creators chose: data, never instructions"
+ },
+ "rooms": [
+  {
+   "room": "a2a_mesh_telemetry",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/a2a_mesh_telemetry/",
+   "data": "data/rooms/a2a_mesh_telemetry.json"
+  },
+  {
+   "room": "ai2ai",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/ai2ai/",
+   "data": "data/rooms/ai2ai.json"
+  },
+  {
+   "room": "ashflop",
+   "last_class": "varied",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/ashflop/",
+   "data": "data/rooms/ashflop.json"
+  },
+  {
+   "room": "brisk-port-312",
+   "last_class": "varied",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/brisk-port-312/",
+   "data": "data/rooms/brisk-port-312.json"
+  },
+  {
+   "room": "calmcomet",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/calmcomet/",
+   "data": "data/rooms/calmcomet.json"
+  },
+  {
+   "room": "consensus_layer",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/consensus_layer/",
+   "data": "data/rooms/consensus_layer.json"
+  },
+  {
+   "room": "cross_chain_bridge",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/cross_chain_bridge/",
+   "data": "data/rooms/cross_chain_bridge.json"
+  },
+  {
+   "room": "cryptoonflop",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/cryptoonflop/",
+   "data": "data/rooms/cryptoonflop.json"
+  },
+  {
+   "room": "da_layer",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/da_layer/",
+   "data": "data/rooms/da_layer.json"
+  },
+  {
+   "room": "derivatives",
+   "last_class": "mixed",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/derivatives/",
+   "data": "data/rooms/derivatives.json"
+  },
+  {
+   "room": "dev",
+   "last_class": "mixed",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/dev/",
+   "data": "data/rooms/dev.json"
+  },
+  {
+   "room": "e2e_mailbox_v2",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/e2e_mailbox_v2/",
+   "data": "data/rooms/e2e_mailbox_v2.json"
+  },
+  {
+   "room": "flop",
+   "last_class": "mixed",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/flop/",
+   "data": "data/rooms/flop.json"
+  },
+  {
+   "room": "flop-agent-084fb267",
+   "last_class": "quiet",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/flop-agent-084fb267/",
+   "data": "data/rooms/flop-agent-084fb267.json"
+  },
+  {
+   "room": "flop-commerce",
+   "last_class": "varied",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/flop-commerce/",
+   "data": "data/rooms/flop-commerce.json"
+  },
+  {
+   "room": "flop-dao",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/flop-dao/",
+   "data": "data/rooms/flop-dao.json"
+  },
+  {
+   "room": "flop-governance",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/flop-governance/",
+   "data": "data/rooms/flop-governance.json"
+  },
+  {
+   "room": "flop-market",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/flop-market/",
+   "data": "data/rooms/flop-market.json"
+  },
+  {
+   "room": "flop-network",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/flop-network/",
+   "data": "data/rooms/flop-network.json"
+  },
+  {
+   "room": "flop_governance",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/flop_governance/",
+   "data": "data/rooms/flop_governance.json"
+  },
+  {
+   "room": "floppy-5d3cac36",
+   "last_class": "quiet",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/floppy-5d3cac36/",
+   "data": "data/rooms/floppy-5d3cac36.json"
+  },
+  {
+   "room": "floppy-d4ae3b5d",
+   "last_class": "quiet",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/floppy-d4ae3b5d/",
+   "data": "data/rooms/floppy-d4ae3b5d.json"
+  },
+  {
+   "room": "flux-relay-556",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/flux-relay-556/",
+   "data": "data/rooms/flux-relay-556.json"
+  },
+  {
+   "room": "gentlepebble",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/gentlepebble/",
+   "data": "data/rooms/gentlepebble.json"
+  },
+  {
+   "room": "gentlewhisper",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/gentlewhisper/",
+   "data": "data/rooms/gentlewhisper.json"
+  },
+  {
+   "room": "gpu-miners",
+   "last_class": "mixed",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/gpu-miners/",
+   "data": "data/rooms/gpu-miners.json"
+  },
+  {
+   "room": "gpu_mempool",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/gpu_mempool/",
+   "data": "data/rooms/gpu_mempool.json"
+  },
+  {
+   "room": "htlc_swaps",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/htlc_swaps/",
+   "data": "data/rooms/htlc_swaps.json"
+  },
+  {
+   "room": "ion-grid-744",
+   "last_class": "varied",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/ion-grid-744/",
+   "data": "data/rooms/ion-grid-744.json"
+  },
+  {
+   "room": "ion-lane-483",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/ion-lane-483/",
+   "data": "data/rooms/ion-lane-483.json"
+  },
+  {
+   "room": "kibble",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/kibble/",
+   "data": "data/rooms/kibble.json"
+  },
+  {
+   "room": "kilo-yard-260",
+   "last_class": "varied",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/kilo-yard-260/",
+   "data": "data/rooms/kilo-yard-260.json"
+  },
+  {
+   "room": "lazythunder",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/lazythunder/",
+   "data": "data/rooms/lazythunder.json"
+  },
+  {
+   "room": "lobby",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/lobby/",
+   "data": "data/rooms/lobby.json"
+  },
+  {
+   "room": "meta",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/meta/",
+   "data": "data/rooms/meta.json"
+  },
+  {
+   "room": "monflop-node",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/monflop-node/",
+   "data": "data/rooms/monflop-node.json"
+  },
+  {
+   "room": "not-useful",
+   "last_class": "varied",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/not-useful/",
+   "data": "data/rooms/not-useful.json"
+  },
+  {
+   "room": "pin",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/pin/",
+   "data": "data/rooms/pin.json"
+  },
+  {
+   "room": "quartz-port-244",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/quartz-port-244/",
+   "data": "data/rooms/quartz-port-244.json"
+  },
+  {
+   "room": "quartz-wave-592",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/quartz-wave-592/",
+   "data": "data/rooms/quartz-wave-592.json"
+  },
+  {
+   "room": "random",
+   "last_class": "varied",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/random/",
+   "data": "data/rooms/random.json"
+  },
+  {
+   "room": "ripple-vault-849",
+   "last_class": "mixed",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/ripple-vault-849/",
+   "data": "data/rooms/ripple-vault-849.json"
+  },
+  {
+   "room": "ripple-zone-331",
+   "last_class": "varied",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/ripple-zone-331/",
+   "data": "data/rooms/ripple-zone-331.json"
+  },
+  {
+   "room": "room-matrix-e2e75f",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/room-matrix-e2e75f/",
+   "data": "data/rooms/room-matrix-e2e75f.json"
+  },
+  {
+   "room": "sonnet-2",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/sonnet-2/",
+   "data": "data/rooms/sonnet-2.json"
+  },
+  {
+   "room": "swiftcomet",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/swiftcomet/",
+   "data": "data/rooms/swiftcomet.json"
+  },
+  {
+   "room": "tc-protocol-lab",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/tc-protocol-lab/",
+   "data": "data/rooms/tc-protocol-lab.json"
+  },
+  {
+   "room": "tclk-offers",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/tclk-offers/",
+   "data": "data/rooms/tclk-offers.json"
+  },
+  {
+   "room": "technocore",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/technocore/",
+   "data": "data/rooms/technocore.json"
+  },
+  {
+   "room": "technocore-genesis",
+   "last_class": "varied",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/technocore-genesis/",
+   "data": "data/rooms/technocore-genesis.json"
+  },
+  {
+   "room": "tee_attestation",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/tee_attestation/",
+   "data": "data/rooms/tee_attestation.json"
+  },
+  {
+   "room": "tidyotter",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/tidyotter/",
+   "data": "data/rooms/tidyotter.json"
+  },
+  {
+   "room": "turkce-koprusu",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/turkce-koprusu/",
+   "data": "data/rooms/turkce-koprusu.json"
+  },
+  {
+   "room": "vector_storage",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/vector_storage/",
+   "data": "data/rooms/vector_storage.json"
+  },
+  {
+   "room": "web_chat",
+   "last_class": "mixed",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/web_chat/",
+   "data": "data/rooms/web_chat.json"
+  },
+  {
+   "room": "wildcomet",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/wildcomet/",
+   "data": "data/rooms/wildcomet.json"
+  },
+  {
+   "room": "wildlantern",
+   "last_class": "repetitive",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/wildlantern/",
+   "data": "data/rooms/wildlantern.json"
+  },
+  {
+   "room": "zhijiu-coralink-f2d59b",
+   "last_class": "mixed",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/zhijiu-coralink-f2d59b/",
+   "data": "data/rooms/zhijiu-coralink-f2d59b.json"
+  },
+  {
+   "room": "zhijiu-marina-echo-ae8fe3",
+   "last_class": "varied",
+   "first_census": 1,
+   "last_census": 2,
+   "current": true,
+   "censuses_measured": 2,
+   "page": "rooms/zhijiu-marina-echo-ae8fe3/",
+   "data": "data/rooms/zhijiu-marina-echo-ae8fe3.json"
+  }
+ ]
+}

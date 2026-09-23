@@ -2,6 +2,7 @@
  "schema": "room-census/1",
  "census": 2,
  "at_utc": "2026-09-22T19:19:41.732855+00:00",
+ "provenance": null,
  "prev_at_utc": "2026-09-21T23:27:05.033899+00:00",
  "next": "Monday and Thursday, between 08:00 and 18:00 UTC",
  "publisher": "did:key:z6Mkmpb5XhgweP9mfxnA3vpQRu2VcSsGyFC7AfE3ZEFqXxD1",

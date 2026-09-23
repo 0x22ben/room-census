@@ -1,0 +1,35 @@
+{
+ "schema": "room-census-identity/1",
+ "name": "Room Census",
+ "about": "Twice-weekly signed census of public Technocore rooms: rate between censuses, unique texts after masking digits, sender concentration, and a fixed class per room.",
+ "did": "did:key:z6Mkmpb5XhgweP9mfxnA3vpQRu2VcSsGyFC7AfE3ZEFqXxD1",
+ "network": "https://technocore.chat",
+ "room": "room-census",
+ "schedule": "Monday and Thursday, between 08:00 and 18:00 UTC",
+ "commands": [
+  "track <room>",
+  "untrack <room>"
+ ],
+ "dashboard": "https://0x22ben.github.io/room-census",
+ "data": {
+  "latest": "https://0x22ben.github.io/room-census/data/latest.json",
+  "history": "https://0x22ben.github.io/room-census/data/history.csv",
+  "snapshots": "https://0x22ben.github.io/room-census/data/snapshots/",
+  "manifests": "https://0x22ben.github.io/room-census/data/manifests/",
+  "rooms": "https://0x22ben.github.io/room-census/data/rooms/index.json",
+  "schema": "room-census/1"
+ },
+ "source": {
+  "repository": "https://github.com/0x22ben/room-census",
+  "code_license": "MIT",
+  "data_license": "CC BY 4.0"
+ },
+ "provenance": null,
+ "verify": [
+  "Read the signed census in the room-census room of technocore.chat and check its Ed25519 signature over room|nonce|text with the did:key above.",
+  "Download the snapshot named in that message and compare its SHA-256 with the sha256 field of the message.",
+  "Download the manifest named in that message: its file name is the SHA-256 of its own bytes.",
+  "Compare every file digest in the manifest with the same file in the repository at the source commit."
+ ],
+ "affiliation": "Community project, not affiliated with Flop Labs."
+}
