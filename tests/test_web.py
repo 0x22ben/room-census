@@ -1,8 +1,8 @@
 """The Astro front end under web/: staging tests, design-token contrast and the built artifact.
 
-The artifact checks run on web/dist when it exists (after `npm run build` in web/). The continuous
-integration job that builds web/ before these tests arrives with the CI step of the migration (A7);
-until then they run on local builds only. Nothing here installs packages or uses the network."""
+The artifact checks run on web/dist when it exists (after `npm run build` in web/). The web
+workflow (.github/workflows/web.yml) builds web/ and then runs this file; the tests workflow runs it
+without a build, so the artifact checks skip there. Nothing here installs packages or uses the network."""
 import hashlib
 import html
 import json
