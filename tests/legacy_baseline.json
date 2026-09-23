@@ -1,0 +1,98 @@
+{
+ "content_types": {
+  "(no extension)": [
+   "text/plain",
+   "application/octet-stream"
+  ],
+  ".csv": [
+   "text/csv"
+  ],
+  ".html": [
+   "text/html"
+  ],
+  ".json": [
+   "application/json"
+  ],
+  ".png": [
+   "image/png"
+  ],
+  ".txt": [
+   "text/plain"
+  ]
+ },
+ "legacy_only": [
+  "LICENSE",
+  "README.md",
+  "app.js",
+  "assets/room.css",
+  "assets/room.js",
+  "census_render.py",
+  "durable.py",
+  "flop_did.py",
+  "manifest.py",
+  "requirements.txt",
+  "room_census.py",
+  "room_pages.py",
+  "tests/dashboard_harness.js",
+  "tests/helpers.py",
+  "tests/legacy_baseline.json",
+  "tests/site_contract.py",
+  "tests/test_census.py",
+  "tests/test_classify.py",
+  "tests/test_dashboard.py",
+  "tests/test_did.py",
+  "tests/test_durable.py",
+  "tests/test_manifest.py",
+  "tests/test_outputs.py",
+  "tests/test_publication.py",
+  "tests/test_requests.py",
+  "tests/test_room_pages.py",
+  "tests/test_schedule.py",
+  "tests/test_site_contract.py"
+ ],
+ "room_page_bytes": {
+  "largest": 6043,
+  "smallest": 5800,
+  "total": 349478
+ },
+ "routes": {
+  "manifests": 1,
+  "pages": 61,
+  "room_data": 60,
+  "room_pages": 59,
+  "snapshots": 3,
+  "total": 131
+ },
+ "schema": "room-census-site-baseline/1",
+ "sizes": {
+  "app.js": {
+   "bytes": 23720,
+   "gzip": 8338
+  },
+  "assets/room.css": {
+   "bytes": 7525,
+   "gzip": 2378
+  },
+  "assets/room.js": {
+   "bytes": 8059,
+   "gzip": 3451
+  },
+  "data/history.csv": {
+   "bytes": 31944,
+   "gzip": 7108
+  },
+  "data/latest.json": {
+   "bytes": 28068,
+   "gzip": 4838
+  },
+  "index.html": {
+   "bytes": 29726,
+   "gzip": 8234
+  },
+  "rooms/index.html": {
+   "bytes": 8245,
+   "gzip": 1579
+  }
+ },
+ "source_commit": "d9ff0f72cbf1efe8b498c2f361fe63f9abcd5336"
+}

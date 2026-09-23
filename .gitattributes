@@ -1,0 +1,4 @@
+# Published bytes are hashed and compared byte for byte: never convert their line endings on checkout.
+data/** -text
+identity.json -text
+llms.txt -text
