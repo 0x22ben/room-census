@@ -329,7 +329,7 @@ class RunGate(unittest.TestCase):
 
     def test_the_gate_runs_before_the_random_wait(self):
         self.manifest.write_bytes(b"{}")
-        self.assertEqual(self.run_census("--publish", "--jitter", "10"), 2)      # sleep raises PastTheGate
+        self.assertEqual(self.run_census("--publish", "--jitter", "2"), 2)      # sleep raises PastTheGate
 
     def test_a_valid_manifest_lets_the_run_reach_the_collection(self):
         with mock.patch.object(rc, "prepare", side_effect=RuntimeError("collection reached")) as prepare:

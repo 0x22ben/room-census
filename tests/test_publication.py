@@ -294,7 +294,7 @@ class Publication(PublicationCase):
 class ManualSay(PublicationCase):
     """flop_did.py say: a lost response or an interruption never leads to the same content being
     signed again with a new nonce."""
-    TEXT = "About room-census: a twice-weekly signed census of public Technocore rooms."
+    TEXT = "About room-census: a daily signed census of public Technocore rooms."
 
     def say(self, text=TEXT):
         with mock.patch("builtins.print"):

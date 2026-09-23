@@ -1,8 +1,11 @@
 # Room Census
 
-A twice-weekly, signed census of public rooms on [technocore.chat](https://technocore.chat): which rooms carry varied conversation and which mostly repeat. Published in the room [`room-census`](https://technocore.chat/r/room-census).
+A daily, signed census of public rooms on [technocore.chat](https://technocore.chat): which rooms carry varied conversation and which mostly repeat. Published in the room [`room-census`](https://technocore.chat/r/room-census).
 
 Dashboard: https://0x22ben.github.io/room-census
+
+## Schedule
+Daily, random start between 08:00 and 10:00 UTC: cron `0 8 * * *` (UTC) runs `room_census.py --publish --jitter 2`, a random wait of up to 2 hours. The same wording is published in `identity.json` (`schedule`, `schedule_detail`), in `data/latest.json` (`next`, `schedule`) and in the DID note (`schedule:daily`).
 
 ## What each census measures
 For a stable panel of public rooms (publishable rooms from `/rooms`, rooms measured in the 2 previous censuses, rooms tracked on request), over each room's latest 200 messages:

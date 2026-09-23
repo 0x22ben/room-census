@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-room_census.py: Room Census, a twice-weekly census of public Technocore rooms, published as a signed
-message (schema room-census/1).
+room_census.py: Room Census, a daily census of public Technocore rooms, published as a signed
+message (schema room-census/1). Scheduled by cron at 0 8 * * * (UTC) with --publish --jitter 2, so
+each census starts at a random time between 08:00 and 10:00 UTC (see SCHEDULE_* below).
 
 Commands:
   python room_census.py            dry run: computes and prints the message, sends and stores nothing
@@ -65,6 +66,16 @@ OLD_ROOMS = ("flop-veille",)
 DASHBOARD = "https://0x22ben.github.io/room-census"
 SCHEMA = "room-census/1"
 USER_AGENT = "room-census/1.0"
+# The one source of the publication schedule: identity.json, latest.json and the DID note all derive
+# from it. The cron line on the server must match: 0 8 * * * ... room_census.py --publish --jitter 2
+SCHEDULE_CRON = "0 8 * * *"                      # UTC, every day
+SCHEDULE_JITTER_HOURS = 2
+_START_HOUR = int(SCHEDULE_CRON.split()[1])
+SCHEDULE_WINDOW_UTC = f"{_START_HOUR:02d}:00-{_START_HOUR + SCHEDULE_JITTER_HOURS:02d}:00"
+SCHEDULE_TEXT = (f"Daily, random start between {_START_HOUR:02d}:00 and "
+                 f"{_START_HOUR + SCHEDULE_JITTER_HOURS:02d}:00 UTC")
+SCHEDULE = {"cadence": "daily", "cron_utc": SCHEDULE_CRON, "jitter_hours": SCHEDULE_JITTER_HOURS,
+            "window_utc": SCHEDULE_WINDOW_UTC, "text": SCHEDULE_TEXT}
 BASE = Path(__file__).resolve().parent
 SITE_DIR = BASE / "site"
 MANIFEST_FILE = manifest.MANIFEST_FILE           # provenance: checked before anything else runs
@@ -590,8 +601,8 @@ def refresh_did_note(did: str):
     """Rewrites the public DID note (Technocore /patterns.md section 3 convention)."""
     fp = hashlib.sha256(did.encode()).hexdigest()[:16]
     value = (f"{did} mailbox:{ROOM} data:{DASHBOARD}/data/latest.json schema:{SCHEMA} commands:track,untrack "
-             f"schedule:mon,thu about: Room Census, a twice-weekly signed census of public Technocore rooms "
-             f"(varied, mixed, repetitive). dashboard: {DASHBOARD}")
+             f"schedule:daily window:{SCHEDULE_WINDOW_UTC}UTC about: Room Census, a daily signed census of public "
+             f"Technocore rooms (varied, mixed, repetitive). dashboard: {DASHBOARD}")
     url = f"{SERVER}/kv/did-{fp[:2]}/{fp[2:]}/set/{urllib.parse.quote(value, safe='')}"
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=30) as resp:
@@ -635,12 +646,13 @@ def identity_doc(own_did, prov):
     return {
         "schema": IDENTITY_SCHEMA,
         "name": "Room Census",
-        "about": ("Twice-weekly signed census of public Technocore rooms: rate between censuses, unique texts "
+        "about": ("Daily signed census of public Technocore rooms: rate between censuses, unique texts "
                   "after masking digits, sender concentration, and a fixed class per room."),
         "did": own_did,
         "network": SERVER,
         "room": ROOM,
-        "schedule": "Monday and Thursday, between 08:00 and 18:00 UTC",
+        "schedule": SCHEDULE_TEXT,
+        "schedule_detail": dict(SCHEDULE),
         "commands": ["track <room>", "untrack <room>"],
         "dashboard": DASHBOARD,
         "data": {"latest": f"{DASHBOARD}/data/latest.json", "history": f"{DASHBOARD}/data/history.csv",
@@ -702,7 +714,8 @@ def write_data_files(records, own_did):
         "at_utc": last["at_utc"],
         "provenance": prov,
         "prev_at_utc": records[-2]["at_utc"] if len(records) > 1 else None,
-        "next": "Monday and Thursday, between 08:00 and 18:00 UTC",
+        "next": SCHEDULE_TEXT,
+        "schedule": dict(SCHEDULE),
         "publisher": own_did,
         "signed_in": last.get("signed_in"),
         "snapshot": last.get("snapshot", snapshot_path(last)),

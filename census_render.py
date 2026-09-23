@@ -210,7 +210,7 @@ def render_page(page, view, base_url):
     card = f"{base_url}/data/card.png?v={view['census']}"
     blocks = {
         "head": "\n".join([
-            f'<meta name="description" content="{e(headline)} A signed, twice-weekly census of public rooms.">',
+            f'<meta name="description" content="{e(headline)} A signed, daily census of public rooms.">',
             f'<meta property="og:type" content="website">',
             f'<meta property="og:url" content="{e(base_url)}/">',
             f'<meta property="og:title" content="Room Census: which rooms talk, which rooms loop">',
