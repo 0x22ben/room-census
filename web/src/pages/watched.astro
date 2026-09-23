@@ -1,0 +1,58 @@
+---
+// Watched rooms: the reader's own list, kept only in this browser. The page carries the public
+// figures of every room; the script picks the watched ones. Nothing about the reader leaves the device.
+import Base from "../layouts/Base.astro";
+import Help from "../components/Help.astro";
+import HardDrive from "@lucide/astro/icons/hard-drive";
+import Star from "@lucide/astro/icons/star";
+import { site } from "../lib/data";
+import { DISCLAIMER } from "../lib/patterns";
+
+const { rooms, latest } = site();
+const data: Record<string, unknown> = {};
+for (const doc of rooms.values()) {
+  data[doc.room] = {
+    p: doc.last_class,
+    r: doc.last_measured.rate_interval,
+    s: doc.current ? null : doc.last_census,
+    h: doc.history.map((p) => ({ c: p.census, r: p.rate_interval, p: p.class, e: p.eff_senders })),
+  };
+}
+---
+<Base title="Watched rooms" description="The Technocore rooms you follow, with what changed since your last visit. Saved only in your browser.">
+  <section aria-labelledby="watched-title" class="grid gap-1.5">
+    <h1 id="watched-title" class="text-3xl font-medium tracking-tight sm:text-4xl">Watched rooms</h1>
+    <p class="text-text-muted">The rooms you follow, with what changed since your last visit.</p>
+  </section>
+
+  <p class="mt-4 flex items-center gap-2.5 rounded-md border border-border bg-surface px-4 py-2.5 text-sm text-text-secondary">
+    <HardDrive size={18} aria-hidden="true" class="shrink-0" />
+    Saved only in this browser. Your watched rooms are never sent anywhere.
+  </p>
+
+  <p data-watched-noscript class="mt-4 text-text-muted">Watching rooms needs JavaScript. The list stays in this browser.</p>
+
+  <section data-watched data-rooms={JSON.stringify(data)} data-census={latest.census} hidden aria-labelledby="list-title" class="mt-4 overflow-hidden rounded-lg border border-border bg-surface">
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+      <h2 id="list-title" tabindex="-1" class="outline-none flex items-center gap-2 text-lg font-medium">
+        <span data-watched-count>0 rooms</span>
+        <Help term="Since your last visit" ask="How is the last visit known?" text="Each time you open a watched room or this page, this browser remembers the census you saw. Nothing is sent or stored online." />
+      </h2>
+      <p class="text-sm text-text-muted">Latest census #{latest.census}</p>
+    </div>
+    <ul data-watched-list></ul>
+    <p data-watched-status role="status" class="sr-only"></p>
+    <div data-watched-empty hidden class="grid gap-2 px-4 py-6">
+      <p class="font-semibold">No watched room yet.</p>
+      <p class="text-text-muted">Open a room and choose Watch. <a href="/rooms/" class="inline-flex min-h-11 items-center font-semibold text-link">Browse all rooms</a></p>
+    </div>
+  </section>
+
+  <p class="mt-4 text-sm text-text-muted">{DISCLAIMER} <a href="/#method" class="text-link">How message patterns are measured</a></p>
+
+  <template data-star-icon><Star size={18} aria-hidden="true" class="fill-current" /></template>
+</Base>
+
+<script>
+  import "../scripts/watched.ts";
+</script>

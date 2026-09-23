@@ -1,15 +1,25 @@
 ---
-// One room across every census. A census that did not measure the room stays a gap, never a zero;
-// a room missing from the latest census shows its last known figures, marked as such.
+// One room across every census. The page answers plain questions first (is it active, how do its
+// messages look, how many senders carry it, is it growing), then shows the evidence. A census that
+// did not measure the room stays a gap, never a zero; a room missing from the latest census shows
+// its last known figures, marked as such.
 import Base from "../../layouts/Base.astro";
 import ClassBadge from "../../components/ClassBadge.astro";
 import Help from "../../components/Help.astro";
 import LineChart from "../../components/LineChart.astro";
+import Activity from "@lucide/astro/icons/activity";
 import ArrowUpRight from "@lucide/astro/icons/arrow-up-right";
 import ChevronRight from "@lucide/astro/icons/chevron-right";
+import Clock from "@lucide/astro/icons/clock";
+import MessagesSquare from "@lucide/astro/icons/messages-square";
+import Star from "@lucide/astro/icons/star";
+import TrendingDown from "@lucide/astro/icons/trending-down";
+import TrendingUp from "@lucide/astro/icons/trending-up";
 import TriangleAlert from "@lucide/astro/icons/triangle-alert";
+import Users from "@lucide/astro/icons/users";
 import { site } from "../../lib/data";
 import { QUIET_MIN_MESSAGES } from "../../lib/method";
+import { DISCLAIMER, PATTERN, PATTERN_HELP } from "../../lib/patterns";
 import { change, dateTimeUtc, dateUtc, MISSING, pct, rate } from "../../lib/format";
 
 export function getStaticPaths() {
@@ -17,47 +27,62 @@ export function getStaticPaths() {
 }
 
 const { room } = Astro.params;
-const { rooms, latest, censuses } = site();
+const { rooms, latest } = site();
 const doc = rooms.get(room!)!;
 const m = doc.last_measured;
 const rated = doc.history.filter((p) => p.rate_interval !== null);
 const prevRated = rated.length > 1 ? rated[rated.length - 2] : null;
 const rateChange = m.rate_interval !== null ? change(prevRated?.rate_interval ?? null, m.rate_interval) : null;
-const reason = doc.current ? latest.rooms.find((r) => r.room === doc.room)?.reason : undefined;
+// the measured signals in the site's own words (the runtime's reason strings use internal class names)
+const senders = m.eff_senders === null ? null : Math.max(1, Math.round(m.eff_senders));
+const signals = [
+  m.unique_tpl !== null && `${pct(m.unique_tpl)} different messages`,
+  m.top_share !== null && `top sender ${pct(m.top_share)} of the messages`,
+  senders !== null && `about ${senders} effective ${senders === 1 ? "sender" : "senders"}`,
+].filter(Boolean).join(", ");
 const cls = doc.last_class;
 const MEANING = {
-  varied: ["Varied conversation, not template traffic", "Many regular senders write mostly unique texts."],
-  mixed: ["Between varied and repetitive", "At least one signal keeps this room from being varied, without making it repetitive. The measured signals are below."],
-  repetitive: ["Template or bot traffic", "Most texts repeat a template, one sender dominates, or senders only post once."],
-  quiet: ["Too quiet to classify", `The room had fewer than ${QUIET_MIN_MESSAGES} recent messages, or all of them at the same moment, when it was measured.`],
+  varied: "Recent messages differ from each other once numbers are masked.",
+  mixed: "Some recent messages repeat and others differ. The measured signals are below.",
+  repetitive: "Many recent messages repeat the same wording once numbers are masked, come from one sender, or come from senders who post only once.",
+  quiet: `Fewer than ${QUIET_MIN_MESSAGES} recent messages, or all of them at the same moment, when the room was measured.`,
 } as const;
-const meaning = cls ? MEANING[cls] : null;
-const STATUS = { measured: "Measured", quiet: "Quiet", absent: "Not listed", failed: "Not read" } as const;
+const STATUS = { measured: "Measured", quiet: "Low activity", absent: "Not listed", failed: "Not read" } as const;
+const history = doc.history.map((p) => ({ c: p.census, r: p.rate_interval, p: p.class, e: p.eff_senders }));
 const kpi = "grid gap-1 rounded-lg border border-border bg-surface p-4";
 const kpiLabel = "flex items-center gap-1.5 text-sm text-text-secondary";
+const fact = "flex items-center gap-2.5 text-base";
 const title = `${doc.room} room`;
 ---
-<Base title={title} description={`${doc.room} on technocore.chat: class, activity and history across every Room Census census.`}>
+<Base title={title} description={`${doc.room} on technocore.chat: activity, message pattern and history across every Room Census census.`}>
   <nav aria-label="Breadcrumb" class="text-sm">
     <ol class="flex items-center gap-1 text-text-muted">
-      <li><a href="/rooms/" class="inline-flex min-h-11 items-center text-link">Rooms</a></li>
+      <li><a href="/rooms/" class="inline-flex min-h-11 items-center text-link">All rooms</a></li>
       <li aria-hidden="true"><ChevronRight size={14} /></li>
       <li aria-current="page" class="font-mono">{doc.room}</li>
     </ol>
   </nav>
 
   <section aria-labelledby="room-title" class="flex flex-wrap items-start justify-between gap-4">
-    <div class="grid gap-2">
-      <h1 id="room-title" class="flex flex-wrap items-center gap-3">
-        <span class="font-mono text-3xl font-medium tracking-tight break-all sm:text-4xl">{doc.room}</span>
-        {cls && <span class="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1"><ClassBadge cls={cls} /></span>}
-      </h1>
-      {doc.current
-        ? <p class="text-text-muted">Measured in the latest census · {dateTimeUtc(m.at_utc)}</p>
-        : <p class="inline-flex items-center gap-2 rounded-md border border-warning-border bg-warning-soft px-3 py-2 text-sm">
-            <TriangleAlert size={16} aria-hidden="true" class="text-warning" />
-            {STATUS[doc.latest_census_status]} in census #{latest.census}. The figures below are from census #{doc.last_census}, {dateUtc(m.at_utc)}.
-          </p>}
+    <div class="grid min-w-0 gap-3">
+      <h1 id="room-title" class="font-mono text-3xl font-medium tracking-tight break-all sm:text-4xl">{doc.room}</h1>
+      <ul class="grid gap-2" aria-label="At a glance">
+        {doc.current
+          ? <li class={fact}><Activity size={18} aria-hidden="true" class:list={["shrink-0", doc.latest_census_status === "measured" ? "text-accent" : "text-text-muted"]} />
+              {doc.latest_census_status === "measured" ? "Active" : "Low activity"} in the latest census · {dateTimeUtc(m.at_utc)}
+              <Help term="Latest census" ask="When was this measured?" text="Room Census measures every public room once a day. Activity between two censuses is not shown." /></li>
+          : <li class="flex items-center gap-2 rounded-md border border-warning-border bg-warning-soft px-3 py-2 text-sm">
+              <TriangleAlert size={16} aria-hidden="true" class="shrink-0 text-warning" />
+              {STATUS[doc.latest_census_status]} in census #{latest.census}. The figures below are from census #{doc.last_census}, {dateUtc(m.at_utc)}.
+            </li>}
+        {cls && <li class={fact}><MessagesSquare size={18} aria-hidden="true" class="shrink-0 text-text-secondary" />{PATTERN[cls].sentence}
+          <Help term="Message pattern" ask="What is a message pattern?" text={PATTERN_HELP} /></li>}
+        {senders !== null && <li class={fact}><Users size={18} aria-hidden="true" class="shrink-0 text-text-secondary" />Activity shared across about {senders} {senders === 1 ? "sender" : "senders"}
+          <Help term="Effective senders" ask="How are senders counted?" text="How many senders really carry the activity. A room where one sender writes most messages counts as about one sender." /></li>}
+        {rateChange && prevRated && <li class={fact}>
+          {rateChange.startsWith("-") ? <TrendingDown size={18} aria-hidden="true" class="shrink-0 text-text-secondary" /> : <TrendingUp size={18} aria-hidden="true" class="shrink-0 text-accent" />}
+          {rateChange} messages per hour since census #{prevRated.census}</li>}
+      </ul>
       {doc.early_history && (
         <p class="flex items-center gap-2 text-sm text-text-muted">
           Early history: {doc.censuses_measured} of 6 censuses
@@ -65,9 +90,16 @@ const title = `${doc.room} room`;
         </p>
       )}
     </div>
-    <a href={doc.technocore} class="inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 text-sm font-semibold text-text no-underline">
-      Open the room on Technocore <ArrowUpRight size={16} aria-hidden="true" />
-    </a>
+    <div class="flex flex-wrap gap-2">
+      <button type="button" data-watch={doc.room} aria-pressed="false" hidden
+        class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-border-strong px-4 text-sm font-semibold text-text aria-pressed:border-repetitive aria-pressed:text-repetitive">
+        <Star size={16} aria-hidden="true" class="in-aria-pressed:fill-current" />Watch
+      </button>
+      <a href={doc.technocore} class="inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 text-sm font-semibold text-text no-underline">
+        <ArrowUpRight size={16} aria-hidden="true" /> Open on Technocore
+      </a>
+      <p data-watch-note role="status" class="basis-full text-sm text-text-muted empty:hidden"></p>
+    </div>
   </section>
 
   <dl class="mt-5 grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-3">
@@ -76,11 +108,11 @@ const title = `${doc.room} room`;
       <dd class="flex flex-wrap items-baseline gap-x-2"><span class="font-mono text-2xl font-bold">{rate(m.rate_interval)}</span>{rateChange && prevRated && <span class="font-mono text-xs text-text-muted">{rateChange} vs #{prevRated.census}</span>}</dd>
     </div>
     <div class={kpi}>
-      <dt class={kpiLabel}>Effective senders <Help term="Effective senders" ask="What are effective senders?" text="How many senders really carry the room. A room where one bot writes most messages counts as about one sender." /></dt>
+      <dt class={kpiLabel}>Effective senders <Help term="Effective senders" id="help-effective-senders-kpi" ask="How are senders counted?" text="How many senders really carry the activity. A room where one sender writes most messages counts as about one sender." /></dt>
       <dd class="font-mono text-2xl font-bold">{m.eff_senders === null ? MISSING : m.eff_senders.toFixed(1)}</dd>
     </div>
     <div class={kpi}>
-      <dt class={kpiLabel}>Unique texts <Help term="Unique texts" ask="What are unique texts?" text="Share of messages that are not copies of the same template, once numbers are masked." /></dt>
+      <dt class={kpiLabel}>Different messages <Help term="Different messages" ask="What are different messages?" text="Share of recent messages that differ from each other, once numbers are masked." /></dt>
       <dd class="font-mono text-2xl font-bold">{pct(m.unique_tpl)}</dd>
     </div>
     <div class={kpi}>
@@ -88,6 +120,24 @@ const title = `${doc.room} room`;
       <dd class="flex flex-wrap items-baseline gap-x-2"><span class="font-mono text-2xl font-bold">{pct(m.top_share)}</span>{m.traffic_rank && <span class="font-mono text-xs text-text-muted">rank #{m.traffic_rank} of {m.ranked_rooms}</span>}</dd>
     </div>
   </dl>
+
+  <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <section data-visit={doc.room} data-census={latest.census} data-history={JSON.stringify(history)} hidden aria-labelledby="visit-title" class="grid content-start gap-2 rounded-lg border border-border bg-surface p-5">
+      <h2 id="visit-title" class="flex items-center gap-2 text-lg font-medium">
+        Since your last visit
+        <Help term="Since your last visit" ask="How is the last visit known?" text="This browser remembers the census you last saw for each room. Nothing is sent or stored online." />
+      </h2>
+      <ul data-visit-lines class="grid gap-1.5 text-text-secondary"></ul>
+    </section>
+    <section aria-labelledby="usual-title" class="grid content-start gap-2 rounded-lg border border-border bg-surface p-5">
+      <h2 id="usual-title" class="flex items-center gap-2 text-lg font-medium">
+        Usually active
+        <Help term="Usually active" ask="What will this show?" text="The hours of the day when the room is busiest." />
+      </h2>
+      <p class="flex items-center gap-2 font-semibold"><Clock size={18} aria-hidden="true" class="text-text-muted" />Not available</p>
+      <p class="text-sm text-text-muted">Daily censuses cannot show the hours of activity.</p>
+    </section>
+  </div>
 
   <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
     <section aria-labelledby="activity-title" class="grid min-w-0 content-start gap-3 rounded-lg border border-border bg-surface p-5">
@@ -106,12 +156,12 @@ const title = `${doc.room} room`;
     </section>
 
     <section aria-labelledby="meaning-title" class="grid content-start gap-3 rounded-lg border border-border bg-surface p-5">
-      <p class="font-mono text-xs font-bold tracking-widest text-text-muted uppercase">What this means</p>
-      {meaning && <h2 id="meaning-title" class="text-xl font-semibold">{meaning[0]}</h2>}
-      {!meaning && <h2 id="meaning-title" class="text-xl font-semibold">No class yet</h2>}
-      {meaning && <p class="text-text-secondary">{meaning[1]}</p>}
-      {reason && <p class="text-sm text-text-muted">Measured: {reason}.</p>}
-      <p class="text-sm"><a href="/#method" class="inline-flex min-h-11 items-center font-semibold text-link">How rooms are classified</a></p>
+      <p class="font-mono text-xs font-bold tracking-widest text-text-muted uppercase">Message pattern</p>
+      <h2 id="meaning-title" class="text-xl font-semibold">{cls ? PATTERN[cls].sentence : "No pattern yet"}</h2>
+      {cls && <p class="text-text-secondary">{MEANING[cls]}</p>}
+      {signals && <p class="text-sm text-text-muted">Measured in census #{m.census}: {signals}.</p>}
+      <p class="text-sm text-text-muted">{DISCLAIMER}</p>
+      <p class="text-sm"><a href="/#method" class="inline-flex min-h-11 items-center font-semibold text-link">How message patterns are measured</a></p>
     </section>
   </div>
 
@@ -127,10 +177,10 @@ const title = `${doc.room} room`;
           <tr class="border-b border-border font-mono text-xs font-bold tracking-widest text-text-muted uppercase">
             <th scope="col" class="px-4 py-3">Census</th>
             <th scope="col" class="hidden px-4 py-3 sm:table-cell">Date</th>
-            <th scope="col" class="px-4 py-3">Class</th>
+            <th scope="col" class="px-4 py-3">Pattern</th>
             <th scope="col" class="px-4 py-3 text-right">Msg/h</th>
             <th scope="col" class="hidden px-4 py-3 text-right sm:table-cell">Eff. senders</th>
-            <th scope="col" class="px-4 py-3 text-right">Unique</th>
+            <th scope="col" class="px-4 py-3 text-right">Different</th>
           </tr>
         </thead>
         <tbody>
@@ -164,3 +214,7 @@ const title = `${doc.room} room`;
     <p class="font-mono text-xs break-all text-text-muted">sha256 {m.sha256}{m.signed_nonce && ` · nonce ${m.signed_nonce}`}</p>
   </section>
 </Base>
+
+<script>
+  import "../../scripts/room.ts";
+</script>

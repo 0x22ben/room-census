@@ -28,6 +28,13 @@ if (controls && rows.length > 0) {
     });
   }
   search?.addEventListener("input", apply);
+  // a link can open the page on one pattern, e.g. /rooms/?pattern=repetitive
+  const wanted = new URLSearchParams(window.location.search).get("pattern");
+  const preset = buttons.find((b) => b.dataset.filter === wanted);
+  if (preset) {
+    cls = wanted!;
+    for (const other of buttons) other.setAttribute("aria-pressed", String(other === preset));
+  }
   controls.hidden = false;
   apply();
 }

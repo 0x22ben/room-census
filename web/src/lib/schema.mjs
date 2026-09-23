@@ -68,6 +68,7 @@ export const latestSchema = z.looseObject({
     thresholds: z.looseObject({
       varied_min: z.looseObject({ unique_tpl: share, repeat_share: share, top_share: share, eff_senders: num.positive() }),
       repetitive_if_any: z.looseObject({ unique_tpl: share, top_share: share, repeat_share: share }),
+      rise: z.looseObject({ ratio: num.positive(), min_per_hour: num.nonnegative() }),
     }),
   }),
   rooms: z.array(latestRoom),
@@ -217,5 +218,23 @@ export function loadSite(read) {
     return { census: c.census, at_utc: c.at_utc, ...counts, traffic: rated ? traffic : null };
   });
 
-  return { latest, identity, index, rooms, censuses, byCensus };
+  // what changed between the last two censuses, for rooms measured in both: the biggest increases of
+  // messages per hour (among rooms above the published minimum rate) and the rooms seen for the first time
+  const n = latest.census;
+  const minRate = latest.method.thresholds.rise.min_per_hour;
+  const increases = [];
+  const newRooms = [];
+  for (const doc of rooms.values()) {
+    if (doc.first_census === n && n > 1) newRooms.push(doc.room);
+    if (n < 2) continue;
+    const before = doc.history[n - 2].rate_interval;
+    const after = doc.history[n - 1].rate_interval;
+    if (before !== null && after !== null && before > 0 && before >= minRate && after > before) {
+      increases.push({ room: doc.room, before, after, change: (after - before) / before });
+    }
+  }
+  increases.sort((a, b) => b.change - a.change || a.room.localeCompare(b.room));
+  newRooms.sort();
+
+  return { latest, identity, index, rooms, censuses, byCensus, increases, newRooms };
 }

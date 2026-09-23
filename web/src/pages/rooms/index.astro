@@ -6,6 +6,7 @@ import Help from "../../components/Help.astro";
 import RoomTable, { type Row } from "../../components/RoomTable.astro";
 import Search from "@lucide/astro/icons/search";
 import { site } from "../../lib/data";
+import { DISCLAIMER, PATTERN } from "../../lib/patterns";
 
 const { rooms, latest } = site();
 const docs = [...rooms.values()];
@@ -20,15 +21,15 @@ const counts = { varied: 0, mixed: 0, repetitive: 0, quiet: 0 } as Record<string
 for (const d of docs) if (d.last_class) counts[d.last_class] += 1;
 const filters = [
   { key: "all", label: "All", n: docs.length, dot: "" },
-  { key: "varied", label: "Varied", n: counts.varied, dot: "bg-varied" },
-  { key: "mixed", label: "Mixed", n: counts.mixed, dot: "bg-mixed" },
-  { key: "repetitive", label: "Repetitive", n: counts.repetitive, dot: "bg-repetitive" },
-  { key: "quiet", label: "Quiet", n: counts.quiet, dot: "bg-quiet-fill" },
+  { key: "varied", label: PATTERN.varied.short, n: counts.varied, dot: "bg-varied" },
+  { key: "mixed", label: PATTERN.mixed.short, n: counts.mixed, dot: "bg-mixed" },
+  { key: "repetitive", label: PATTERN.repetitive.short, n: counts.repetitive, dot: "bg-repetitive" },
+  { key: "quiet", label: PATTERN.quiet.short, n: counts.quiet, dot: "bg-quiet-fill" },
 ];
 ---
-<Base title="Rooms" description="Every public Technocore room Room Census has measured, with its class and activity.">
+<Base title="Rooms" description="Every public Technocore room Room Census has measured, with its message pattern and activity.">
   <section aria-labelledby="rooms-title" class="grid gap-1.5">
-    <h1 id="rooms-title" class="text-3xl font-medium tracking-tight sm:text-4xl">Rooms</h1>
+    <h1 id="rooms-title" class="text-3xl font-medium tracking-tight sm:text-4xl">All rooms</h1>
     <p class="flex items-center gap-2 text-text-muted">
       Every public Technocore room measured so far, from census #{latest.census}.
       <Help term="Room" ask="What is a room?" text="A public chat room on technocore.chat. Anyone can create one; Room Census measures every public room it can list." />
@@ -36,7 +37,7 @@ const filters = [
   </section>
 
   <div data-room-filters hidden class="mt-5 grid gap-3">
-    <div role="group" aria-label="Filter by class" class="flex flex-wrap gap-2">
+    <div role="group" aria-label="Filter by message pattern" class="flex flex-wrap gap-2">
       {filters.map((f) => (
         <button type="button" data-filter={f.key} aria-pressed={f.key === "all" ? "true" : "false"}
           class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-border px-4 text-sm font-medium text-text-secondary transition-colors duration-150 hover:text-text aria-pressed:border-border-strong aria-pressed:bg-surface-raised aria-pressed:font-semibold aria-pressed:text-text">
@@ -60,6 +61,8 @@ const filters = [
     </div>
     <RoomTable rows={rows} caption={`Every room measured by Room Census, ${docs.length} rooms`} />
   </section>
+
+  <p class="mt-4 text-sm text-text-muted">{DISCLAIMER} <a href="/#method" class="text-link">How message patterns are measured</a></p>
 </Base>
 
 <script>

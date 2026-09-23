@@ -15,20 +15,24 @@ export const CSP = [
   "object-src 'none'",
 ].join("; ");
 
-export type Icon = "overview" | "rooms" | "did" | "verify" | "data" | "method" | "source";
+export type Icon = "discover" | "rooms" | "watched" | "did" | "verify" | "data" | "method" | "source";
 export type NavItem = { label: string; href: string; icon: Icon; ready: boolean; external?: boolean };
 export type NavSection = { label: string; items: NavItem[] };
 
 // the sidebar of the approved mockup; a destination stays out of the navigation until its page
-// exists (Create DID also waits for its recovery tests and security review)
+// exists (My DID also waits for its recovery tests and security review)
 export const NAV: NavSection[] = [
   {
     label: "Explore",
     items: [
-      { label: "Overview", href: "/", icon: "overview", ready: true },
-      { label: "Rooms", href: "/rooms/", icon: "rooms", ready: true },
-      { label: "Create DID", href: "/did/", icon: "did", ready: false },
+      { label: "Discover rooms", href: "/", icon: "discover", ready: true },
+      { label: "All rooms", href: "/rooms/", icon: "rooms", ready: true },
+      { label: "Watched rooms", href: "/watched/", icon: "watched", ready: true },
     ],
+  },
+  {
+    label: "You",
+    items: [{ label: "My DID", href: "/did/", icon: "did", ready: false }],
   },
   {
     label: "Evidence",

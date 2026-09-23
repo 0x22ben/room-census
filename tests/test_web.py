@@ -192,12 +192,13 @@ class Artifact(unittest.TestCase):
             for label in ("Primary", "Menu"):
                 links = self.nav_links(text, label)
                 with self.subTest(page=route, nav=label):
-                    self.assertEqual([t for _, t, _ in links], ["Overview", "Rooms", "Source code"])
+                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "Source code"])
                     for href, _, _ in links:
                         if href.startswith("/"):
                             self.assertTrue(contract.resolve(DIST, route, href).is_file(), href)
                     current = [h for h, _, on in links if on]
-                    expected = ["/"] if route == "/" else ["/rooms/"] if route.startswith("/rooms/") else []
+                    expected = (["/"] if route == "/" else ["/rooms/"] if route.startswith("/rooms/")
+                                else ["/watched/"] if route == "/watched/" else [])
                     self.assertEqual(current, expected)
             with self.subTest(page=route):
                 # pages that do not exist yet are never linked, in any form (data files under /data/ are)
@@ -216,9 +217,9 @@ class Artifact(unittest.TestCase):
         latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
         spec = json.loads(html.unescape(re.search(r'data-chart="([^"]+)"', text).group(1)))
         self.assertEqual(spec["labels"], [f"#{i}" for i in range(1, latest["census"] + 1)])
-        last = {s["label"].lower(): s["values"][-1] for s in spec["series"]}
-        for cls in ("varied", "mixed", "repetitive"):
-            self.assertEqual(last[cls], latest["summary"][cls])
+        last = {s["label"]: s["values"][-1] for s in spec["series"]}
+        for label, cls in (("Different", "varied"), ("Mixed", "mixed"), ("Repeated", "repetitive")):
+            self.assertEqual(last[label], latest["summary"][cls])
         active = sorted((r for r in latest["rooms"] if r["class"] != "quiet"), key=lambda r: -(r.get("rate_interval") or -1))
         table = re.search(r'<section id="rooms".*?</section>', text, re.S).group(0)
         shown = re.findall(r'href="/rooms/([a-z0-9_-]+)/"', table)
@@ -233,7 +234,7 @@ class Artifact(unittest.TestCase):
             with self.subTest(page=self.route(page)):
                 for attrs in scripts:
                     self.assertRegex(attrs, r'type="module" src="/_astro/[\w.-]+\.js"')
-                needed = ("data-chart=" in text) + ("data-room-filters" in text)
+                needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched "))
                 self.assertEqual(len(scripts), needed)
 
     def test_the_built_site_meets_the_legacy_route_contract(self):
@@ -262,9 +263,9 @@ class Artifact(unittest.TestCase):
         text = re.sub(r"<[^>]+>", "", (DIST / "index.html").read_text(encoding="utf-8"))
         v, r = rc.VARIED, rc.REPETITIVE
         pc = lambda x: f"{round(x * 100)}%"
-        for needle in (f"at least {pc(v['unique_tpl'])} unique texts", f"at least {pc(v['repeat_share'])} of messages from senders",
+        for needle in (f"at least {pc(v['unique_tpl'])} different messages", f"at least {pc(v['repeat_share'])} of messages from senders",
                        f"no sender above {pc(v['top_share'])}", f"at least {v['eff_senders']} effective senders",
-                       f"under {pc(r['unique_tpl'])} unique texts", f"one sender writing {pc(r['top_share'])} or more",
+                       f"under {pc(r['unique_tpl'])} different messages", f"one sender writing {pc(r['top_share'])} or more",
                        f"under {pc(r['repeat_share'])} of messages from senders", f"fewer than {rc.MIN_WINDOW} recent messages",
                        f"windows of {rc.WINDOW} messages"):
             with self.subTest(needle=needle):
@@ -297,6 +298,65 @@ class Artifact(unittest.TestCase):
         for page in self.html_pages():
             with self.subTest(page=self.route(page)):
                 self.assertIn('href="/licenses/"', page.read_text(encoding="utf-8"))
+
+    # claims the census cannot prove, and internal class names, must never reach a reader
+    FORBIDDEN = (r"human conversation", r"human-like", r"bot detected", r"\bbots?\b", r"authentic traffic",
+                 r"quality room", r"healthy room", r"varied traffic", r"traffic quality", r"human activity",
+                 r"airdrop", r"eligib", r"reputation score", r"real conversation", r"\bvaried\b", r"\brepetitive\b")
+
+    # daily censuses cannot show live or hourly activity, and a signature is not a verification
+    OVERCLAIM = (r"\bactive now\b", r"\blive activity\b", r"\bright now\b", r"\brising\b", r"\bverified\b",
+                 r"\bin the last \d+ hours?\b", r"\bplanned\b", r"where people post")
+
+    def visible_text(self, page):
+        text = page.read_text(encoding="utf-8")
+        text = re.sub(r"<(script|template)\b.*?</\1>", " ", text, flags=re.S)
+        # words a reader or a search engine gets from attributes: descriptions, titles, alt texts, accessible names
+        said = re.findall(r'\b(?:aria-label|content|title|alt|placeholder)="([^"]*)"', text)
+        text = re.sub(r"<[^>]*>", " ", text)                     # other tags and attributes are data, not words
+        return html.unescape(text + " " + " ".join(said))
+
+    def test_no_forbidden_or_internal_wording_reaches_a_reader(self):
+        for page in self.html_pages():
+            text = self.visible_text(page)
+            for pattern in self.FORBIDDEN + self.OVERCLAIM:
+                with self.subTest(page=self.route(page), pattern=pattern):
+                    self.assertIsNone(re.search(pattern, text, re.I))
+        # text the scripts insert at runtime: every string literal of every built script. The internal
+        # class names stay allowed there (data keys and color classes); labels come from lib/patterns.ts
+        claims = [p for p in self.FORBIDDEN if p not in (r"\bvaried\b", r"\brepetitive\b")]
+        for script in DIST.glob("_astro/*.js"):
+            code = script.read_text(encoding="utf-8")
+            strings = " ".join(a or b for a, b in re.findall(r'"([^"\n]*)"|`([^`]*)`', code))
+            for pattern in claims + list(self.OVERCLAIM):
+                with self.subTest(script=script.name, pattern=pattern):
+                    self.assertIsNone(re.search(pattern, strings, re.I))
+
+    def test_every_page_carries_the_message_pattern_disclaimer_where_patterns_show(self):
+        disclaimer = "They do not prove whether a message was written by a human or an automated agent."
+        marks = re.compile(r'data-pattern=|data-watched |data-filter="varied"')
+        showing = [p for p in self.html_pages() if marks.search(p.read_text(encoding="utf-8"))]
+        self.assertGreater(len(showing), 3)
+        for page in showing:
+            with self.subTest(page=self.route(page)):
+                self.assertIn(disclaimer, self.visible_text(page))
+
+    def test_the_watched_page_keeps_the_list_in_the_browser(self):
+        text = (DIST / "watched" / "index.html").read_text(encoding="utf-8")
+        data = json.loads(html.unescape(re.search(r'data-rooms="([^"]+)"', text).group(1)))
+        index = json.loads((DIST / "data" / "rooms" / "index.json").read_text(encoding="utf-8"))["rooms"]
+        self.assertEqual(sorted(data), sorted(r["room"] for r in index))
+        self.assertIn("Saved only in this browser", text)
+        self.assertRegex(text, r"<section data-watched [^>]*hidden")
+        self.assertIn("needs JavaScript", text)
+        for room_page in (DIST / "rooms").glob("*/index.html"):
+            page = room_page.read_text(encoding="utf-8")
+            with self.subTest(room=room_page.parent.name):
+                self.assertRegex(page, r'<button type="button" data-watch="[a-z0-9_-]+" aria-pressed="false" hidden')
+                self.assertIn('data-watch-note role="status"', page)
+        store = next(DIST.glob("_astro/watch-store*.js")).read_text(encoding="utf-8")
+        self.assertIn("localStorage", store)
+        self.assertNotRegex(store, r"fetch\(|XMLHttpRequest|sendBeacon|navigator\.send")
 
     def test_the_rooms_index_lists_every_room_with_filters_that_need_script(self):
         text = (DIST / "rooms" / "index.html").read_text(encoding="utf-8")
