@@ -69,15 +69,39 @@ class Project(unittest.TestCase):
     # anything that could publish the site or write to the repository from a workflow
     DEPLOYING = (r"deploy-pages", r"upload-pages-artifact", r"configure-pages", r"write-all",
                  r"\b(pages|contents|id-token|deployments|actions)\s*:\s*['\"]?write", r"git\s+push", r"gh-pages")
+    # what no workflow may do, not even the one that publishes: change the repository itself
+    REPO_WRITING = (r"write-all", r"\b(contents|deployments|actions)\s*:\s*['\"]?write", r"git\s+push", r"gh-pages")
+    PUBLISHER = "pages.yml"
 
-    def test_no_active_pages_deployment(self):
+    def test_only_the_pages_workflow_can_publish_the_site(self):
         workflows = sorted((REPO / ".github" / "workflows").glob("*.y*ml"))
         self.assertTrue(workflows)
+        self.assertIn(self.PUBLISHER, [wf.name for wf in workflows])
         for wf in workflows:
+            if wf.name == self.PUBLISHER:
+                continue
             text = wf.read_text(encoding="utf-8")
             for pattern in self.DEPLOYING:
                 with self.subTest(workflow=wf.name, pattern=pattern):
                     self.assertIsNone(re.search(pattern, text, re.I))
+
+    def test_the_publishing_workflow_deploys_only_main_and_only_what_passed_the_contract(self):
+        text = (REPO / ".github" / "workflows" / self.PUBLISHER).read_text(encoding="utf-8")
+        # it is the one that publishes, and it says so plainly
+        for needed in ("actions/upload-pages-artifact", "actions/deploy-pages", "pages: write", "id-token: write", "path: web/dist"):
+            self.assertIn(needed, text)
+        # only main reaches the public site: a branch can never change what is served
+        self.assertRegex(text, r"branches:\s*\[main\]")
+        self.assertNotIn("astro-migration", text)
+        # and it can read the repository, never write to it
+        self.assertIn("contents: read", text)
+        for pattern in self.REPO_WRITING:
+            with self.subTest(pattern=pattern):
+                self.assertIsNone(re.search(pattern, text, re.I))
+        # nothing is uploaded before the build has been checked
+        upload = text.index("upload-pages-artifact")
+        for gate in ("tests.test_web", "site_contract.py"):
+            self.assertLess(text.index(gate), upload, f"{gate} must run before the upload")
 
     def test_ci_runs_the_did_page_in_a_real_browser(self):
         """The /did/ script is tested as shipped; in CI a missing browser fails instead of skipping."""
@@ -91,6 +115,12 @@ class Project(unittest.TestCase):
                         "contents: write", "id-token: \"write\"", "run: git push origin HEAD:gh-pages"):
             with self.subTest(example=example):
                 self.assertTrue(any(re.search(p, example, re.I) for p in self.DEPLOYING))
+        for example in ("permissions: write-all", "contents: write", "run: git push origin HEAD:gh-pages"):
+            with self.subTest(repository=example):
+                self.assertTrue(any(re.search(p, example, re.I) for p in self.REPO_WRITING))
+        for allowed in ("pages: write", "id-token: write", "uses: actions/deploy-pages@v4"):
+            with self.subTest(allowed=allowed):
+                self.assertFalse(any(re.search(p, allowed, re.I) for p in self.REPO_WRITING))
 
 
 def luminance(hex_color):
