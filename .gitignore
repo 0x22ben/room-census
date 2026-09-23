@@ -17,3 +17,6 @@ census.lock
 abandoned/
 # deployment manifest of the running copy: built from an approved commit, never committed with it
 deploy_manifest.json
+
+# editor and tool settings that belong to one machine
+web/.claude/
