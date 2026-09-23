@@ -1,0 +1,42 @@
+---
+// A line chart drawn by Chart.js (src/scripts/charts.ts), with its numbers always available as a
+// table. The canvas takes the keyboard focus; the arrow keys move from census to census.
+import { rate } from "../lib/format";
+
+interface Series { label: string; token: string; values: (number | null)[] }
+interface Props { labels: string[]; series: Series[]; unit?: string; min?: number; summary: string; caption: string }
+const { labels, series, unit = "", min, summary, caption } = Astro.props;
+const spec = JSON.stringify({ labels, series, unit, min });
+const cell = (v: number | null) => (v === null ? "no value" : `${rate(v)}${unit}`);
+---
+<figure class="grid gap-3">
+  <div class="relative h-64 sm:h-72">
+    <canvas data-chart={spec} role="img" aria-label={summary} tabindex="0" class="rounded-md"></canvas>
+  </div>
+  <figcaption class="text-sm text-text-muted">{caption} Use the left and right arrow keys on the chart to read each census.</figcaption>
+  <details class="text-sm">
+    <summary class="inline-flex min-h-11 cursor-pointer items-center font-semibold text-link">Show the numbers</summary>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead>
+          <tr class="border-b border-border text-text-muted">
+            <th scope="col" class="py-2 pr-4 font-mono text-xs font-bold tracking-widest uppercase">Census</th>
+            {series.map((s) => <th scope="col" class="py-2 pr-4 font-mono text-xs font-bold tracking-widest uppercase">{s.label}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {labels.map((label, i) => (
+            <tr class="border-b border-border last:border-0">
+              <th scope="row" class="py-2 pr-4 font-mono font-normal">{label}</th>
+              {series.map((s) => <td class="py-2 pr-4 font-mono tabular-nums">{cell(s.values[i])}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</figure>
+
+<script>
+  import "../scripts/charts.ts";
+</script>

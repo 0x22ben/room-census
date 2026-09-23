@@ -1,0 +1,62 @@
+---
+// A table of rooms. The whole row opens the room page (the room name is the real link, stretched
+// over the row), so the table works with a mouse, by touch, by keyboard and without script.
+import ClassBadge from "./ClassBadge.astro";
+import Help from "./Help.astro";
+import { MISSING, pct, rate } from "../lib/format";
+
+export interface Row {
+  room: string;
+  cls: "varied" | "mixed" | "repetitive" | "quiet" | null;
+  rate: number | null;
+  eff: number | null;
+  unique: number | null;
+  note?: string;
+}
+interface Props { rows: Row[]; caption: string; helpSuffix?: string }
+const { rows, caption, helpSuffix = "" } = Astro.props;
+// full class names, so Tailwind finds them in the source
+const FILL = { varied: "text-varied", mixed: "text-mixed", repetitive: "text-repetitive", quiet: "text-quiet-fill" } as const;
+const head = "px-4 py-3 font-mono text-xs font-bold tracking-widest text-text-muted uppercase";
+---
+<div class="overflow-x-auto">
+  <table class="w-full text-left sm:min-w-[40rem]">
+    <caption class="sr-only">{caption}</caption>
+    <thead>
+      <tr class="border-b border-border">
+        <th scope="col" class={head}>Room</th>
+        <th scope="col" class:list={[head, "text-right"]}><span class="inline-flex items-center gap-1.5">Msg/h <Help term="Messages per hour" ask="What is msg/h?" id={`help-rate${helpSuffix}`} text="Messages per hour in the room, measured between the last two censuses." /></span></th>
+        <th scope="col" class:list={[head, "hidden text-right sm:table-cell"]}><span class="inline-flex items-center gap-1.5">Eff. senders <Help term="Effective senders" ask="What are effective senders?" id={`help-eff${helpSuffix}`} text="How many senders really carry a room. A room where one bot writes most messages counts as about one sender." /></span></th>
+        <th scope="col" class:list={[head, "hidden text-right sm:table-cell"]}><span class="inline-flex items-center gap-1.5">Unique texts <Help term="Unique texts" ask="What are unique texts?" id={`help-unique${helpSuffix}`} text="Share of messages that are not copies of the same template, once numbers are masked." /></span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {rows.map((r) => (
+        <tr data-room={r.room} data-class={r.cls ?? "none"} class="relative border-b border-border transition-colors duration-150 last:border-0 hover:bg-surface-raised focus-within:bg-surface-raised">
+          <th scope="row" class="px-4 py-3 font-normal">
+            <span class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <a href={`/rooms/${r.room}/`} class="font-mono text-link after:absolute after:inset-0 after:content-['']">{r.room}</a>
+              {r.cls && <ClassBadge cls={r.cls} />}
+              {r.note && <span class="text-sm text-text-muted">{r.note}</span>}
+            </span>
+            <span class="mt-1 block text-sm text-text-muted sm:hidden">{r.unique === null ? "No unique-text measure" : `${pct(r.unique)} unique texts`}</span>
+          </th>
+          <td class="px-4 py-3 text-right font-mono tabular-nums">{rate(r.rate)}</td>
+          <td class="hidden px-4 py-3 text-right font-mono tabular-nums sm:table-cell">{r.eff === null ? MISSING : Math.round(r.eff).toLocaleString("en-US")}</td>
+          <td class="hidden px-4 py-3 sm:table-cell">
+            <span class="flex items-center justify-end gap-3">
+              <span class="font-mono tabular-nums">{pct(r.unique)}</span>
+              <span class="h-1.5 w-14 overflow-hidden rounded-full bg-border" aria-hidden="true">
+                {r.unique !== null && r.cls && (
+                  <svg viewBox="0 0 100 6" preserveAspectRatio="none" class="block h-1.5 w-14">
+                    <rect width={Math.max(2, Math.round(r.unique * 100))} height="6" rx="3" class:list={["fill-current", FILL[r.cls]]} />
+                  </svg>
+                )}
+              </span>
+            </span>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>

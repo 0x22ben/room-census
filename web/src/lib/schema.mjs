@@ -63,6 +63,13 @@ export const latestSchema = z.looseObject({
     went_quiet: z.array(z.unknown()),
   }),
   global: z.looseObject({ new_rooms_per_hour: num.nonnegative().nullable() }),
+  method: z.looseObject({
+    window_msgs: censusNo,
+    thresholds: z.looseObject({
+      varied_min: z.looseObject({ unique_tpl: share, repeat_share: share, top_share: share, eff_senders: num.positive() }),
+      repetitive_if_any: z.looseObject({ unique_tpl: share, top_share: share, repeat_share: share }),
+    }),
+  }),
   rooms: z.array(latestRoom),
 });
 

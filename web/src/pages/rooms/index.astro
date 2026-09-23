@@ -1,18 +1,67 @@
 ---
-// Rooms shell: the room index and the room pages arrive in A5.
+// Every room ever measured, busiest first. Rooms missing from the latest census keep their last
+// known figures, marked as such.
 import Base from "../../layouts/Base.astro";
 import Help from "../../components/Help.astro";
-import { roomCount } from "../../lib/data";
+import RoomTable, { type Row } from "../../components/RoomTable.astro";
+import Search from "@lucide/astro/icons/search";
+import { site } from "../../lib/data";
 
-const rooms = roomCount();
+const { rooms, latest } = site();
+const docs = [...rooms.values()];
+const rows: Row[] = docs
+  .map((d) => ({ doc: d, m: d.last_measured }))
+  .sort((a, b) => Number(b.doc.current) - Number(a.doc.current) || (b.m.rate_interval ?? -1) - (a.m.rate_interval ?? -1) || a.doc.room.localeCompare(b.doc.room))
+  .map(({ doc, m }) => ({
+    room: doc.room, cls: doc.last_class, rate: m.rate_interval, eff: m.eff_senders, unique: m.unique_tpl,
+    note: doc.current ? undefined : `Last seen in census #${doc.last_census}`,
+  }));
+const counts = { varied: 0, mixed: 0, repetitive: 0, quiet: 0 } as Record<string, number>;
+for (const d of docs) if (d.last_class) counts[d.last_class] += 1;
+const filters = [
+  { key: "all", label: "All", n: docs.length, dot: "" },
+  { key: "varied", label: "Varied", n: counts.varied, dot: "bg-varied" },
+  { key: "mixed", label: "Mixed", n: counts.mixed, dot: "bg-mixed" },
+  { key: "repetitive", label: "Repetitive", n: counts.repetitive, dot: "bg-repetitive" },
+  { key: "quiet", label: "Quiet", n: counts.quiet, dot: "bg-quiet-fill" },
+];
 ---
-<Base title="Rooms" description="Every public Technocore room Room Census has measured.">
-  <section aria-labelledby="rooms-title" class="grid gap-2">
+<Base title="Rooms" description="Every public Technocore room Room Census has measured, with its class and activity.">
+  <section aria-labelledby="rooms-title" class="grid gap-1.5">
     <h1 id="rooms-title" class="text-3xl font-medium tracking-tight sm:text-4xl">Rooms</h1>
-    <p class="flex items-center gap-2 text-lg text-text-secondary">
-      {rooms} rooms measured so far
+    <p class="flex items-center gap-2 text-text-muted">
+      Every public Technocore room measured so far, from census #{latest.census}.
       <Help term="Room" ask="What is a room?" text="A public chat room on technocore.chat. Anyone can create one; Room Census measures every public room it can list." />
     </p>
-    <p class="max-w-prose text-text-muted">The searchable room index follows in the next steps.</p>
+  </section>
+
+  <div data-room-filters hidden class="mt-5 grid gap-3">
+    <div role="group" aria-label="Filter by class" class="flex flex-wrap gap-2">
+      {filters.map((f) => (
+        <button type="button" data-filter={f.key} aria-pressed={f.key === "all" ? "true" : "false"}
+          class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-border px-4 text-sm font-medium text-text-secondary transition-colors duration-150 hover:text-text aria-pressed:border-border-strong aria-pressed:bg-surface-raised aria-pressed:font-semibold aria-pressed:text-text">
+          {f.dot && <span class:list={["size-2 rounded-full", f.dot]} aria-hidden="true"></span>}
+          {f.label} <span class="font-mono text-xs text-text-muted">{f.n}</span>
+        </button>
+      ))}
+    </div>
+    <label class="relative block max-w-md">
+      <span class="sr-only">Search a room by name</span>
+      <Search size={18} aria-hidden="true" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-text-muted" />
+      <input type="search" placeholder="Search a room" autocomplete="off" spellcheck="false"
+        class="min-h-11 w-full rounded-md border border-border-strong bg-bg pr-3 pl-10 text-base text-text placeholder:text-text-muted" />
+    </label>
+  </div>
+
+  <section aria-labelledby="table-title" class="mt-4 overflow-hidden rounded-lg border border-border bg-surface">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3">
+      <h2 id="table-title" class="text-lg font-medium">{docs.length} rooms</h2>
+      <p data-room-count role="status" class="text-sm text-text-muted">Showing all {docs.length} rooms</p>
+    </div>
+    <RoomTable rows={rows} caption={`Every room measured by Room Census, ${docs.length} rooms`} />
   </section>
 </Base>
+
+<script>
+  import "../../scripts/rooms-filter.ts";
+</script>

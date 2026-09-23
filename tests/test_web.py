@@ -4,6 +4,7 @@ The artifact checks run on web/dist when it exists (after `npm run build` in web
 integration job that builds web/ before these tests arrives with the CI step of the migration (A7);
 until then they run on local builds only. Nothing here installs packages or uses the network."""
 import hashlib
+import html
 import json
 import re
 import shutil
@@ -196,13 +197,97 @@ class Artifact(unittest.TestCase):
                         if href.startswith("/"):
                             self.assertTrue(contract.resolve(DIST, route, href).is_file(), href)
                     current = [h for h, _, on in links if on]
-                    self.assertEqual(current, {"/": ["/"], "/rooms/": ["/rooms/"]}.get(route, []))
+                    expected = ["/"] if route == "/" else ["/rooms/"] if route.startswith("/rooms/") else []
+                    self.assertEqual(current, expected)
             with self.subTest(page=route):
                 # pages that do not exist yet are never linked, in any form (data files under /data/ are)
                 self.assertIsNone(re.search(r'href="(https?://[^"/]+)?/(did|verify|method)(/[^"]*)?"', text))
                 self.assertIsNone(re.search(r'href="(https?://[^"/]+)?/data/?"', text))
         for gated in ("did", "verify", "method"):
             self.assertFalse((DIST / gated).exists())
+
+    def test_the_overview_keeps_the_anchors_signed_messages_link_to(self):
+        ids = contract.parse(DIST / "index.html").ids
+        for anchor in contract.ANCHORS["/"]:
+            self.assertIn(anchor, ids)
+
+    def test_the_overview_numbers_come_from_the_published_data(self):
+        text = (DIST / "index.html").read_text(encoding="utf-8")
+        latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
+        spec = json.loads(html.unescape(re.search(r'data-chart="([^"]+)"', text).group(1)))
+        self.assertEqual(spec["labels"], [f"#{i}" for i in range(1, latest["census"] + 1)])
+        last = {s["label"].lower(): s["values"][-1] for s in spec["series"]}
+        for cls in ("varied", "mixed", "repetitive"):
+            self.assertEqual(last[cls], latest["summary"][cls])
+        active = sorted((r for r in latest["rooms"] if r["class"] != "quiet"), key=lambda r: -(r.get("rate_interval") or -1))
+        table = re.search(r'<section id="rooms".*?</section>', text, re.S).group(0)
+        shown = re.findall(r'href="/rooms/([a-z0-9_-]+)/"', table)
+        self.assertEqual(shown, [r["room"] for r in active[:8]])
+        self.assertIn(f'{round(latest["summary"]["repetitive_share"] * 100)}%', text)
+
+    def test_scripts_are_external_modules_and_only_where_needed(self):
+        """Charts and the room filters need script; every other page works without any."""
+        for page in self.html_pages():
+            text = page.read_text(encoding="utf-8")
+            scripts = re.findall(r"<script\b([^>]*)>", text)
+            with self.subTest(page=self.route(page)):
+                for attrs in scripts:
+                    self.assertRegex(attrs, r'type="module" src="/_astro/[\w.-]+\.js"')
+                needed = ("data-chart=" in text) + ("data-room-filters" in text)
+                self.assertEqual(len(scripts), needed)
+
+    def test_the_built_site_meets_the_legacy_route_contract(self):
+        """Same routes, anchors, data files and link integrity as the legacy site, at the domain root."""
+        self.assertEqual(contract.check(DIST, contract.DOMAIN_BASE), [])
+
+    def test_room_pages_show_gaps_and_stale_rooms_honestly(self):
+        index = json.loads((DIST / "data" / "rooms" / "index.json").read_text(encoding="utf-8"))["rooms"]
+        for entry in index:
+            doc = json.loads((DIST / entry["data"]).read_text(encoding="utf-8"))
+            text = (DIST / entry["page"] / "index.html").read_text(encoding="utf-8")
+            history = re.search(r'<section id="history".*?</section>', text, re.S).group(0)
+            rows = re.findall(r"<tr class=\"border-b border-border last:border-0\">(.*?)</tr>", history, re.S)
+            with self.subTest(room=entry["room"]):
+                self.assertEqual(len(rows), doc["censuses_total"])
+                for row, point in zip(rows, reversed(doc["history"])):
+                    cells = re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)
+                    self.assertIn(f"#{point['census']}<", row)
+                    if point["rate_interval"] is None:
+                        self.assertIn("–", cells[2], "a missing rate must be shown as missing, never as zero")
+                self.assertEqual("Figures below are from census" in text or "The figures below are from census" in text, not doc["current"])
+                self.assertIn(f'href="{doc["technocore"]}"', text)
+
+    def test_the_method_text_matches_the_code_that_classifies(self):
+        import room_census as rc
+        text = re.sub(r"<[^>]+>", "", (DIST / "index.html").read_text(encoding="utf-8"))
+        v, r = rc.VARIED, rc.REPETITIVE
+        pc = lambda x: f"{round(x * 100)}%"
+        for needle in (f"at least {pc(v['unique_tpl'])} unique texts", f"at least {pc(v['repeat_share'])} of messages from senders",
+                       f"no sender above {pc(v['top_share'])}", f"at least {v['eff_senders']} effective senders",
+                       f"under {pc(r['unique_tpl'])} unique texts", f"one sender writing {pc(r['top_share'])} or more",
+                       f"under {pc(r['repeat_share'])} of messages from senders", f"fewer than {rc.MIN_WINDOW} recent messages",
+                       f"windows of {rc.WINDOW} messages"):
+            with self.subTest(needle=needle):
+                self.assertIn(needle, text)
+
+    def test_a_measured_rate_is_never_shown_as_zero(self):
+        for entry in json.loads((DIST / "data" / "rooms" / "index.json").read_text(encoding="utf-8"))["rooms"]:
+            doc = json.loads((DIST / entry["data"]).read_text(encoding="utf-8"))
+            text = (DIST / entry["page"] / "index.html").read_text(encoding="utf-8")
+            history = re.search(r'<section id="history".*?</section>', text, re.S).group(0)
+            rows = re.findall(r"<tr class=\"border-b border-border last:border-0\">(.*?)</tr>", history, re.S)
+            for row, point in zip(rows, reversed(doc["history"])):
+                shown = re.sub(r"<[^>]+>", "", re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)[2]).strip()
+                if point["rate_interval"]:
+                    with self.subTest(room=entry["room"], census=point["census"]):
+                        self.assertNotEqual(shown, "0")
+
+    def test_the_rooms_index_lists_every_room_with_filters_that_need_script(self):
+        text = (DIST / "rooms" / "index.html").read_text(encoding="utf-8")
+        index = json.loads((DIST / "data" / "rooms" / "index.json").read_text(encoding="utf-8"))["rooms"]
+        listed = re.findall(r'<tr data-room="([^"]+)"', text)
+        self.assertEqual(sorted(listed), sorted(r["room"] for r in index))
+        self.assertRegex(text, r"<div data-room-filters hidden")
 
     def test_the_census_status_never_claims_more_than_the_data(self):
         latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
