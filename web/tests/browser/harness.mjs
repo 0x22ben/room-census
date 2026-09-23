@@ -93,10 +93,18 @@ export async function start() {
   const args = ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", `--user-data-dir=${profile}`,
     "--remote-debugging-port=0", "about:blank"];
   if (process.platform === "linux") args.unshift("--no-sandbox");
-  browser = spawn(BROWSER, args, { stdio: "ignore" });
+  // a cold browser on a CI runner can take well over ten seconds to open its debugging port
+  let stderr = "";
+  browser = spawn(BROWSER, args, { stdio: ["ignore", "ignore", "pipe"] });
+  browser.stderr.on("data", (d) => { stderr = (stderr + d).slice(-2000); });
   const portFile = join(profile, "DevToolsActivePort");
-  for (let i = 0; i < 200 && !existsSync(portFile); i++) await sleep(50);
-  const port = readFileSync(portFile, "utf8").split("\n")[0].trim();
+  for (let i = 0; i < 1200 && !existsSync(portFile) && browser.exitCode === null; i++) await sleep(50);
+  assert.ok(existsSync(portFile), `the browser did not open its debugging port within 60 s (exit ${browser.exitCode}): ${stderr}`);
+  let port = "";
+  for (let i = 0; i < 100 && !port; i++) {
+    port = readFileSync(portFile, "utf8").split("\n")[0].trim();
+    if (!port) await sleep(50);
+  }
   let target;
   for (let i = 0; i < 100 && !target; i++) {
     try { target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find((t) => t.type === "page"); } catch {}
