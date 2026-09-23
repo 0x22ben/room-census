@@ -29,12 +29,16 @@ const item = "flex h-11 items-center gap-3 rounded-md px-3 text-base transition-
     </div>
   ))}
   <ul class="mt-auto flex flex-col gap-1.5 border-t border-border pt-4">
-    {footer.map((i) => (
-      <li>
-        <a href={i.href} class:list={[item, "font-medium text-text-secondary hover:bg-surface hover:text-text"]}>
-          <NavIcon name={i.icon} /><span>{i.label}</span>
-        </a>
-      </li>
-    ))}
+    {footer.map((i) => {
+      const on = isActive(i, pathname);
+      return (
+        <li>
+          <a href={i.href} aria-current={on ? "page" : undefined}
+            class:list={[item, on ? "bg-surface-raised font-semibold text-text" : "font-medium text-text-secondary hover:bg-surface hover:text-text"]}>
+            <NavIcon name={i.icon} /><span>{i.label}</span>
+          </a>
+        </li>
+      );
+    })}
   </ul>
 </nav>

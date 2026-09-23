@@ -1,75 +1,17 @@
-// The built /did/ page in a real headless browser. The site is served from web/dist; every
-// Technocore read is answered by the test (no network), so the page script runs exactly as shipped:
-// bounded concurrency, visible progress and partial failures, stop, honest results, the local
-// proof, and nothing stored or sent. Needs a Chromium browser (Chrome, Edge or Chromium): set
-// BROWSER_BIN, or it is looked up. Skipped when none is found, unless REQUIRE_BROWSER=1 (CI).
+// The built /did/ page in a real headless browser. Every Technocore read is answered by the test
+// (no network), so the page script runs exactly as shipped: bounded concurrency, visible progress and
+// partial failures, stop, honest results, the local proof, and nothing stored or sent.
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { createServer } from "node:http";
-import { tmpdir } from "node:os";
-import { dirname, extname, join, normalize, resolve, sep } from "node:path";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { after, before, test } from "node:test";
-import { fileURLToPath } from "node:url";
 
-const WEB = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const DIST = join(WEB, "dist");
+import { DIST, WEB, listeners, navigate, page, send, site, skip, sleep, start, stop, until } from "./harness.mjs";
+
 const fixture = readFileSync(join(WEB, "tests", "fixtures", "room-census-reply.json"), "utf8");
 const identity = JSON.parse(readFileSync(join(WEB, "..", "identity.json"), "utf8"));
 const DID = identity.did;
 const OTHER = "did:key:z6Mkfw79DoBMgePecy4YaXSSimwzHKYz8sB3JB9X7bKSXMkG";
-
-const CANDIDATES = [
-  process.env.BROWSER_BIN,
-  "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
-  "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
-  "C:/Program Files/Google/Chrome/Application/chrome.exe",
-  "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/microsoft-edge",
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-].filter(Boolean);
-const BROWSER = CANDIDATES.find((p) => existsSync(p));
-const BUILT = existsSync(join(DIST, "did", "index.html"));
-if (process.env.REQUIRE_BROWSER === "1") {
-  assert.ok(BROWSER, "REQUIRE_BROWSER=1 but no Chromium browser was found (set BROWSER_BIN)");
-  assert.ok(BUILT, "REQUIRE_BROWSER=1 but web/dist is not built");
-}
-const skip = !BROWSER ? "no Chromium browser found" : !BUILT ? "web/dist is not built" : false;
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json",
-  ".woff2": "font/woff2", ".woff": "font/woff", ".png": "image/png", ".txt": "text/plain", ".csv": "text/csv" };
-
-let server;
-let origin;
-let browser;
-let profile;
-let ws;
-let id = 0;
-const pending = new Map();
-const listeners = new Set();
-
-function send(method, params = {}) {
-  return new Promise((ok, fail) => {
-    const n = ++id;
-    pending.set(n, (msg) => (msg.error ? fail(new Error(`${method}: ${msg.error.message}`)) : ok(msg.result)));
-    ws.send(JSON.stringify({ id: n, method, params }));
-  });
-}
-
-async function page(expr) {
-  const r = await send("Runtime.evaluate", { expression: expr, returnByValue: true, awaitPromise: true });
-  if (r.exceptionDetails) throw new Error(`page: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
-  return r.result.value;
-}
-
-async function until(expr, what, ms = 20000) {
-  const end = Date.now() + ms;
-  while (Date.now() < end) {
-    if (await page(expr)) return;
-    await sleep(40);
-  }
-  throw new Error(`timed out waiting for ${what}`);
-}
 
 /**
  * Opens /did/ with Technocore answered by `answer(room)` -> {status, body} after `delay` ms (or held
@@ -77,8 +19,8 @@ async function until(expr, what, ms = 20000) {
  */
 async function open({ answer, delay = 25, hold = false, noEd25519 = false }) {
   const log = { requests: [], technocore: [], inFlight: 0, maxInFlight: 0, held: [] };
-  for (const l of listeners) listeners.delete(l);
-  const onEvent = async (msg) => {
+  listeners.clear();
+  listeners.add(async (msg) => {
     if (msg.method === "Network.requestWillBeSent") log.requests.push(msg.params.request.url);
     if (msg.method !== "Fetch.requestPaused") return;
     const { requestId, request } = msg.params;
@@ -97,22 +39,17 @@ async function open({ answer, delay = 25, hold = false, noEd25519 = false }) {
     };
     if (hold) log.held.push(reply);
     else setTimeout(reply, delay);
-  };
-  listeners.add(onEvent);
-  await send("Page.addScriptToEvaluateOnNewDocument", {
+  });
+  await send("Fetch.enable", { patterns: [{ urlPattern: "https://technocore.chat/*", requestStage: "Request" }] });
+  const { identifier } = await send("Page.addScriptToEvaluateOnNewDocument", {
     source: noEd25519
       ? `{ const real = crypto.subtle.importKey.bind(crypto.subtle);
            crypto.subtle.importKey = (f, k, alg, ...rest) => (alg && alg.name === "Ed25519") ? Promise.reject(new Error("NotSupportedError")) : real(f, k, alg, ...rest); }`
       : "",
-  }).then(({ identifier }) => { log.script = identifier; });
-  let loaded = false;
-  const onLoad = (msg) => { if (msg.method === "Page.loadEventFired") loaded = true; };
-  listeners.add(onLoad);
-  await send("Page.navigate", { url: `${origin}/did/` });
-  for (let i = 0; i < 200 && !loaded; i++) await sleep(25);
-  listeners.delete(onLoad);
+  });
+  await navigate("/did/");
   await until("!document.querySelector('form[data-did-form]').hidden", "the form to be enabled by the script");
-  if (log.script) await send("Page.removeScriptToEvaluateOnNewDocument", { identifier: log.script });
+  await send("Page.removeScriptToEvaluateOnNewDocument", { identifier });
   return log;
 }
 
@@ -133,51 +70,8 @@ const proof = () => page(`(async () => {
   return { name: window.__proofName, json: JSON.parse(await blob.text()) };
 })()`);
 
-before(async () => {
-  if (skip) return;
-  server = createServer((req, res) => {
-    const path = decodeURIComponent(new URL(req.url, "http://x").pathname);
-    let file = normalize(join(DIST, path));
-    if (!file.startsWith(DIST + sep) && file !== DIST) { res.writeHead(403).end(); return; }
-    if (path.endsWith("/")) file = join(file, "index.html");
-    if (!existsSync(file)) { res.writeHead(404).end(); return; }
-    res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream" }).end(readFileSync(file));
-  });
-  await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  origin = `http://127.0.0.1:${server.address().port}`;
-
-  profile = mkdtempSync(join(tmpdir(), "did-page-"));
-  const args = ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", `--user-data-dir=${profile}`,
-    "--remote-debugging-port=0", "about:blank"];
-  if (process.platform === "linux") args.unshift("--no-sandbox");
-  browser = spawn(BROWSER, args, { stdio: "ignore" });
-  const portFile = join(profile, "DevToolsActivePort");
-  for (let i = 0; i < 200 && !existsSync(portFile); i++) await sleep(50);
-  const port = readFileSync(portFile, "utf8").split("\n")[0].trim();
-  let target;
-  for (let i = 0; i < 100 && !target; i++) {
-    try { target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find((t) => t.type === "page"); } catch {}
-    if (!target) await sleep(50);
-  }
-  ws = new WebSocket(target.webSocketDebuggerUrl);
-  await new Promise((r) => ws.addEventListener("open", r, { once: true }));
-  ws.addEventListener("message", (m) => {
-    const msg = JSON.parse(m.data);
-    if (msg.id && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); return; }
-    for (const l of listeners) l(msg);
-  });
-  await send("Page.enable");
-  await send("Network.enable");
-  await send("Fetch.enable", { patterns: [{ urlPattern: "https://technocore.chat/*", requestStage: "Request" }] });
-});
-
-after(async () => {
-  ws?.close();
-  browser?.kill();
-  await new Promise((r) => (server ? server.close(r) : r()));
-  await sleep(300);
-  if (profile) rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-});
+before(start);
+after(stop);
 
 function rooms() {
   const latest = JSON.parse(readFileSync(join(DIST, "data", "latest.json"), "utf8"));
@@ -210,7 +104,7 @@ test("a lookup reads every room at most four at a time, shows progress and failu
   assert.deepEqual(log.technocore.map((u) => new URL(u).pathname.split("/")[2]).sort(), [...all].sort());
   for (const u of log.technocore) assert.match(u, /^https:\/\/technocore\.chat\/r\/[a-z0-9][a-z0-9_-]*\?format=json&limit=200$/);
   for (const u of log.requests) {
-    assert.ok(u.startsWith(origin) || u.startsWith("https://technocore.chat/") || u.startsWith("data:"), `unexpected request ${u}`);
+    assert.ok(u.startsWith(site.origin) || u.startsWith("https://technocore.chat/") || u.startsWith("data:"), `unexpected request ${u}`);
     assert.ok(!u.includes("z6Mk") && !u.includes("did%3Akey") && !u.includes("did:key"), `the DID left the browser: ${u}`);
   }
 

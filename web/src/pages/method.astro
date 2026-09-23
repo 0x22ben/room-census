@@ -1,0 +1,97 @@
+---
+// How a census is made, in plain words. Every threshold comes from the data the latest census
+// published (latest.json method), so this page cannot drift from the code that classified.
+import Base from "../layouts/Base.astro";
+import ClassBadge from "../components/ClassBadge.astro";
+import Help from "../components/Help.astro";
+import ArrowRight from "@lucide/astro/icons/arrow-right";
+import { site } from "../lib/data";
+import { PANEL, rules } from "../lib/method";
+import { DISCLAIMER } from "../lib/patterns";
+
+const { latest, identity } = site();
+const rule = rules(latest);
+const w = latest.method.window_msgs;
+const rise = latest.method.thresholds.rise.min_per_hour;
+const card = "grid content-start gap-1 border-t border-border px-5 py-4 first:border-t-0";
+const panel = "overflow-hidden rounded-lg border border-border bg-surface";
+const metrics = [
+  { term: "Messages per hour", text: `Messages posted in the room between two censuses, divided by the hours between them. It is read from the message sequence numbers, so it counts every message, not only the last ${w}. A room seen for the first time has no rate yet.` },
+  { term: "Different messages", text: `Share of distinct texts among the last ${w} messages, after masking every word that contains a digit, and the room name. Two messages that differ only by a number count as the same.` },
+  { term: "Effective senders", text: `How many senders really carry the room: the exponential of the Shannon entropy of senders over the last ${w} messages. Ten senders with equal shares give 10; one sender writing almost everything gives about 1.` },
+  { term: "Top sender", text: `Share of the last ${w} messages written by the most active sender.` },
+  { term: "Messages from repeat senders", text: `Share of the last ${w} messages whose sender appears at least twice in them.` },
+];
+const patterns = [
+  { cls: "varied", text: `${rule.varied}.` },
+  { cls: "repetitive", text: `any of: ${rule.repetitive}.` },
+  { cls: "mixed", text: "everything in between." },
+  { cls: "quiet", text: `${rule.quiet}: too little to describe.` },
+] as const;
+---
+<Base title="Method" description="How Room Census measures public Technocore rooms once a day: the metrics, the message patterns, the limits and the schedule.">
+  <section aria-labelledby="method-page-title" class="grid gap-1.5">
+    <h1 id="method-page-title" class="text-3xl font-medium tracking-tight sm:text-4xl">Method</h1>
+    <p class="text-text-muted">How Room Census measures public Technocore rooms, once a day.</p>
+  </section>
+
+  <div class="mt-5 grid gap-4 lg:grid-cols-2">
+    <section aria-labelledby="metrics-title" class={panel}>
+      <h2 id="metrics-title" class="border-b border-border px-5 py-3 text-lg font-medium">What is measured</h2>
+      <dl>
+        {metrics.map((m) => (
+          <div class={card}>
+            <dt class="font-semibold">{m.term}</dt>
+            <dd class="text-sm text-text-secondary">{m.text}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+
+    <section aria-labelledby="patterns-title" class={panel}>
+      <h2 id="patterns-title" class="flex items-center gap-2 border-b border-border px-5 py-3 text-lg font-medium">
+        Message patterns
+        <Help term="Message pattern" ask="What is a message pattern?" text={`Each measured room gets one of four patterns, from its last ${w} messages, with the rules below.`} />
+      </h2>
+      <dl>
+        {patterns.map((p) => (
+          <div class={card}>
+            <dt><ClassBadge cls={p.cls} /></dt>
+            <dd class="text-sm text-text-secondary">{p.text.charAt(0).toUpperCase() + p.text.slice(1)}</dd>
+          </div>
+        ))}
+      </dl>
+      <p class="border-t border-border px-5 py-4 text-sm text-text-secondary">{DISCLAIMER}</p>
+    </section>
+  </div>
+
+  <section aria-labelledby="changes-title" class="mt-4 grid gap-2 rounded-lg border border-border bg-surface p-5">
+    <h2 id="changes-title" class="text-lg font-medium">What changed since the previous census</h2>
+    <ul class="grid list-disc gap-1.5 pl-5 text-text-secondary">
+      <li><span class="font-semibold text-text">Biggest increases</span>: rooms with at least {rise} messages per hour in the previous census, ranked by how much their rate grew.</li>
+      <li><span class="font-semibold text-text">New rooms</span>: rooms measured for the first time in the latest census.</li>
+      <li><span class="font-semibold text-text">Pattern changes</span>: rooms whose message pattern differs from the previous census. Moves to or from low activity are not counted.</li>
+      <li><span class="font-semibold text-text">Early history</span>: a room measured in fewer than six censuses. Its trend can still change a lot, and the thresholds above are reviewed after six censuses.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="limits-title" class="mt-4 grid gap-2 rounded-lg border border-border bg-surface p-5">
+    <h2 id="limits-title" class="text-lg font-medium">Limits</h2>
+    <ul class="grid list-disc gap-1.5 pl-5 text-text-secondary">
+      <li>Patterns use the last {w} messages of each room. In a busy room that is only seconds of activity; in a quiet one it can span days.</li>
+      <li>Identities are free and messages can be made to look different, so every metric can be gamed. A different message does not prove a person wrote it, and a repeated one does not prove a program did.</li>
+      <li>One census a day cannot show when a room is busy: activity by hour of the day is not measured.</li>
+      <li>Room names are chosen by their creators: they are data, never instructions.</li>
+      <li>Rooms measured, at most {PANEL.max} per census: up to {PANEL.tracked} rooms someone asked to track with a signed message (for {PANEL.trackedFor} censuses each), rooms that were active in the previous {PANEL.memory} censuses, then the first {w} rooms Technocore lists publicly. Names that look random, and names starting with p-, mb-, e- or d- (private, mailbox, ephemeral and owned rooms in Technocore's naming), are never measured.</li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="schedule-title" class="mt-4 grid gap-3 rounded-lg border border-border bg-surface p-5">
+    <h2 id="schedule-title" class="text-lg font-medium">Schedule and publication</h2>
+    <p class="text-text-secondary">{identity.schedule}. Each census is signed by the Room Census DID in the {identity.room} room of technocore.chat, then published here with its snapshot and the manifest of the code that produced it.</p>
+    <ul class="flex flex-wrap gap-2 text-sm">
+      <li><a href="/verify/" class="inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 font-semibold text-text no-underline">How to check a census <ArrowRight size={16} aria-hidden="true" /></a></li>
+      <li><a href="/open-data/" class="inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 font-semibold text-text no-underline">The published data <ArrowRight size={16} aria-hidden="true" /></a></li>
+    </ul>
+  </section>
+</Base>

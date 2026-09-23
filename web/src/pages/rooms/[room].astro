@@ -70,7 +70,7 @@ const title = `${doc.room} room`;
         {doc.current
           ? <li class={fact}><Activity size={18} aria-hidden="true" class:list={["shrink-0", doc.latest_census_status === "measured" ? "text-accent" : "text-text-muted"]} />
               {doc.latest_census_status === "measured" ? "Active" : "Low activity"} in the latest census · {dateTimeUtc(m.at_utc)}
-              <Help term="Latest census" ask="When was this measured?" text="Room Census measures every public room once a day. Activity between two censuses is not shown." /></li>
+              <Help term="Latest census" ask="When was this measured?" text="Room Census measures public rooms once a day. Activity between two censuses is not shown." /></li>
           : <li class="flex items-center gap-2 rounded-md border border-warning-border bg-warning-soft px-3 py-2 text-sm">
               <TriangleAlert size={16} aria-hidden="true" class="shrink-0 text-warning" />
               {STATUS[doc.latest_census_status]} in census #{latest.census}. The figures below are from census #{doc.last_census}, {dateUtc(m.at_utc)}.

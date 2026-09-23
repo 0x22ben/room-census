@@ -204,20 +204,18 @@ class Artifact(unittest.TestCase):
             for label in ("Primary", "Menu"):
                 links = self.nav_links(text, label)
                 with self.subTest(page=route, nav=label):
-                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "My DID", "Source code"])
+                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "My DID", "Verify", "Data",
+                                                                "Method", "Source code"])
                     for href, _, _ in links:
                         if href.startswith("/"):
                             self.assertTrue(contract.resolve(DIST, route, href).is_file(), href)
                     current = [h for h, _, on in links if on]
+                    own = ("/watched/", "/did/", "/verify/", "/open-data/", "/method/")
                     expected = (["/"] if route == "/" else ["/rooms/"] if route.startswith("/rooms/")
-                                else ["/watched/"] if route == "/watched/" else ["/did/"] if route == "/did/" else [])
+                                else [route] if route in own else [])
                     self.assertEqual(current, expected)
-            with self.subTest(page=route):
-                # pages that do not exist yet are never linked, in any form (data files under /data/ are)
-                self.assertIsNone(re.search(r'href="(https?://[^"/]+)?/(verify|method)(/[^"]*)?"', text))
-                self.assertIsNone(re.search(r'href="(https?://[^"/]+)?/data/?"', text))
-        for gated in ("verify", "method"):
-            self.assertFalse((DIST / gated).exists())
+        for page in ("did", "verify", "open-data", "method"):
+            self.assertTrue((DIST / page / "index.html").is_file())
 
     def test_the_overview_keeps_the_anchors_signed_messages_link_to(self):
         ids = contract.parse(DIST / "index.html").ids
@@ -246,7 +244,8 @@ class Artifact(unittest.TestCase):
             with self.subTest(page=self.route(page)):
                 for attrs in scripts:
                     self.assertRegex(attrs, r'type="module" src="/_astro/[\w.-]+\.js"')
-                needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched ", "data-did-form "))
+                needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched ", "data-did-form ",
+                                                       "data-verify-summary "))
                 self.assertEqual(len(scripts), needed)
 
     def test_the_built_site_meets_the_legacy_route_contract(self):
@@ -401,6 +400,78 @@ class Artifact(unittest.TestCase):
                 with self.subTest(page=self.route(page)):
                     self.assertNotIn("technocore.chat https", contract.parse(page).csp or "")
                     self.assertNotIn("connect-src 'self' https", contract.parse(page).csp or "")
+
+    def test_verify_runs_only_the_checks_it_can_and_names_the_published_fingerprints(self):
+        text = (DIST / "verify" / "index.html").read_text(encoding="utf-8")
+        visible = self.visible_text(DIST / "verify" / "index.html")
+        latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
+        prov = latest["provenance"]
+        checks = dict(re.findall(r'data-check="(\w+)" data-url="([^"]+)"', text))
+        self.assertEqual(checks, {"snapshot": "/" + latest["snapshot"], "manifest": "/" + prov["manifest"]})
+        self.assertIn(f'data-expected="{latest["sha256"]}"', text)
+        self.assertIn(f'data-expected="{prov["manifest_sha256"]}"', text)
+        # the published files really have those fingerprints, and the manifest is named after its own
+        self.assertEqual(hashlib.sha256((DIST / latest["snapshot"]).read_bytes()).hexdigest(), latest["sha256"])
+        self.assertEqual(hashlib.sha256((DIST / prov["manifest"]).read_bytes()).hexdigest(), prov["manifest_sha256"])
+        manifest = json.loads((DIST / prov["manifest"]).read_text(encoding="utf-8"))
+        for f in manifest["files"]:
+            self.assertIn(f["sha256"], text)
+            self.assertIn(f["path"], text)
+        self.assertIn(f"{DOMAIN}/{latest['snapshot']}", visible)
+        self.assertIn(f"git cat-file blob {prov['commit']}:$f", html.unescape(text))
+        self.assertIn(f"curl -fsSLO {DOMAIN}/{latest['snapshot']}", visible)
+        self.assertIn(latest["signed_in"]["nonce"], visible)
+        self.assertIn(latest["publisher"], visible)
+        # without script it says what it cannot do; it never claims a check it did not run
+        self.assertIn("that needs JavaScript", visible)
+        for claim in ("All checks pass", "checks pass for", "Verified"):
+            self.assertNotIn(claim, visible)
+        self.assertEqual(visible.count("Checked by you"), 2)
+
+    def test_data_lists_every_published_file_with_its_real_size(self):
+        text = html.unescape((DIST / "open-data" / "index.html").read_text(encoding="utf-8"))
+        def size(n):
+            return f"{n} B" if n < 1024 else f"{round(n / 1024)} KB" if n < 1024 * 1024 else f"{n / 1024 / 1024:.1f} MB"
+        for rel in ("data/latest.json", "data/history.csv", "data/rooms/index.json", "identity.json", "llms.txt",
+                    "data/card.png", "data/LICENSE"):
+            with self.subTest(file=rel):
+                row = re.search(rf'<li [^>]*data-file="{re.escape(rel)}".*?</li>', text, re.S).group(0)
+                self.assertIn(f'href="/{rel}"', row)
+                self.assertIn(size((DIST / rel).stat().st_size), row)
+        room_files = [f for f in (DIST / "data" / "rooms").glob("*.json") if f.name != "index.json"]
+        self.assertIn(f"{len(room_files)} files, {size(sum(f.stat().st_size for f in room_files))}", text)
+        latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
+        censuses = re.findall(r'<span class="font-semibold">Census #(\d+)</span>', text)
+        self.assertEqual(sorted(map(int, censuses)), list(range(1, latest["census"] + 1)))
+        for snap in sorted((DIST / "data" / "snapshots").glob("*.json")):
+            with self.subTest(snapshot=snap.name):
+                self.assertIn(f"sha256 {hashlib.sha256(snap.read_bytes()).hexdigest()}", text)
+        for man in (DIST / "data" / "manifests").glob("*.json"):
+            self.assertIn(f'href="/data/manifests/{man.name}"', text)
+        self.assertIn(", ".join((DIST / "data" / "history.csv").read_text(encoding="utf-8").splitlines()[0].split(",")), text)
+
+    def test_the_method_page_matches_the_data_and_the_code(self):
+        import room_census as rc
+        visible = self.visible_text(DIST / "method" / "index.html").lower()
+        latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
+        t = latest["method"]["thresholds"]
+        v, r = t["varied_min"], t["repetitive_if_any"]
+        self.assertEqual((v, r), (rc.VARIED, rc.REPETITIVE))
+        pc = lambda x: f"{round(x * 100)}%"
+        for needle in (f"at least {pc(v['unique_tpl'])} different messages", f"at least {pc(v['repeat_share'])} of messages from senders",
+                       f"no sender above {pc(v['top_share'])}", f"at least {v['eff_senders']} effective senders",
+                       f"under {pc(r['unique_tpl'])} different messages", f"one sender writing {pc(r['top_share'])} or more",
+                       f"under {pc(r['repeat_share'])} of messages from senders", f"fewer than {rc.MIN_WINDOW} recent messages",
+                       f"at least {t['rise']['min_per_hour']} messages per hour",
+                       f"last {latest['method']['window_msgs']} messages",
+                       # how rooms are chosen: the constants of the census code, never typed by hand
+                       f"at most {rc.MAX_PANEL} per census", f"up to {rc.MAX_TRACKED} rooms someone asked to track",
+                       f"for {rc.TRACK_PULSES} censuses each", f"active in the previous {rc.PANEL_MEMORY} censuses",
+                       f"the first {rc.WINDOW} rooms technocore lists"):
+            with self.subTest(needle=needle):
+                self.assertIn(needle.lower(), visible)
+        identity = json.loads((DIST / "identity.json").read_text(encoding="utf-8"))
+        self.assertIn(identity["schedule"].lower(), visible)
 
     def test_the_rooms_index_lists_every_room_with_filters_that_need_script(self):
         text = (DIST / "rooms" / "index.html").read_text(encoding="utf-8")

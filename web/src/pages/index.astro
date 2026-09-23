@@ -87,7 +87,7 @@ const views = [
     <section aria-labelledby="headline-title" class="grid content-start gap-4 rounded-lg border border-border bg-surface p-5">
       <h2 id="headline-title" class="flex items-center gap-2 font-mono text-xs font-bold tracking-widest text-text-muted uppercase">
         Latest census
-        <Help term="Census" ask="What is a census?" text="One daily measurement of every public Technocore room, signed by Room Census." />
+        <Help term="Census" ask="What is a census?" text="One daily measurement of public Technocore rooms, signed by Room Census." />
       </h2>
       <p class="grid gap-1">
         <span class="font-mono text-6xl font-bold tracking-tight">{s.active}</span>
@@ -220,6 +220,7 @@ const views = [
         <li><a class={pill} href={`/${latest.snapshot}`}>Snapshot</a></li>
         {latest.provenance && <li><a class={pill} href={`/${latest.provenance.manifest}`}>Code manifest</a></li>}
         {commit && <li><a class={pill} href={`${latest.provenance?.repository}/tree/${commit}`}>Source at {commit.slice(0, 8)} <ArrowUpRight size={14} aria-hidden="true" /></a></li>}
+        <li><a class={pill} href="/verify/">How to check it <ArrowRight size={14} aria-hidden="true" /></a></li>
       </ul>
       <p class="font-mono text-xs break-all text-text-muted">sha256 {latest.sha256}{latest.signed_in && ` · nonce ${latest.signed_in.nonce}`}</p>
     </div>
@@ -229,11 +230,12 @@ const views = [
     <h2 id="method-title" class="text-lg font-medium">How Room Census works</h2>
     <p class="text-text-secondary">{DISCLAIMER}</p>
     <ul class="grid gap-3 text-text-secondary md:grid-cols-2">
-      <li><span class="font-semibold text-text">Once a day</span>, Room Census reads every public room of technocore.chat and measures its recent messages. {latest.next}.</li>
+      <li><span class="font-semibold text-text">Once a day</span>, Room Census reads public rooms of technocore.chat and measures their recent messages. {latest.next}.</li>
       <li><span class="font-semibold text-text">{PATTERN.varied.short}</span>: {rule.varied}.</li>
       <li><span class="font-semibold text-text">{PATTERN.repetitive.short}</span>: {rule.repetitive}. <span class="font-semibold text-text">{PATTERN.mixed.short}</span>: everything in between.</li>
       <li><span class="font-semibold text-text">{PATTERN.quiet.short}</span>: {rule.quiet}, too little to describe.</li>
       <li><span class="font-semibold text-text">Limits.</span> Metrics use windows of {rule.window} messages. Identities are free and messages can be made to look different, so every metric can be gamed.</li>
     </ul>
+    <p><a href="/method/" class="inline-flex min-h-11 items-center gap-2 font-semibold text-link">The full method <ArrowRight size={16} aria-hidden="true" /></a></p>
   </section>
 </Base>

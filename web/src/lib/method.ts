@@ -5,6 +5,8 @@ import type { Latest } from "./data";
 
 // not published in the data: mirrors MIN_WINDOW in room_census.py (checked by tests/test_web.py)
 export const QUIET_MIN_MESSAGES = 30;
+// how rooms are chosen, mirrors MAX_PANEL, PANEL_MEMORY, MAX_TRACKED and TRACK_PULSES (same test)
+export const PANEL = { max: 80, memory: 2, tracked: 5, trackedFor: 4 };
 
 export function rules(latest: Latest) {
   const v = latest.method.thresholds.varied_min;

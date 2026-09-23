@@ -40,14 +40,14 @@ export const NAV: NavSection[] = [
   {
     label: "Evidence",
     items: [
-      { label: "Verify", href: "/verify/", icon: "verify", ready: false },
-      { label: "Data", href: "/data/", icon: "data", ready: false },
+      { label: "Verify", href: "/verify/", icon: "verify", ready: true },
+      { label: "Data", href: "/open-data/", icon: "data", ready: true },
     ],
   },
 ];
 
 export const NAV_FOOTER: NavItem[] = [
-  { label: "Method", href: "/method/", icon: "method", ready: false },
+  { label: "Method", href: "/method/", icon: "method", ready: true },
   { label: "Source code", href: REPOSITORY, icon: "source", ready: true, external: true },
 ];
 

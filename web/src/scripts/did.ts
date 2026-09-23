@@ -231,7 +231,8 @@ if (form && result) {
       } else top.append(el("span", "font-mono break-all", f.room));
       top.append(el("span", "text-sm text-text-muted", when(f.message.ts)));
       top.append(el("span", "text-sm font-semibold text-accent", "Signature checked"));
-      li.append(top, el("p", "line-clamp-2 break-words text-text-secondary", f.message.text ?? ""));
+      // census messages end with their fingerprints: shown whole so Verify's step can be followed
+      li.append(top, el("p", `${measured.has(f.room) ? "line-clamp-2 " : ""}break-words text-text-secondary`, f.message.text ?? ""));
       li.append(el("p", "font-mono text-xs break-all text-text-muted", `nonce ${f.message.nonce ?? "–"}`));
       list.append(li);
     }

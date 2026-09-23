@@ -1,0 +1,148 @@
+---
+// How to check the latest census, step by step. Two checks run in the reader's browser against the
+// files this site serves (snapshot and manifest fingerprints). The signature and the source code
+// are checked by the reader with the steps given here; the page never claims a check it did not run.
+import Base from "../layouts/Base.astro";
+import Help from "../components/Help.astro";
+import ArrowUpRight from "@lucide/astro/icons/arrow-up-right";
+import CircleDashed from "@lucide/astro/icons/circle-dashed";
+import Copy from "@lucide/astro/icons/copy";
+import Download from "@lucide/astro/icons/download";
+import ShieldCheck from "@lucide/astro/icons/shield-check";
+import { site } from "../lib/data";
+import { json } from "../lib/files";
+import { dateTimeUtc } from "../lib/format";
+
+type Manifest = { files: { path: string; sha256: string; bytes: number }[]; source: { commit: string; repository: string } };
+const { latest, identity } = site();
+const prov = latest.provenance;
+const manifest = prov ? json<Manifest>(prov.manifest) : null;
+const snapshotFile = latest.snapshot.split("/").pop()!;
+const base = Astro.site!.href.replace(/\/$/, "");
+const commit = prov?.commit ?? "";
+const short = commit.slice(0, 8);
+const step = "grid gap-3 border-t border-border px-4 py-4 first:border-t-0 sm:px-5";
+const button = "inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 text-sm font-semibold text-text no-underline";
+const code = "overflow-x-auto rounded-md border border-border bg-bg p-3 font-mono text-xs leading-relaxed text-text-secondary";
+const pending = "flex items-center gap-2 text-sm font-semibold text-text-muted";
+---
+<Base title="Verify" description={`How to check census #${latest.census} of Room Census: its signed message, its snapshot, its code manifest and the source code that produced it.`}>
+  <section aria-labelledby="verify-title" class="grid gap-1.5">
+    <h1 id="verify-title" class="text-3xl font-medium tracking-tight sm:text-4xl">Verify census #{latest.census}</h1>
+    <p class="text-text-muted">Check the signed message, the snapshot and the code that produced it. Everything here is public.</p>
+  </section>
+
+  <p data-verify-summary role="status" class="mt-4 flex items-start gap-2.5 rounded-md border border-border bg-surface px-4 py-2.5 text-sm">
+    <ShieldCheck size={18} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />
+    <span data-verify-summary-text>Your browser can check the snapshot and the manifest on this page; that needs JavaScript. The signature and the source code are checked with the steps below. Census #{latest.census}, {dateTimeUtc(latest.at_utc)}.</span>
+  </p>
+
+  <ol class="mt-4 overflow-hidden rounded-lg border border-border bg-surface">
+    <li class={step}>
+      <div class="grid gap-1">
+        <h2 class="flex items-center gap-2 font-semibold">
+          1. Snapshot
+          <Help term="Snapshot" ask="What is the snapshot?" text="The frozen data of this census. Its SHA-256 is written in the signed message, so a changed file would no longer match the signed message." />
+        </h2>
+        <p class="text-sm text-text-secondary">The SHA-256 of the snapshot file must equal the one published with this census.</p>
+        <p class="font-mono text-xs break-all text-text-muted">sha256 {latest.sha256}</p>
+      </div>
+      <p data-check="snapshot" data-url={`/${latest.snapshot}`} data-expected={latest.sha256} class={pending}>
+        <CircleDashed size={18} aria-hidden="true" /><span data-check-text>Not checked in this browser</span>
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <a href={`/${latest.snapshot}`} download="" class={button}><Download size={16} aria-hidden="true" /> Download snapshot</a>
+      </div>
+      <pre class={code}><code>curl -fsSLO {base}/{latest.snapshot}
+sha256sum {snapshotFile}    # on macOS: shasum -a 256 {snapshotFile}</code></pre>
+    </li>
+
+    {prov && manifest && (
+      <li class={step}>
+        <div class="grid gap-1">
+          <h2 class="flex items-center gap-2 font-semibold">
+            2. Code manifest
+            <Help term="Code manifest" ask="What is the code manifest?" text="The list of the program files the publisher says ran this census, with the SHA-256 of each. Its own file name is the SHA-256 of its bytes, and the signed message names it." />
+          </h2>
+          <p class="text-sm text-text-secondary">The file name of the manifest is the SHA-256 of its own bytes, and this census names the same one.</p>
+          <p class="font-mono text-xs break-all text-text-muted">manifest {prov.manifest_sha256}</p>
+        </div>
+        <p data-check="manifest" data-url={`/${prov.manifest}`} data-expected={prov.manifest_sha256} class={pending}>
+          <CircleDashed size={18} aria-hidden="true" /><span data-check-text>Not checked in this browser</span>
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <a href={`/${prov.manifest}`} download="" class={button}><Download size={16} aria-hidden="true" /> Download manifest</a>
+        </div>
+      </li>
+    )}
+
+    {latest.signed_in && (
+      <li class={step}>
+        <div class="grid gap-1">
+          <h2 class="flex items-center gap-2 font-semibold">
+            3. Signed message
+            <Help term="Signed message" ask="What does the signature prove?" text="The census is announced by a message signed with the Room Census key. A valid signature proves that key wrote this exact text, which carries the snapshot and manifest fingerprints. It proves who published the census, not that its numbers are right; the manifest names the code the publisher says ran, and steps 2 and 4 let you read it." />
+          </h2>
+          <p class="text-sm text-text-secondary">An Ed25519 signature over <code class="font-mono">{latest.signed_in.room}|nonce|text</code> by the Room Census DID, in the {latest.signed_in.room} room of technocore.chat. Its text carries the snapshot SHA-256 and the manifest above.</p>
+          <p class="font-mono text-xs break-all text-text-muted">nonce {latest.signed_in.nonce}</p>
+        </div>
+        <p class={pending}><CircleDashed size={18} aria-hidden="true" />Checked by you, in My DID or by hand</p>
+        <div class="grid gap-1.5 text-sm text-text-secondary">
+          <p><span class="font-semibold text-text">In this browser:</span> copy the DID below, open My DID and look it up. The message with nonce {latest.signed_in.nonce} appears with “Signature checked”; compare the fingerprints at the end of its text with steps 1 and 2. The activity proof you can download there holds the full text too.</p>
+          <p><span class="font-semibold text-text">By hand:</span> read the room as JSON, take the message with this nonce, and check its <code class="font-mono">sig</code> over <code class="font-mono">{latest.signed_in.room}|{latest.signed_in.nonce}|text</code> with the DID below, for example with <code class="font-mono">verify()</code> in <code class="font-mono">flop_did.py</code> from the repository.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a href="/did/" class={button}>Open My DID</a>
+          <a href={`${identity.network}/r/${latest.signed_in.room}?format=json`} class={button}>Read the room as JSON <ArrowUpRight size={16} aria-hidden="true" /></a>
+        </div>
+      </li>
+    )}
+
+    {manifest && (
+      <li class={step}>
+        <div class="grid gap-1">
+          <h2 class="flex items-center gap-2 font-semibold">
+            4. Source code
+            <Help term="Source code" ask="How is the code checked?" text="Every program file listed in the manifest must have the same SHA-256 as the file in the public repository at the source commit. Then anyone can read the code the manifest names." />
+          </h2>
+          <p class="text-sm text-text-secondary">Every file digest in the manifest must match the same file in the repository at commit <span class="font-mono">{short}</span>.</p>
+        </div>
+        <p class={pending}><CircleDashed size={18} aria-hidden="true" />Checked by you, with Git</p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <caption class="sr-only">Program files listed in the manifest, with their SHA-256</caption>
+            <thead class="text-xs text-text-muted uppercase"><tr><th scope="col" class="py-1.5 pr-4 font-mono">File</th><th scope="col" class="py-1.5 font-mono">SHA-256</th></tr></thead>
+            <tbody>
+              {manifest.files.map((f) => <tr class="border-t border-border"><td class="py-1.5 pr-4 font-mono">{f.path}</td><td class="py-1.5 font-mono text-xs break-all text-text-muted">{f.sha256}</td></tr>)}
+            </tbody>
+          </table>
+        </div>
+        <pre class={code}><code>git clone {manifest.source.repository}
+cd room-census
+for f in {manifest.files.map((f) => f.path).join(" ")}; do
+  printf '%s  %s\n' "$(git cat-file blob {commit}:$f | sha256sum | cut -d' ' -f1)" "$f"
+done</code></pre>
+        <div class="flex flex-wrap gap-2">
+          <a href={`${manifest.source.repository}/tree/${commit}`} class={button}>View commit {short} <ArrowUpRight size={16} aria-hidden="true" /></a>
+        </div>
+      </li>
+    )}
+  </ol>
+
+  <section aria-labelledby="signer-title" class="mt-4 grid gap-2 rounded-lg border border-border bg-surface p-4 sm:p-5">
+    <h2 id="signer-title" class="flex items-center gap-2 font-mono text-xs font-semibold tracking-widest text-text-muted uppercase">
+      Signed by
+      <Help term="Room Census DID" ask="Whose key is this?" text="The public identifier of the Room Census key. It is also published in identity.json." />
+    </h2>
+    <div class="flex flex-wrap items-center gap-3">
+      <code class="min-w-0 font-mono text-sm break-all">{latest.publisher}</code>
+      <button type="button" data-copy={latest.publisher} hidden class={`${button} cursor-pointer`}><Copy size={16} aria-hidden="true" /><span data-copy-label aria-live="polite">Copy</span><span class="sr-only"> the DID</span></button>
+    </div>
+  </section>
+
+  <p class="mt-4 text-sm text-text-muted">Older censuses: every snapshot and manifest is listed with its fingerprint on the <a href="/open-data/#censuses" class="text-link">Data</a> page.</p>
+</Base>
+
+<script>
+  import "../scripts/verify.ts";
+</script>
