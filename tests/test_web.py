@@ -20,8 +20,9 @@ DIST = WEB / "dist"
 DOMAIN = "https://roomcensus.xyz"
 PAGE_CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; "
             "base-uri 'none'; form-action 'none'; object-src 'none'")
-# My DID is the only page that may connect out, and only to Technocore's public read API
+# My DID and Verify are the only pages that may connect out, and only to Technocore's public read API
 DID_CSP = PAGE_CSP.replace("connect-src 'self'", "connect-src 'self' https://technocore.chat")
+CONNECTS = ("/did/", "/verify/")
 DID_DISCLAIMER = ("This page summarizes public Technocore activity. It does not determine ownership, reputation or "
                   "eligibility for any reward.")
 BUILT = (DIST / "index.html").is_file()
@@ -156,8 +157,8 @@ class Artifact(unittest.TestCase):
             p = contract.parse(page)
             route = self.route(page)
             with self.subTest(page=route):
-                self.assertEqual(p.csp, DID_CSP if route == "/did/" else PAGE_CSP)
-                self.assertIsNone(contract.csp_problem(p.csp.replace(" https://technocore.chat", "") if route == "/did/" else p.csp))
+                self.assertEqual(p.csp, DID_CSP if route in CONNECTS else PAGE_CSP)
+                self.assertIsNone(contract.csp_problem(p.csp.replace(" https://technocore.chat", "") if route in CONNECTS else p.csp))
                 self.assertEqual(p.inline_scripts, 0)
                 self.assertNotRegex(text, r"<style[\s>]")
                 self.assertNotRegex(text, r"\sstyle=")
@@ -396,7 +397,7 @@ class Artifact(unittest.TestCase):
         self.assertIn("https://technocore.chat", script + "".join(p.read_text(encoding="utf-8") for p in DIST.glob("_astro/did-core*.js")))
         self.assertNotRegex(script, r"localStorage|sessionStorage|indexedDB|sendBeacon|XMLHttpRequest|document\.cookie")
         for page in self.html_pages():
-            if self.route(page) != "/did/":
+            if self.route(page) not in CONNECTS:
                 with self.subTest(page=self.route(page)):
                     self.assertNotIn("technocore.chat https", contract.parse(page).csp or "")
                     self.assertNotIn("connect-src 'self' https", contract.parse(page).csp or "")
@@ -408,6 +409,10 @@ class Artifact(unittest.TestCase):
         prov = latest["provenance"]
         checks = dict(re.findall(r'data-check="(\w+)" data-url="([^"]+)"', text))
         self.assertEqual(checks, {"snapshot": "/" + latest["snapshot"], "manifest": "/" + prov["manifest"]})
+        sig = re.search(r'<p data-check="signature"([^>]*)>', text).group(1)
+        for attr, value in (("room", latest["signed_in"]["room"]), ("nonce", latest["signed_in"]["nonce"]), ("did", latest["publisher"]),
+                            ("sha256", latest["sha256"]), ("manifest", prov["manifest_sha256"])):
+            self.assertIn(f'data-{attr}="{value}"', sig)
         self.assertIn(f'data-expected="{latest["sha256"]}"', text)
         self.assertIn(f'data-expected="{prov["manifest_sha256"]}"', text)
         # the published files really have those fingerprints, and the manifest is named after its own
@@ -426,7 +431,10 @@ class Artifact(unittest.TestCase):
         self.assertIn("that needs JavaScript", visible)
         for claim in ("All checks pass", "checks pass for", "Verified"):
             self.assertNotIn(claim, visible)
-        self.assertEqual(visible.count("Checked by you"), 2)
+        # the manual ways stay: My DID and by hand for the signature, Git for the code
+        self.assertEqual(visible.count("Checked by you"), 1)
+        for way in ("Another way, in this browser:", "By hand:", "Read the room export"):
+            self.assertIn(way, visible)
 
     def test_data_lists_every_published_file_with_its_real_size(self):
         text = html.unescape((DIST / "open-data" / "index.html").read_text(encoding="utf-8"))

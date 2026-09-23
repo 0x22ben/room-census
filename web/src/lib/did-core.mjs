@@ -138,3 +138,25 @@ export function summarize(found) {
     unchecked: found.filter((f) => f.result === "unsupported").length,
   };
 }
+
+/** Records of a room export (JSONL), nonces kept as exact digits; an unreadable line is skipped. */
+export function readExport(body) {
+  const out = [];
+  for (const line of body.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const m = JSON.parse(line.replace(/"nonce"(\s*):(\s*)(\d+)/g, '"nonce"$1:$2"$3"'));
+      if (m && typeof m === "object" && !Array.isArray(m)) out.push(m);
+    } catch {
+      // a torn or foreign line proves nothing either way
+    }
+  }
+  return out;
+}
+
+/** The message `did` wrote with exactly this nonce, or null. */
+export const findMessage = (messages, did, nonce) => messages.find((m) => m.from === did && m.nonce === nonce) ?? null;
+
+/** Whether a census message names the published snapshot and manifest fingerprints. */
+export const carriesFingerprints = (text, sha256, manifest) =>
+  typeof text === "string" && text.includes(`sha256:${sha256}`) && (manifest === null || text.includes(`manifest:${manifest}`));

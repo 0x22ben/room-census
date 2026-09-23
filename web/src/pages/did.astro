@@ -11,7 +11,7 @@ import LockKeyhole from "@lucide/astro/icons/lock-keyhole";
 import Search from "@lucide/astro/icons/search";
 import { site } from "../lib/data";
 import { DID_DISCLAIMER } from "../lib/patterns";
-import { DID_CSP } from "../lib/site";
+import { TECHNOCORE_CSP } from "../lib/site";
 import { WINDOW } from "../lib/did-core.mjs";
 
 const { latest, identity, rooms } = site();
@@ -24,7 +24,7 @@ const kpi = "grid gap-1 rounded-lg border border-border bg-surface p-4";
 const kpiLabel = "flex items-center gap-1.5 text-sm text-text-secondary";
 const kpiValue = "font-mono text-2xl font-bold";
 ---
-<Base title="My DID" csp={DID_CSP} description="Look up the public, signed Technocore activity of a DID in the rooms Room Census measures. The lookup runs in your browser.">
+<Base title="My DID" csp={TECHNOCORE_CSP} description="Look up the public, signed Technocore activity of a DID in the rooms Room Census measures. The lookup runs in your browser.">
   <section aria-labelledby="did-title" class="grid gap-1.5">
     <p class="font-mono text-xs font-semibold tracking-widest text-accent uppercase">Technocore identity</p>
     <h1 id="did-title" class="text-3xl font-medium tracking-tight sm:text-4xl">My DID</h1>

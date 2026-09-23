@@ -15,8 +15,8 @@ const policy = (connect: string) => [
   "object-src 'none'",
 ].join("; ");
 export const CSP = policy("'self'");
-// My DID reads public room messages from Technocore in the browser; no other page may connect out
-export const DID_CSP = policy("'self' https://technocore.chat");
+// My DID and Verify read public room messages from Technocore in the browser; no other page may connect out
+export const TECHNOCORE_CSP = policy("'self' https://technocore.chat");
 
 export type Icon = "discover" | "rooms" | "watched" | "did" | "verify" | "data" | "method" | "source";
 export type NavItem = { label: string; href: string; icon: Icon; ready: boolean; external?: boolean };

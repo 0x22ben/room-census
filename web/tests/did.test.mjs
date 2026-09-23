@@ -7,7 +7,9 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { check, importKey, publicKey, readReply, roomCoverage, shortestWindow, span, summarize, validRoom, validTs } from "../src/lib/did-core.mjs";
+import {
+  carriesFingerprints, check, findMessage, importKey, publicKey, readExport, readReply, roomCoverage, shortestWindow, span, summarize, validRoom, validTs,
+} from "../src/lib/did-core.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const body = readFileSync(join(HERE, "fixtures", "room-census-reply.json"), "utf8");
@@ -101,4 +103,34 @@ test("only checked messages count, and the coverage says what was read", async (
 test("room names are checked before they reach a URL", () => {
   for (const ok of ["lobby", "room-census", "a", "x_1"]) assert.ok(validRoom(ok));
   for (const bad of ["", "Lobby", "../x", "a/b", "a?b", "-a", "a".repeat(49)]) assert.ok(!validRoom(bad), bad);
+});
+
+test("an export is read line by line, exact nonces kept, torn lines skipped", () => {
+  const exported = [
+    '{"seq":1,"from":"a","nonce":1790180154067082191,"text":"x \\"nonce\\": 5"}',
+    '{"torn',
+    "",
+    "[1,2]",
+    '{"seq":2,"from":"b","nonce" : 7}',
+    "",
+  ].join("\n");
+  const lines = readExport(exported);
+  assert.deepEqual(lines.map((m) => m.nonce), ["1790180154067082191", "7"]);
+  assert.equal(lines[0].text, 'x "nonce": 5');
+  assert.deepEqual(readExport(""), []);
+});
+
+test("the census message is found by its DID and exact nonce, and must name both fingerprints", () => {
+  const messages = readReply(body);
+  const m = messages[messages.length - 1];
+  assert.equal(findMessage(messages, DID, m.nonce), m);
+  assert.equal(findMessage(messages, "did:key:z6MkOther", m.nonce), null);
+  assert.equal(findMessage(messages, DID, String(BigInt(m.nonce) + 1n)), null);
+  const sha = m.text.match(/sha256:([0-9a-f]{64})/)[1];
+  const manifest = m.text.match(/manifest:([0-9a-f]{64})/)[1];
+  assert.ok(carriesFingerprints(m.text, sha, manifest));
+  assert.ok(carriesFingerprints(m.text, sha, null));
+  assert.ok(!carriesFingerprints(m.text, "0".repeat(64), manifest));
+  assert.ok(!carriesFingerprints(m.text, sha, "0".repeat(64)));
+  assert.ok(!carriesFingerprints(undefined, sha, manifest));
 });
