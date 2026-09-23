@@ -282,6 +282,22 @@ class Artifact(unittest.TestCase):
                     with self.subTest(room=entry["room"], census=point["census"]):
                         self.assertNotEqual(shown, "0")
 
+    def test_the_licenses_page_publishes_the_official_texts(self):
+        text = html.unescape((DIST / "licenses" / "index.html").read_text(encoding="utf-8"))
+        shipped = {"@fontsource-variable/inter": "LICENSE", "@fontsource/ibm-plex-mono": "LICENSE", "chart.js": "LICENSE.md",
+                   "@kurkle/color": "LICENSE.md", "@lucide/astro": "LICENSE", "tailwindcss": "LICENSE", "astro": "LICENSE"}
+        for name, file in shipped.items():
+            with self.subTest(package=name):
+                official = (WEB / "node_modules" / name / file).read_text(encoding="utf-8").strip()
+                self.assertIn(official, text)
+        for own in (REPO / "LICENSE", REPO / "data" / "LICENSE"):
+            with self.subTest(file=own.name):
+                self.assertIn(own.read_text(encoding="utf-8").strip().replace("\r\n", "\n"), text)
+        self.assertEqual(text.count("SIL OPEN FONT LICENSE"), 2, "both self-hosted fonts ship their OFL text")
+        for page in self.html_pages():
+            with self.subTest(page=self.route(page)):
+                self.assertIn('href="/licenses/"', page.read_text(encoding="utf-8"))
+
     def test_the_rooms_index_lists_every_room_with_filters_that_need_script(self):
         text = (DIST / "rooms" / "index.html").read_text(encoding="utf-8")
         index = json.loads((DIST / "data" / "rooms" / "index.json").read_text(encoding="utf-8"))["rooms"]

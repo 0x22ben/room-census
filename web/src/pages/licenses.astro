@@ -1,0 +1,42 @@
+---
+// Licenses of the project and of everything the site ships, with their full official texts.
+import Base from "../layouts/Base.astro";
+import ArrowUpRight from "@lucide/astro/icons/arrow-up-right";
+import { licenses, type Entry } from "../lib/licenses";
+
+const { project, shipped } = licenses();
+const sections: [string, string, Entry[]][] = [
+  ["project-title", "Room Census", project],
+  ["shipped-title", "Fonts, libraries and tools", shipped],
+];
+---
+<Base title="Licenses" description="Licenses of the Room Census code, data, fonts and libraries, with their full texts.">
+  <section aria-labelledby="licenses-title" class="grid gap-1.5">
+    <h1 id="licenses-title" class="text-3xl font-medium tracking-tight sm:text-4xl">Licenses</h1>
+    <p class="max-w-prose text-text-muted">What this site is made of, and the terms each part comes with. The texts below are read from the exact versions the site was built with.</p>
+  </section>
+
+  {sections.map(([id, title, entries]) => (
+    <section aria-labelledby={id} class="mt-6 grid gap-3">
+      <h2 id={id} class="text-xl font-medium">{title}</h2>
+      <ul class="grid gap-3">
+        {entries.map((e) => (
+          <li class="rounded-lg border border-border bg-surface p-5">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 class="font-semibold">{e.name}{e.version && <span class="ml-2 font-mono text-xs font-normal text-text-muted">{e.version}</span>}</h3>
+              <span class="font-mono text-sm text-text-secondary">{e.license}</span>
+            </div>
+            <p class="mt-1 text-text-secondary">{e.use}</p>
+            <div class="mt-2 flex flex-wrap gap-x-4">
+              <a href={e.url} class="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-link">Project page <ArrowUpRight size={14} aria-hidden="true" /></a>
+              <details class="text-sm">
+                <summary class="inline-flex min-h-11 cursor-pointer items-center font-semibold text-link">Full license text</summary>
+                <pre class="mt-2 max-h-96 overflow-auto rounded-md border border-border bg-bg p-3 font-mono text-xs whitespace-pre-wrap text-text-secondary">{e.text}</pre>
+              </details>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  ))}
+</Base>
