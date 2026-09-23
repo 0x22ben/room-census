@@ -1,0 +1,16 @@
+---
+// Lucide icons for the navigation, rendered as static SVG at build time.
+import LayoutGrid from "@lucide/astro/icons/layout-grid";
+import Radio from "@lucide/astro/icons/radio";
+import KeyRound from "@lucide/astro/icons/key-round";
+import ShieldCheck from "@lucide/astro/icons/shield-check";
+import Database from "@lucide/astro/icons/database";
+import BookOpen from "@lucide/astro/icons/book-open";
+import Code from "@lucide/astro/icons/code";
+import type { Icon } from "../lib/site";
+
+interface Props { name: Icon }
+const ICONS = { overview: LayoutGrid, rooms: Radio, did: KeyRound, verify: ShieldCheck, data: Database, method: BookOpen, source: Code };
+const Component = ICONS[Astro.props.name];
+---
+<Component size={18} aria-hidden="true" class="shrink-0" />

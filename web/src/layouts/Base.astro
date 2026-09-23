@@ -1,9 +1,13 @@
 ---
 import "../styles/global.css";
-import Header from "../components/Header.astro";
+import Sidebar from "../components/Sidebar.astro";
+import MobileHeader from "../components/MobileHeader.astro";
 import Footer from "../components/Footer.astro";
+import Help from "../components/Help.astro";
+import CircleCheck from "@lucide/astro/icons/circle-check";
+import TriangleAlert from "@lucide/astro/icons/triangle-alert";
 import { CSP, SITE_NAME } from "../lib/site";
-import { latest } from "../lib/data";
+import { censusStatus, latest } from "../lib/data";
 
 // indexable: false for pages served at any missing address (404), which have no canonical URL
 interface Props { title: string; description: string; indexable?: boolean }
@@ -11,7 +15,8 @@ const { title, description, indexable = true } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 const fullTitle = title === SITE_NAME ? title : `${title} | ${SITE_NAME}`;
 const favicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0D10'/%3E%3Cpath d='M9 8v16M14 8v16M19 8v16M24 8v16M6 21l22-10' stroke='%232EC4A6' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E";
-const schedule = latest().next;
+const census = latest();
+const status = censusStatus(census);
 ---
 <!doctype html>
 <html lang="en">
@@ -32,12 +37,29 @@ const schedule = latest().next;
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
   </head>
-  <body>
-    <a class="skip-link" href="#main">Skip to content</a>
-    <Header />
-    <main id="main" tabindex="-1">
-      <slot />
-    </main>
-    <Footer schedule={schedule} />
+  <body class="bg-bg font-sans text-base leading-normal text-text antialiased">
+    <a href="#main" class="fixed top-2 left-2 z-50 -translate-y-24 rounded-md bg-surface-raised px-4 py-2.5 text-text focus:translate-y-0">Skip to content</a>
+    <div class="flex min-h-screen">
+      <Sidebar />
+      <div class="flex min-w-0 flex-1 flex-col">
+        <header>
+          <MobileHeader />
+          <div class="flex min-h-14 items-center justify-end border-b border-border px-4 sm:px-7">
+            <div class:list={["inline-flex min-h-9 items-center gap-2 rounded-md border px-3 text-sm font-semibold text-text",
+              status.complete ? "border-accent-border bg-accent-soft" : "border-warning-border bg-warning-soft"]}>
+              {status.complete
+                ? <CircleCheck size={16} aria-hidden="true" class="text-accent" />
+                : <TriangleAlert size={16} aria-hidden="true" class="text-warning" />}
+              {status.label}
+              <Help term={status.label} ask="What does this status mean?" id="help-census-status" text={status.help} />
+            </div>
+          </div>
+        </header>
+        <main id="main" tabindex="-1" class="flex-1 px-4 py-6 sm:px-7">
+          <slot />
+        </main>
+        <Footer schedule={census.next} />
+      </div>
+    </div>
   </body>
 </html>

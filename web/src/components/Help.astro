@@ -1,0 +1,29 @@
+---
+// A "?" next to a term a newcomer cannot guess. Native popover: opens on click, tap, Enter or
+// Space, closes on Escape or an outside click, with no script. `term` titles the popover, `ask` is
+// what a screen reader announces on the button. The popover id must be unique on the page: pass
+// `id` when the same term appears twice.
+import CircleQuestionMark from "@lucide/astro/icons/circle-question-mark";
+
+interface Props { term: string; text: string; ask?: string; id?: string; href?: string; linkLabel?: string }
+const { term, text, href, linkLabel = "How we measure it" } = Astro.props;
+const ask = Astro.props.ask ?? `What is ${term}?`;
+const id = Astro.props.id ?? `help-${term.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+---
+<button
+  type="button"
+  popovertarget={id}
+  aria-label={ask}
+  class="relative inline-grid size-5 shrink-0 cursor-pointer place-items-center rounded-full text-text-muted transition-colors duration-150 hover:text-text after:absolute after:-inset-3 after:content-['']"
+>
+  <CircleQuestionMark size={16} aria-hidden="true" />
+</button>
+<span
+  id={id}
+  popover
+  class="help-popover rounded-md border border-border-strong bg-surface-raised p-3.5 text-left text-sm text-text-secondary shadow-2xl shadow-shadow/40"
+>
+  <span class="block font-sans text-sm font-bold normal-case tracking-normal text-text">{term}</span>
+  <span class="mt-1 block font-sans text-sm normal-case tracking-normal">{text}</span>
+  {href && <a class="mt-2 inline-flex min-h-11 items-center font-sans font-semibold normal-case tracking-normal text-link underline" href={href}>{linkLabel}</a>}
+</span>

@@ -4,6 +4,7 @@ The artifact checks run on web/dist when it exists (after `npm run build` in web
 integration job that builds web/ before these tests arrives with the CI step of the migration (A7);
 until then they run on local builds only. Nothing here installs packages or uses the network."""
 import hashlib
+import json
 import re
 import shutil
 import subprocess
@@ -109,6 +110,11 @@ class Tokens(unittest.TestCase):
                         self.assertGreaterEqual(contrast(tokens[fg], tokens[bg]), 4.5)
             with self.subTest(scheme=scheme, pair="on-accent"):
                 self.assertGreaterEqual(contrast(tokens["--color-on-accent"], tokens["--color-accent"]), 4.5)
+            # tinted surfaces: the verified status pill and the warning messages
+            for fg, bg in (("--color-text", "--color-accent-soft"), ("--color-accent", "--color-accent-soft"),
+                           ("--color-text", "--color-warning-soft"), ("--color-warning", "--color-warning-soft")):
+                with self.subTest(scheme=scheme, fg=fg, bg=bg):
+                    self.assertGreaterEqual(contrast(tokens[fg], tokens[bg]), 4.5)
 
     def test_focus_ring_is_visible_on_every_background(self):
         for scheme, tokens in self.schemes().items():
@@ -169,17 +175,60 @@ class Artifact(unittest.TestCase):
                 else:
                     self.assertEqual(contract.parse(page).canonical, DOMAIN + route)
 
-    def test_navigation_shows_only_ready_destinations(self):
+    def nav_links(self, text, label):
+        """(href, visible text, current) of every link of the navigation landmark named `label`."""
+        nav = re.search(rf'<nav aria-label="{label}".*?</nav>', text, re.S).group(0)
+        out = []
+        for attrs, inner in re.findall(r"<a([^>]*)>(.*?)</a>", nav, re.S):
+            href = re.search(r'href="([^"]*)"', attrs).group(1)
+            out.append((href, re.sub(r"<[^>]+>", "", inner).strip(), 'aria-current="page"' in attrs))
+        return out
+
+    def test_navigation_shows_only_pages_that_exist(self):
         for page in self.html_pages():
             text = page.read_text(encoding="utf-8")
-            nav = re.search(r'<nav aria-label="Primary".*?</nav>', text, re.S).group(0)
-            labels = re.findall(r">([^<>]+)</a>", nav)
+            route = self.route(page)
+            for label in ("Primary", "Menu"):
+                links = self.nav_links(text, label)
+                with self.subTest(page=route, nav=label):
+                    self.assertEqual([t for _, t, _ in links], ["Overview", "Rooms", "Source code"])
+                    for href, _, _ in links:
+                        if href.startswith("/"):
+                            self.assertTrue(contract.resolve(DIST, route, href).is_file(), href)
+                    current = [h for h, _, on in links if on]
+                    self.assertEqual(current, {"/": ["/"], "/rooms/": ["/rooms/"]}.get(route, []))
+            with self.subTest(page=route):
+                # pages that do not exist yet are never linked, in any form (data files under /data/ are)
+                self.assertIsNone(re.search(r'href="(https?://[^"/]+)?/(did|verify|method)(/[^"]*)?"', text))
+                self.assertIsNone(re.search(r'href="(https?://[^"/]+)?/data/?"', text))
+        for gated in ("did", "verify", "method"):
+            self.assertFalse((DIST / gated).exists())
+
+    def test_the_census_status_never_claims_more_than_the_data(self):
+        latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
+        complete = not latest["partial"] and latest["signed_in"] is not None and latest["provenance"] is not None
+        expected = f"Census #{latest['census']} " + ("signed" if complete else "incomplete")
+        for page in self.html_pages():
+            text = page.read_text(encoding="utf-8")
             with self.subTest(page=self.route(page)):
-                self.assertEqual(labels, ["Overview", "Rooms"])
-                self.assertNotIn("/did/", text)
-        self.assertFalse((DIST / "did").exists())
-        for page, current in ((DIST / "index.html", "/"), (DIST / "rooms" / "index.html", "/rooms/")):
-            self.assertRegex(page.read_text(encoding="utf-8"), rf'<a href="{current}" aria-current="page"')
+                self.assertIn(expected, text)
+                self.assertNotRegex(text, r"(?i)census #\d+ verified")
+                self.assertNotIn("passed every public check", text)
+
+    def test_the_mobile_menu_and_the_help_work_without_script(self):
+        for page in self.html_pages():
+            text = page.read_text(encoding="utf-8")
+            with self.subTest(page=self.route(page)):
+                self.assertRegex(text, r'<details[^>]*>\s*<summary aria-label="Menu"')
+                ids = re.findall(r'<span id="([^"]+)" popover', text)
+                targets = re.findall(r'popovertarget="([^"]+)"', text)
+                self.assertTrue(targets, "no help on the page")
+                self.assertEqual(len(ids), len(set(ids)), "duplicate popover id")
+                self.assertEqual(sorted(targets), sorted(ids), "every help button opens its own popover")
+                labels = re.findall(r'popovertarget="[^"]+"[^>]*aria-label="([^"]+)"', text)
+                self.assertEqual(len(labels), len(targets), "every help button has a spoken question")
+                for label in labels:
+                    self.assertTrue(label.endswith("?") and len(label) > 8, label)
 
     def test_public_data_is_published_byte_for_byte(self):
         staged = [p for p in DIST.rglob("*") if p.is_file() and p.relative_to(DIST).parts[0] in ("data", "identity.json", "llms.txt")]
@@ -196,7 +245,7 @@ class Artifact(unittest.TestCase):
             rel = f.relative_to(DIST).as_posix()
             with self.subTest(file=rel):
                 self.assertFalse(rel.endswith(".map"), "source map")
-                ok = (rel.endswith(".html") or re.fullmatch(r"_astro/[\w.-]+\.(css|js)", rel)
+                ok = (rel.endswith(".html") or re.fullmatch(r"_astro/[\w.-]+\.(css|js|woff2?)", rel)
                       or rel in contract.REQUIRED_FILES or rel.startswith("data/"))
                 self.assertTrue(ok, "not a page, a built asset or public data")
         text = "".join(f.read_text(encoding="utf-8", errors="replace") for f in DIST.rglob("*") if f.suffix in (".html", ".css", ".js"))

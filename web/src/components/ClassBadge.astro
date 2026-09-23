@@ -2,30 +2,15 @@
 // A room class, always as text: the color and the shape repeat it, they never replace it.
 interface Props { cls: "varied" | "mixed" | "repetitive" | "quiet" }
 const LABELS = { varied: "Varied", mixed: "Mixed", repetitive: "Repetitive", quiet: "Quiet" } as const;
+const COLORS = { varied: "text-varied", mixed: "text-mixed", repetitive: "text-repetitive", quiet: "text-text-muted" } as const;
 const { cls } = Astro.props;
 ---
-<span class:list={["badge", cls]}>
-  <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false">
+<span class:list={["inline-flex items-center gap-2 text-sm font-semibold", COLORS[cls]]}>
+  <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false" class="shrink-0 fill-current">
     {cls === "varied" && <circle cx="6" cy="6" r="5" />}
     {cls === "mixed" && <rect x="1.5" y="1.5" width="9" height="9" rx="1" transform="rotate(45 6 6)" />}
     {cls === "repetitive" && <rect x="1" y="1" width="10" height="10" rx="2" />}
-    {cls === "quiet" && <circle cx="6" cy="6" r="4" class="ring" />}
+    {cls === "quiet" && <circle cx="6" cy="6" r="4" class="fill-none stroke-current" stroke-width="2" />}
   </svg>
   {LABELS[cls]}
 </span>
-
-<style>
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: var(--text-sm);
-    font-weight: 600;
-  }
-  svg { flex: none; fill: currentColor; }
-  .ring { fill: none; stroke: currentColor; stroke-width: 2; }
-  .varied { color: var(--color-varied); }
-  .mixed { color: var(--color-mixed); }
-  .repetitive { color: var(--color-repetitive); }
-  .quiet { color: var(--color-text-muted); }
-</style>

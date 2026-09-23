@@ -1,60 +1,25 @@
 ---
-import { REPOSITORY, SITE_NAME } from "../lib/site";
-
 interface Props { schedule: string }
 const { schedule } = Astro.props;
+const links = [
+  ["Latest data", "/data/latest.json"],
+  ["Publisher identity", "/identity.json"],
+  ["For agents", "/llms.txt"],
+  ["Data license", "https://creativecommons.org/licenses/by/4.0/"],
+];
 ---
-<footer class="site-footer">
-  <div class="wrap grid">
+<footer class="mt-16 border-t border-border px-4 py-8 sm:px-7">
+  <div class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
     <div>
-      <p class="name">{SITE_NAME}</p>
-      <p class="muted">A signed daily census of public Technocore rooms.</p>
-      <p class="muted">{schedule}.</p>
+      <p class="font-semibold">Room Census</p>
+      <p class="text-text-muted">A signed daily census of public Technocore rooms.</p>
+      <p class="text-text-muted">{schedule}.</p>
     </div>
-    <nav aria-label="Data and source">
-      <ul>
-        <li><a href="/data/latest.json">Latest data</a></li>
-        <li><a href="/identity.json">Publisher identity</a></li>
-        <li><a href="/llms.txt">For agents</a></li>
-        <li><a href={REPOSITORY}>Source code</a></li>
-        <li><a href="https://creativecommons.org/licenses/by/4.0/">Data license</a></li>
-      </ul>
-    </nav>
-    <p class="muted small">Data under CC BY 4.0, code under MIT. Community project, not affiliated with Flop Labs.</p>
+    <ul class="flex flex-wrap gap-x-2">
+      {links.map(([label, href]) => (
+        <li><a href={href} class="inline-flex min-h-11 items-center px-2 text-link underline first:pl-0 md:first:pl-2">{label}</a></li>
+      ))}
+    </ul>
   </div>
+  <p class="mt-5 text-sm text-text-muted">Data under CC BY 4.0, code under MIT. Community project, not affiliated with Flop Labs.</p>
 </footer>
-
-<style>
-  .site-footer {
-    margin-top: var(--space-8);
-    border-top: 1px solid var(--color-border);
-    padding-block: var(--space-6);
-  }
-  .grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-5);
-    align-items: start;
-  }
-  .name { font-weight: 650; margin-bottom: var(--space-1); }
-  .muted { color: var(--color-text-muted); }
-  .small { grid-column: 1 / -1; font-size: var(--text-sm); }
-  ul {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0 var(--target-gap);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-  ul a {
-    display: inline-flex;
-    align-items: center;
-    min-height: var(--target-min);
-    padding-inline: var(--space-2);
-  }
-  @media (max-width: 40rem) {
-    .grid { grid-template-columns: minmax(0, 1fr); }
-    ul a { padding-inline: 0 var(--space-3); }
-  }
-</style>

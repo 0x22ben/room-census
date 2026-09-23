@@ -1,0 +1,13 @@
+---
+// Desktop sidebar: brand, then the navigation.
+import Logo from "./Logo.astro";
+import NavList from "./NavList.astro";
+import { SITE_NAME } from "../lib/site";
+---
+<aside class="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-border bg-bg px-3.5 py-5 lg:flex">
+  <a href="/" aria-label={`${SITE_NAME}, overview`} class="mb-6 flex min-h-11 items-center gap-3 px-2 text-text no-underline">
+    <Logo />
+    <span class="font-mono text-sm font-bold tracking-[0.12em] uppercase">{SITE_NAME}</span>
+  </a>
+  <NavList label="Primary" />
+</aside>

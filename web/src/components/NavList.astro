@@ -1,0 +1,40 @@
+---
+// The navigation of the sidebar, also used by the mobile menu. Only pages that exist are listed.
+import NavIcon from "./NavIcon.astro";
+import { NAV_FOOTER, isActive, readySections } from "../lib/site";
+
+interface Props { label: string }
+const pathname = Astro.url.pathname;
+const sections = readySections();
+const footer = NAV_FOOTER.filter((i) => i.ready);
+const item = "flex h-11 items-center gap-3 rounded-md px-3 text-base transition-colors duration-150";
+---
+<nav aria-label={Astro.props.label} class="flex flex-1 flex-col">
+  {sections.map((section) => (
+    <div class="mt-4 first:mt-0">
+      <p class="px-3 pb-1.5 font-mono text-xs font-bold tracking-widest text-text-muted uppercase">{section.label}</p>
+      <ul class="flex flex-col gap-1.5">
+        {section.items.map((i) => {
+          const on = isActive(i, pathname);
+          return (
+            <li>
+              <a href={i.href} aria-current={on ? "page" : undefined}
+                class:list={[item, on ? "bg-surface-raised font-semibold text-text" : "font-medium text-text-secondary hover:bg-surface hover:text-text"]}>
+                <NavIcon name={i.icon} /><span>{i.label}</span>
+              </a>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  ))}
+  <ul class="mt-auto flex flex-col gap-1.5 border-t border-border pt-4">
+    {footer.map((i) => (
+      <li>
+        <a href={i.href} class:list={[item, "font-medium text-text-secondary hover:bg-surface hover:text-text"]}>
+          <NavIcon name={i.icon} /><span>{i.label}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</nav>
