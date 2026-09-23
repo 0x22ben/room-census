@@ -7,10 +7,12 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 import flop_did
 
+ROOT = Path(__file__).resolve().parent.parent
 B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 
@@ -66,6 +68,19 @@ class Identity(unittest.TestCase):
             with self.subTest(room=room), self.assertRaises(SystemExit):
                 flop_did.sign(room, text)
 
+
+if __name__ == "__main__":
+    unittest.main()
+
+class Fixture(unittest.TestCase):
+    """The identity.pem the web tests open must be one this tool could have written."""
+
+    def test_the_web_fixture_is_this_tools_format_and_did(self):
+        pem = (ROOT / "web" / "tests" / "fixtures" / "identity-test-key.pem.txt").read_text(encoding="utf-8")
+        key = serialization.load_pem_private_key(pem.encode(), b"correct horse battery staple")
+        raw = key.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        self.assertEqual(flop_did.did_from_public(raw), "did:key:z6MkehRgf7yJbgaGfYsdoAsKdBPE3dj2CYhowQdcjqSJgvVd")
+        self.assertIn("-----BEGIN ENCRYPTED PRIVATE KEY-----", pem)
 
 if __name__ == "__main__":
     unittest.main()

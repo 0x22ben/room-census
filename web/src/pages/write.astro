@@ -52,7 +52,7 @@ const row = "flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 borde
 const rowKey = "text-text-secondary";
 const rowValue = "font-mono break-all text-right";
 ---
-<Base title="Write" csp={TECHNOCORE_CSP} local description="Publish a signed message to a public Technocore room from your browser, with the identity in your recovery file.">
+<Base title="Write" csp={TECHNOCORE_CSP} local description="Publish a signed message to a public Technocore room from your browser, with the identity in your own DID file.">
   <div class="mx-auto grid w-full max-w-3xl grid-cols-[minmax(0,1fr)] gap-6">
     <header class="grid justify-items-center gap-2 pt-4 text-center">
       <p class="flex items-center gap-2 font-mono text-xs font-semibold tracking-widest text-accent uppercase">
@@ -60,26 +60,27 @@ const rowValue = "font-mono break-all text-right";
         <Help term="Signed message" id="help-write-intro" ask="What is a signed message?" text="A public message on technocore.chat, signed by your key. Anyone can check that your DID wrote it, and nobody can change it afterwards." />
       </p>
       <h1 id="write-title" data-page-title class="text-3xl font-medium tracking-tight sm:text-4xl">Write a signed message</h1>
-      <p data-page-lede class="text-text-secondary">Unlock your DID with your recovery file. A public DID alone can never publish.</p>
+      <p data-page-lede class="text-text-secondary">Open your DID file to sign. A public DID alone can never publish.</p>
     </header>
 
     <p data-write-noscript class="text-center text-text-muted">Writing needs JavaScript. Your key is opened and used only in this browser.</p>
     <p data-framed hidden class="text-center font-semibold text-warning">This page is shown inside another site. Open roomcensus.xyz/write/ directly to publish.</p>
 
     <div data-write hidden data-rooms={JSON.stringify(choices)} data-census={latest.census} class="grid grid-cols-[minmax(0,1fr)] gap-6">
-      <!-- locked: only a recovery file unlocks the key that signs -->
+      <!-- locked: only a file holding the key unlocks the DID that signs -->
       <section data-panel="locked" class={card} aria-labelledby="unlock-title">
         <span class={tile}><LockKeyhole size={22} aria-hidden="true" /></span>
-        <h2 id="unlock-title" tabindex="-1" class={title}>Unlock your DID</h2>
-        <p class={lede}>Your encrypted recovery file and its passphrase unlock your key in this tab only.</p>
+        <h2 id="unlock-title" tabindex="-1" class={title}>Open my DID</h2>
+        <p class={lede}>Open the file that holds your key. Your recovery file and your identity.pem are two local backups of the same DID.</p>
         <form data-unlock novalidate class="grid gap-4">
           <div class="grid gap-2">
-            <span class={labelRow}>Recovery file</span>
+            <span class={labelRow}>Your DID file</span>
             <label class="relative flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-lg border border-border-strong bg-bg py-1.5 pr-1.5 pl-3.5 focus-within:outline-2 focus-within:outline-focus">
               <span data-unlock-file-name class="min-w-0 truncate font-mono text-sm text-text-muted">No file chosen</span>
               <span class="shrink-0 rounded-md bg-surface-raised px-3 py-2 text-sm font-semibold">Choose file</span>
-              <input data-unlock-file type="file" accept=".json,application/json" class="absolute inset-0 cursor-pointer opacity-0" aria-label="Recovery file" />
+              <input data-unlock-file type="file" multiple accept=".json,.pem,.txt,application/json,application/x-pem-file,text/plain" class="absolute inset-0 cursor-pointer opacity-0" aria-label="Your DID file" />
             </label>
+            <p class="text-sm text-text-muted">A .json recovery file or an identity.pem. If the Python tool also wrote passphrase.txt or did.txt, you can add them in the same selection.</p>
           </div>
           <div class="grid gap-2">
             <label for="unlock-password" class={labelRow}>Passphrase</label>
@@ -88,17 +89,17 @@ const rowValue = "font-mono break-all text-right";
               <button type="button" data-show="[data-unlock-password]" aria-pressed="false" aria-label="Show the passphrase" class={secondary}>Show</button>
             </span>
           </div>
-          <button type="submit" class={primary}>Unlock my DID <ArrowRight size={18} aria-hidden="true" /></button>
+          <button type="submit" class={primary}>Open my DID <ArrowRight size={18} aria-hidden="true" /></button>
           <p data-error="unlock" role="alert" class={alert}></p>
         </form>
-        <p class={foot}><Lock size={16} aria-hidden="true" class="mt-0.5 shrink-0" />The file and the passphrase never leave your device. They are opened here, by your browser.</p>
+        <p class={foot}><Lock size={16} aria-hidden="true" class="mt-0.5 shrink-0" />The files and the passphrase never leave your device. They are opened here, by your browser.</p>
       </section>
 
       <div data-panel="locked-notes" class="grid gap-3">
         <p class={good}><ShieldCheck size={18} aria-hidden="true" class="shrink-0 text-accent" />The DID that signs always comes from the unlocked key. You cannot type or paste a DID to publish.</p>
         <p class="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-4 py-3 text-sm">
           <Info size={18} aria-hidden="true" class="shrink-0 text-text-muted" />
-          No recovery file yet? <a href="/did/" class="font-semibold text-link">My DID</a> walks you through creating one.
+          No DID file yet? <a href="/did/" class="font-semibold text-link">My DID</a> walks you through creating one.
         </p>
       </div>
 
@@ -111,6 +112,25 @@ const rowValue = "font-mono break-all text-right";
         </span>
         <span class="rounded-md border border-border-strong bg-surface-raised px-3 py-1.5 text-xs font-semibold">Read-only</span>
         <button type="button" data-action="lock" class="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm font-semibold text-link"><Lock size={15} aria-hidden="true" /> Lock</button>
+      </section>
+
+      <!-- one offer, only after an identity.pem was opened: the same key in the Room Census container -->
+      <section data-offer hidden class="grid gap-4 rounded-xl border border-border bg-surface p-5 sm:p-6" aria-labelledby="offer-title">
+        <h2 id="offer-title" class="flex items-center gap-2 text-base font-semibold"><Download size={18} aria-hidden="true" class="shrink-0 text-accent" />Also keep a Room Census recovery file</h2>
+        <p class="text-sm text-text-secondary">Your identity.pem already works here. A Room Census recovery file is the same key and the same DID in the format this site writes, never a different identity. Creating one is optional.</p>
+        <form data-offer-form novalidate hidden class="grid gap-3">
+          <label class="grid gap-2 text-sm font-semibold">Your identity.pem passphrase
+            <input data-offer-pem type="password" autocomplete="current-password" spellcheck="false" class={input} />
+          </label>
+          <p class="text-sm text-text-muted">Asked again because this page never keeps your key in a form it could hand out. The recovery file is protected by that same passphrase.</p>
+          <button type="submit" class={primary}>Create the recovery file <Download size={18} aria-hidden="true" /></button>
+          <p data-error="offer" role="alert" class={alert}></p>
+        </form>
+        <div data-offer-actions class="flex flex-wrap gap-3">
+          <button type="button" data-action="offer-open" class={secondary}>Create a recovery file</button>
+          <button type="button" data-action="offer-skip" class={secondary}>Not now</button>
+        </div>
+        <p data-offer-done hidden class={good}><BadgeCheck size={18} aria-hidden="true" class="shrink-0 text-accent" />Recovery file saved. It holds the same DID as your identity.pem.</p>
       </section>
 
       <section data-panel="room" hidden class={card} aria-labelledby="room-title">

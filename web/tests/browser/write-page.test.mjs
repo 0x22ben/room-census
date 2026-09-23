@@ -8,19 +8,20 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { after, before, test } from "node:test";
 
 import { check, publicKey } from "../../src/lib/did-core.mjs";
-import { backupHeader, createIdentity, sealBackup } from "../../src/lib/did-wallet.mjs";
-import { DIST, listeners, navigate, page, send, site, skip, sleep, start, stop, until } from "./harness.mjs";
+import { backupHeader, createIdentity, openBackup, sealBackup } from "../../src/lib/did-wallet.mjs";
+import { DIST, listeners, navigate, page, send, site, skip, sleep, start, stop, until, WEB } from "./harness.mjs";
 
 const subtle = globalThis.crypto.subtle;
 const PASSWORD = "correct horse battery staple";
 const MESSAGE = "I am building a room map to help newcomers find active rooms. I would appreciate feedback on the layout.";
 const files = mkdtempSync(join(tmpdir(), "rc-write-"));
 let fileNo = 0;
-const saveFile = (text) => { const p = join(files, `backup-${++fileNo}.json`); writeFileSync(p, text); return p; };
+const saveFile = (text, name) => { const p = join(files, name ?? `backup-${++fileNo}.json`); writeFileSync(p, text); return p; };
+const saveAs = (name, text) => { const dir = mkdtempSync(join(files, "sel-")); const p = join(dir, name); writeFileSync(p, text); return p; };
 const latest = JSON.parse(readFileSync(join(DIST, "data", "latest.json"), "utf8"));
 
 const CATCH_DOWNLOADS = `
@@ -81,12 +82,16 @@ const downloads = () => page("Promise.all(window.__downloads.map(async (d) => ({
 const outcome = (kind, ms) => until(`document.querySelector('[data-panel=outcome]').dataset.outcome === '${kind}' && !document.querySelector('[data-panel=outcome]').hidden`, `the ${kind} outcome`, ms);
 const errorOf = (name) => text(`[data-error="${name}"]`);
 const waitError = (name) => until(`document.querySelector('[data-error="${name}"]').textContent !== ''`, `the ${name} error`);
-async function setFile(selector, path) {
+async function setFile(selector, ...paths) {
   const { root } = await send("DOM.getDocument", { depth: 1 });
   const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector });
-  await send("DOM.setFileInputFiles", { nodeId, files: [path] });
+  await send("DOM.setFileInputFiles", { nodeId, files: paths });
 }
-const backupFile = async (identity) => saveFile(JSON.stringify(await sealBackup(subtle, (n) => new Uint8Array(randomBytes(n)), identity, PASSWORD)));
+// the identity.pem the Python tool writes, with the DID it prints for that same key
+const PEM_TEXT = readFileSync(resolve(WEB, "tests", "fixtures", "identity-test-key.pem.txt"), "utf8");
+const PEM_PASSPHRASE = "correct horse battery staple";
+const PEM_DID = "did:key:z6MkehRgf7yJbgaGfYsdoAsKdBPE3dj2CYhowQdcjqSJgvVd";
+const backupFile = async (identity) => saveFile(JSON.stringify(await sealBackup(subtle, (n) => new Uint8Array(randomBytes(n)), identity, PASSWORD)), `room-census-did-recovery-${++fileNo}.json`);
 
 const stored = (post, seq = 51) => {
   const m = JSON.parse(post.postData);
@@ -145,8 +150,8 @@ after(async () => { await stop(); rmSync(files, { recursive: true, force: true }
 
 test("only a recovery file unlocks, and the signing DID comes from the key inside it", { skip }, async () => {
   const log = await open();
-  // the page offers no way to type a DID
-  assert.equal(await page(`[...document.querySelectorAll("[data-write] input")].filter(i => /did/i.test(i.getAttribute("aria-label") || i.id || "")).length`), 0);
+  // the page offers no way to type a DID: the only field naming one takes a file
+  assert.equal(await page(`[...document.querySelectorAll("[data-write] input")].filter(i => i.type !== "file" && /did/i.test(i.getAttribute("aria-label") || i.id || "")).length`), 0);
   assert.equal(await page(`document.querySelector("[data-did-value]").isContentEditable`), false);
   assert.equal(await visible("[data-signing]"), false);
 
@@ -233,6 +238,111 @@ test("only a room from the census list can be picked, and publishing needs a rev
   assert.equal(await visible("[data-signing]"), false);
   assert.equal(await text("[data-signing] code[data-did-value]"), "");
   assert.equal(await page("document.querySelector('[data-unlock-password]').value"), "");
+});
+
+test("an identity.pem opens the same DID, and only with the right files", { skip }, async () => {
+  const log = await open((r) => (r.method === "POST" ? { body: stored(r) } : { body: "{}" }));
+  const pemPath = saveAs("identity.pem", PEM_TEXT);
+  // a did.txt naming another DID stops everything, even with the right passphrase typed by hand
+  const wrongDid = saveAs("did.txt", "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK\n");
+  await setFile("[data-unlock-file]", pemPath, wrongDid);
+  await fill("[data-unlock-password]", PEM_PASSPHRASE);
+  await submit("[data-unlock]");
+  await waitError("unlock");
+  assert.match(await errorOf("unlock"), /did\.txt names a different DID/);
+  assert.equal(await hidden("[data-panel=locked]"), false);
+  assert.equal(await visible("[data-signing]"), false);
+
+  // a did.txt that holds anything else is refused too, and never taken for a passphrase
+  for (const [what, body] of [["extra text", `${PEM_DID} (my identity)\n`], ["nothing usable", "hello\n"],
+    ["two DIDs", `${PEM_DID}\n${PEM_DID}\n`], ["a huge file", "x".repeat(70000)]]) {
+    await setFile("[data-unlock-file]", pemPath, saveAs("did.txt", body));
+    await fill("[data-unlock-password]", PEM_PASSPHRASE);
+    await submit("[data-unlock]");
+    await waitError("unlock");
+    assert.match(await errorOf("unlock"), /did\.txt (does not hold one did:key value|is too large)/, `did.txt with ${what}`);
+    assert.equal(await visible("[data-signing]"), false, `did.txt with ${what} unlocked something`);
+  }
+
+  // a selection that is not one key file with at most one of each helper is refused before it is read
+  const refusals = [
+    [[pemPath, saveAs("backup.json", "{}")], /one DID file at a time/],
+    [[pemPath, saveAs("did.txt", `${PEM_DID}\n`), saveAs("did.txt", `${PEM_DID}\n`)], /Only one did\.txt/],
+    [[pemPath, saveAs("passphrase.txt", "a"), saveAs("passphrase.txt", "b")], /Only one passphrase\.txt/],
+    [[pemPath, saveAs("notes.md", "hello")], /does not know what to do with notes\.md/],
+    [[saveAs("passphrase.txt", "a")], /None of these files is a DID file/],
+    [[saveAs("identity.pem", "x".repeat(70000))], /identity\.pem is too large/],
+  ];
+  for (const [paths, expected] of refusals) {
+    await setFile("[data-unlock-file]", ...paths);
+    await fill("[data-unlock-password]", PEM_PASSPHRASE);
+    await submit("[data-unlock]");
+    await waitError("unlock");
+    assert.match(await errorOf("unlock"), expected);
+    assert.equal(await visible("[data-signing]"), false);
+  }
+
+  // a wrong passphrase says so, and still unlocks nothing
+  await fill("[data-unlock-password]", "not the passphrase");
+  await setFile("[data-unlock-file]", pemPath);
+  await submit("[data-unlock]");
+  await until(`document.querySelector('[data-error="unlock"]').textContent.startsWith("Wrong passphrase")`, "the passphrase error");
+  assert.equal(await visible("[data-signing]"), false);
+
+  // the passphrase and the DID may both come from the files the Python tool wrote
+  await fill("[data-unlock-password]", "");
+  await setFile("[data-unlock-file]", pemPath, saveAs("passphrase.txt", `${PEM_PASSPHRASE}\n`), saveAs("did.txt", `${PEM_DID}\n`));
+  await submit("[data-unlock]");
+  await until("!document.querySelector('[data-panel=room]').hidden", "the room picker");
+  assert.equal(await text("[data-signing] code[data-did-value]"), PEM_DID, "the DID is derived from the key in the PEM");
+  // opening a file asks nothing of the network
+  assert.deepEqual(log.requests.filter((r) => r.url.startsWith("https://technocore.chat/")).map((r) => r.url), []);
+
+  // the same key can also be kept as a Room Census recovery file, and it opens to the same DID
+  assert.equal(await hidden("[data-offer]"), false);
+  await click("[data-action=offer-open]");
+  await fill("[data-offer-pem]", PEM_PASSPHRASE);
+  await submit("[data-offer-form]");
+  await until("!document.querySelector('[data-offer-done]').hidden", "the saved recovery file");
+  const saved = (await downloads()).filter((d) => d.name.startsWith("room-census-did-recovery-"));
+  assert.equal(saved.length, 1);
+  const reopened = await openBackup(subtle, saved[0].text, PEM_PASSPHRASE);
+  assert.equal(reopened.did, PEM_DID, "the recovery file holds the same DID, never a new one");
+
+  // the message is signed by that DID, and the passphrase is nowhere
+  await compose(latest.rooms[0].room);
+  await publishNow();
+  await outcome("published");
+  assert.equal(JSON.parse(log.posts.at(-1).postData).did, PEM_DID);
+  const seen = await exposure(log);
+  assert.ok(!seen.includes(PEM_PASSPHRASE), "the passphrase leaked");
+  const seed = Buffer.from(Array.from({ length: 32 }, (_, i) => i));
+  for (const encoding of ["hex", "base64", "base64url"]) {
+    assert.ok(!seen.includes(seed.toString(encoding)), `the private key leaked as ${encoding}`);
+  }
+
+  // locking forgets the key and the file: the offer is gone too
+  await click("[data-action=lock]");
+  assert.equal(await hidden("[data-panel=locked]"), false);
+  assert.equal(await hidden("[data-offer]"), true);
+});
+
+test("a did.txt that names another DID also stops a .json recovery file", { skip }, async () => {
+  await open();
+  const identity = await createIdentity(subtle);
+  const backup = saveAs("room-census-did-recovery.json", JSON.stringify(await sealBackup(subtle, (n) => new Uint8Array(randomBytes(n)), identity, PASSWORD)));
+  await setFile("[data-unlock-file]", backup, saveAs("did.txt", `${PEM_DID}\n`));
+  await fill("[data-unlock-password]", PASSWORD);
+  await submit("[data-unlock]");
+  await waitError("unlock");
+  assert.match(await errorOf("unlock"), /did\.txt names a different DID than the recovery file/);
+  assert.equal(await visible("[data-signing]"), false);
+  // the same file, with the DID it really holds, opens
+  await setFile("[data-unlock-file]", backup, saveAs("did.txt", `${identity.did}\n`));
+  await fill("[data-unlock-password]", PASSWORD);
+  await submit("[data-unlock]");
+  await until("!document.querySelector('[data-panel=room]').hidden", "the room picker");
+  assert.equal(await text("[data-signing] code[data-did-value]"), identity.did);
 });
 
 test("a refusal, a timeout and a redirect are never called published", { skip }, async () => {

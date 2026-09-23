@@ -1,10 +1,16 @@
-// Write: unlock a DID from its recovery file, choose a room that already exists, review and publish
-// one signed message. The unlocked key lives only in this module's memory, for this tab, and the DID
-// that signs is always derived from it: nothing here reads a DID typed by the reader. Unlocking makes
-// no request. Publishing sends one message, after a review and a confirmation, and never resends it.
-import { messageProblem, nextNonce, openBackup, proofOf, signMessage, WalletError } from "../lib/did-wallet.mjs";
+// Write: open a DID from the file that holds its key, choose a room that already exists, review and
+// publish one signed message. Two local backup formats open the same DID: the Room Census .json
+// recovery file and the identity.pem written by the Python tool. The unlocked key lives only in this
+// module's memory, for this tab, and the DID that signs is always derived from it: nothing here reads
+// a DID typed by the reader, and did.txt is only ever a check. Opening a file makes no request.
+// Publishing sends one message, after a review and a confirmation, and never resends it.
+import {
+  backupFromPem, didFromText, messageProblem, MIN_PASSWORD, nextNonce, openBackup, openIdentityPem,
+  passphraseFromText, PemError, proofOf, signMessage, WalletError,
+} from "../lib/did-wallet.mjs";
 import { dateTimeUtc } from "../lib/format";
 import { lookFor, publish } from "../lib/publish.mjs";
+import { sortFiles } from "../lib/did-files.mjs";
 import { known } from "../lib/rooms.mjs";
 import { roomPicker, type Room } from "./room-picker.ts";
 
@@ -26,10 +32,14 @@ if (root) {
   let unconfirmed = false;
   let busy = false;
   let result: { kind: Kind; reply: string | null; stored: Stored | null } | null = null;
+  // the encrypted PEM text, kept only so its own passphrase can seal a recovery file later
+  let pem: string | null = null;
+  let offered = false;
 
   const error = (name: string, text: string) => { q<HTMLElement>(`[data-error="${name}"]`).textContent = text; };
   const clearErrors = () => root.querySelectorAll<HTMLElement>("[data-error]").forEach((e) => { e.textContent = ""; });
-  const safe = (e: unknown, fallback: string) => (e instanceof WalletError ? e.message : fallback);
+  const safe = (e: unknown, fallback: string) => (e instanceof WalletError || e instanceof PemError ? e.message : fallback);
+  const short = (did: string) => did.slice(-8);
   const stamp = () => new Date().toISOString().slice(0, 19).replace(/:/g, "").replace("T", "-");
   const download = (name: string, data: object) => {
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2) + "\n"], { type: "application/json" }));
@@ -45,6 +55,7 @@ if (root) {
     q<HTMLElement>("[data-panel=locked]").hidden = panel !== "locked";
     q<HTMLElement>("[data-panel=locked-notes]").hidden = panel !== "locked";
     q<HTMLElement>("[data-signing]").hidden = panel === "locked";
+    q<HTMLElement>("[data-offer]").hidden = panel === "locked" || !pem || !offered;
     q<HTMLElement>("[data-panel=room]").hidden = panel !== "compose";
     q<HTMLElement>("[data-panel=message]").hidden = panel !== "compose";
     q<HTMLElement>("[data-panel=review]").hidden = panel !== "review";
@@ -53,8 +64,8 @@ if (root) {
     const lede = document.querySelector<HTMLElement>("[data-page-lede]");
     if (lede) {
       lede.textContent = panel === "locked"
-        ? "Unlock your DID with your recovery file. A public DID alone can never publish."
-        : "Signed by the DID in your recovery file, in a room that already exists.";
+        ? "Open your DID file to sign. A public DID alone can never publish."
+        : "Signed by the DID in your file, in a room that already exists.";
     }
     // a passphrase shown in clear never stays shown
     root!.querySelectorAll<HTMLButtonElement>("[data-show]").forEach((b) => {
@@ -87,7 +98,7 @@ if (root) {
     }
   });
   // the unlocked key is forgotten when the page goes away, whatever the reason
-  window.addEventListener("pagehide", () => { identity = null; });
+  window.addEventListener("pagehide", () => { identity = null; pem = null; });
 
   root.querySelectorAll<HTMLButtonElement>("[data-show]").forEach((b) => b.addEventListener("click", () => {
     const field = q<HTMLInputElement>(b.dataset.show!);
@@ -98,10 +109,11 @@ if (root) {
     b.setAttribute("aria-label", shown ? "Show the passphrase" : "Hide the passphrase");
   }));
 
-  // ---------- unlock ----------
+  // ---------- open the DID ----------
   const file = q<HTMLInputElement>("[data-unlock-file]");
   file.addEventListener("change", () => {
-    q<HTMLElement>("[data-unlock-file-name]").textContent = file.files?.[0]?.name ?? "No file chosen";
+    const names = [...(file.files ?? [])].map((f) => f.name);
+    q<HTMLElement>("[data-unlock-file-name]").textContent = names.join(", ") || "No file chosen";
   });
 
   q<HTMLFormElement>("[data-unlock]").addEventListener("submit", (e) => {
@@ -109,16 +121,74 @@ if (root) {
     return guard((e.currentTarget as HTMLFormElement).querySelector("button[type=submit]"), async () => {
       clearErrors();
       if (identity) return;
-      const chosen = file.files?.[0];
       const pw = q<HTMLInputElement>("[data-unlock-password]");
-      if (!chosen) return error("unlock", "Choose your recovery file.");
+      // each file is taken for what its name says it is, and the selection is checked before it is read
+      const sorted = sortFiles([...(file.files ?? [])]);
+      if (sorted.problem) return error("unlock", sorted.problem);
+      const keyText = await sorted.key.text();
+      const didText = sorted.did ? (await sorted.did.text()).trim() : "";
+      // a did.txt must hold one DID and nothing else, whichever format the key comes in
+      const named = didText === "" ? null : didFromText(didText);
+      if (sorted.did && !named) return error("unlock", "This did.txt does not hold one did:key value and nothing else. Nothing was unlocked.");
+      // a passphrase.txt only fills in for the field, and never overrides what was typed
+      const passphrase = pw.value || passphraseFromText(sorted.passphrase ? await sorted.passphrase.text() : "");
+      if (!passphrase) return error("unlock", "Enter the passphrase that protects this file.");
       try {
-        // the DID comes from the key inside the file; openBackup proves the two match
-        identity = await openBackup(crypto.subtle, await chosen.text(), pw.value);
+        // the DID always comes from the key in the file, whichever format it is
+        if (/-----BEGIN/.test(keyText)) {
+          identity = await openIdentityPem(crypto.subtle, keyText, passphrase, sorted.did ? didText : undefined);
+          pem = keyText;
+          offered = true;
+        } else {
+          const opened = await openBackup(crypto.subtle, keyText, passphrase);
+          if (named && named !== opened.did) {
+            return error("unlock", "This did.txt names a different DID than the recovery file. Nothing was unlocked.");
+          }
+          identity = opened;
+        }
         pw.value = "";
         show("compose");
       } catch (err) {
+        pem = null;
+        offered = false;
         error("unlock", safe(err, "This file could not be opened."));
+      }
+    });
+  });
+
+  // ---------- the same DID, also as a Room Census recovery file ----------
+  const offerForm = q<HTMLFormElement>("[data-offer-form]");
+  const closeOffer = () => {
+    offered = false;
+    offerForm.hidden = true;
+    q<HTMLElement>("[data-offer]").hidden = true;
+    (offerForm.querySelectorAll("input") as NodeListOf<HTMLInputElement>).forEach((i) => { i.value = ""; });
+  };
+  q<HTMLButtonElement>("[data-action=offer-open]").addEventListener("click", () => {
+    offerForm.hidden = false;
+    q<HTMLElement>("[data-offer-actions]").hidden = true;
+    q<HTMLInputElement>("[data-offer-pem]").focus();
+  });
+  q<HTMLButtonElement>("[data-action=offer-skip]").addEventListener("click", closeOffer);
+  offerForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    return guard(offerForm.querySelector("button[type=submit]"), async () => {
+      clearErrors();
+      const pemPass = q<HTMLInputElement>("[data-offer-pem]");
+      if (!identity || !pem) return error("offer", "Open your identity.pem first.");
+      if (!pemPass.value) return error("offer", "Enter the passphrase that protects your identity.pem.");
+      if (pemPass.value.length < MIN_PASSWORD) {
+        return error("offer", `A Room Census recovery file needs at least ${MIN_PASSWORD} characters, and it is protected by this same passphrase. Yours is shorter, so no file was written.`);
+      }
+      try {
+        // the same key and the same DID in another container, proven before anything is written
+        const sealed = await backupFromPem(crypto.subtle, (n: number) => crypto.getRandomValues(new Uint8Array(n)), pem, pemPass.value, pemPass.value, identity.did);
+        download(`room-census-did-recovery-${short(identity.did)}-${stamp()}.json`, sealed);
+        pemPass.value = "";
+        offerForm.hidden = true;
+        q<HTMLElement>("[data-offer-done]").hidden = false;
+      } catch (err) {
+        error("offer", safe(err, "This file could not be written."));
       }
     });
   });
@@ -126,6 +196,8 @@ if (root) {
   q<HTMLButtonElement>("[data-action=lock]").addEventListener("click", () => {
     if (busy) return;
     identity = null;
+    pem = null;
+    offered = false;
     room = "";
     signed = null;
     attempted = false;
@@ -137,6 +209,9 @@ if (root) {
       i.disabled = false;
     });
     q<HTMLElement>("[data-unlock-file-name]").textContent = "No file chosen";
+    offerForm.hidden = true;
+    q<HTMLElement>("[data-offer-actions]").hidden = false;
+    q<HTMLElement>("[data-offer-done]").hidden = true;
     clearErrors();
     show("locked");
   });
@@ -281,7 +356,7 @@ if (root) {
 
   q<HTMLButtonElement>("[data-action=download-proof]").addEventListener("click", () => {
     if (!signed || !result) return;
-    download(`room-census-technical-receipt-${signed.did.slice(-8)}-${stamp()}.json`, proofOf(signed, result.kind, result.reply, result.stored));
+    download(`room-census-technical-receipt-${short(signed.did)}-${stamp()}.json`, proofOf(signed, result.kind, result.reply, result.stored));
   });
 
   document.querySelector("[data-write-noscript]")?.remove();

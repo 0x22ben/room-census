@@ -498,8 +498,14 @@ class Artifact(unittest.TestCase):
         self.assertIn("needs JavaScript", visible)
         self.assertIn("A public DID alone can never publish", visible)
         self.assertIn("You cannot type or paste a DID to publish", visible)
-        self.assertEqual(len(re.findall(r"<input[^>]*", text)), len(re.findall(r'<input[^>]*(?:data-unlock-file|data-unlock-password|data-room-search|data-understand)', text)),
-                         "every input belongs to the recovery file, the passphrase, the room search or the confirmation")
+        self.assertEqual(len(re.findall(r"<input[^>]*", text)), len(re.findall(r'<input[^>]*(?:data-unlock-file|data-unlock-password|data-room-search|data-understand|data-offer-pem)', text)),
+                         "every input belongs to the DID file, a passphrase, the room search or the confirmation")
+        # both local backup formats open the same DID, and neither is presented as an older identity
+        self.assertIn("A .json recovery file or an identity.pem", visible)
+        self.assertIn("two local backups of the same DID", visible)
+        self.assertIn("never a different identity", visible)
+        for wording in ("old did", "previous did", "replacement did", "another did of yours"):
+            self.assertNotIn(wording, visible.lower())
         self.assertNotRegex(text, r'contenteditable')
         # the rooms offered are the measured ones of the latest census, never a reserved room
         carried = json.loads(html.unescape(re.search(r'data-rooms="([^"]+)"', text).group(1)))

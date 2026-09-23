@@ -6,7 +6,7 @@
 // The only requests this file makes are the publication of one reviewed, confirmed message and reads
 // of the room to find it again. Nothing is stored, logged or put in a URL; errors carry no key material.
 // The server reply is kept in memory only to check the result; a technical receipt is optional.
-import { check, importKey, publicKey, readReply, TECHNOCORE } from "../lib/did-core.mjs";
+import { lookFor, publish as publishMessage } from "../lib/publish.mjs";
 import {
   COMMUNITY, createIdentity, forget, INTRODUCTION, messageProblem, MIN_PASSWORD, nextNonce, openBackup, passwordProblem, proofOf, sealBackup,
   signMessage, WalletError,
@@ -22,7 +22,6 @@ type Panel = "start" | "create" | "restore" | "protect" | "save" | "message" | "
 type Kind = "published" | "unconfirmed" | "refused";
 
 const root = document.querySelector<HTMLElement>("[data-wizard]");
-const TIMEOUT_MS = 20000;
 const PANELS: Panel[] = ["start", "create", "restore", "protect", "save", "message", "outcome"];
 const STEP: Record<Panel, number> = { start: -1, create: 0, restore: -1, protect: 1, save: 1, message: 2, outcome: 3 };
 const WITH_LOOKUP: Panel[] = ["start", "outcome"];
@@ -348,27 +347,13 @@ if (root) {
     show("outcome");
   }
 
-  /** The stored copy of our message in a room reply, checked against what we signed, or null. */
-  async function confirmed(body: string): Promise<Stored | null> {
-    if (!signed) return null;
-    let messages: Stored[];
-    try {
-      messages = readReply(body) as Stored[];
-    } catch {
-      return null;
-    }
-    const m = messages.find((x) => x.from === signed!.did && x.nonce === signed!.nonce);
-    if (!m || m.text !== signed.text || m.sig !== signed.sig) return null;
-    const key = await importKey(crypto.subtle, publicKey(signed.did));
-    return key && (await check(crypto.subtle, key, signed.did, signed.room, m)) === "checked" ? m : null;
-  }
-
   function succeed(m: Stored, reply: string) {
     unconfirmed = false;
     sent += 1;
     outcome("published", "Technocore stored your message, and its signature was checked on this device.", reply, m);
   }
 
+  // one publication path for the whole site: lib/publish.mjs
   publish.addEventListener("click", () => guard(publish, async () => {
     if (!signed || attempted || !understand.checked) return;
     attempted = true;
@@ -376,45 +361,24 @@ if (root) {
     understand.disabled = true;
     text.disabled = true;
     status.textContent = `Publishing to ${signed.room}…`;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    let res: Response;
-    let reply: string;
-    try {
-      res = await fetch(`${TECHNOCORE}/r/${signed.room}?format=json`, {
-        // a redirect would re-send the body: refuse it, the answer is then unconfirmed
-        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "omit", referrerPolicy: "no-referrer", cache: "no-store", redirect: "error",
-        signal: controller.signal,
-        body: JSON.stringify({ did: signed.did, sig: signed.sig, nonce: signed.nonce, text: signed.text }),
-      });
-      reply = await res.text();
-    } catch {
-      return outcome("unconfirmed", `${controller.signal.aborted ? "Technocore did not answer in time" : "Technocore could not be reached"} after the message was sent. It may already be public; it will not be sent again from this page.`, null, null);
-    } finally {
-      clearTimeout(timer);
-    }
-    if (res.status >= 400 && res.status < 500) {
+    const out = await publishMessage(crypto.subtle, signed);
+    if (out.kind === "published") return succeed(out.stored!, out.reply!);
+    if (out.kind === "refused") {
       unconfirmed = false;
-      return outcome("refused", `technocore.chat refused this message (HTTP ${res.status}): ${reply.split("\n")[0].slice(0, 200)}. Nothing was published.`, reply, null);
+      return outcome("refused", `${out.reason}. Nothing was published.`, out.reply, null);
     }
-    const m = res.ok ? await confirmed(reply) : null;
-    if (m) return succeed(m, reply);
-    return outcome("unconfirmed", `${res.ok ? "Technocore answered, but the reply did not contain this exact signed message" : `Technocore answered HTTP ${res.status}`}. It may already be public; it will not be sent again from this page.`, reply, null);
+    return outcome("unconfirmed", `${out.reason}. It may already be public; it will not be sent again from this page.`, out.reply, null);
   }));
 
   q<HTMLButtonElement>("[data-action=look]").addEventListener("click", (e) => guard(e.currentTarget as HTMLButtonElement, async () => {
     if (!signed || !unconfirmed) return;
     const foot = q<HTMLElement>("[data-outcome-foot]");
     foot.textContent = `Reading ${signed.room}…`;
-    try {
-      const res = await fetch(`${TECHNOCORE}/r/${signed.room}?format=json&limit=200`, { credentials: "omit", referrerPolicy: "no-referrer", cache: "no-store" });
-      const body = await res.text();
-      const m = res.ok ? await confirmed(body) : null;
-      if (m) return succeed(m, body);
-      foot.textContent = "Not found among the newest 200 messages of the room. Nothing was sent again.";
-    } catch {
-      foot.textContent = "technocore.chat could not be reached. Nothing was sent.";
-    }
+    const out = await lookFor(crypto.subtle, signed);
+    if (out.kind === "published") return succeed(out.stored!, out.reply!);
+    foot.textContent = out.kind === "unreachable"
+      ? "technocore.chat could not be reached. Nothing was sent."
+      : "Not found among the newest 200 messages of the room. Nothing was sent again.";
   }));
 
   // after a refusal nothing was published: the message may be changed and signed again

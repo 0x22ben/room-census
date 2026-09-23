@@ -13,6 +13,10 @@
 //   single-line sweep, signature base64url without padding (86 characters).
 
 import { publicKey } from "./did-core.mjs";
+import { publicFromSeed } from "./ed25519-public.mjs";
+import { didFromText, openPem, PemError } from "./pem.mjs";
+
+export { didFromText, passphraseFromText, PemError } from "./pem.mjs";
 
 export const BACKUP_SCHEMA = "room-census-did-backup/1";
 export const PROOF_SCHEMA = "room-census-did-post-proof/1";
@@ -98,6 +102,48 @@ export async function createIdentity(subtle) {
   const did = didOf(new Uint8Array(await subtle.exportKey("raw", pair.publicKey)));
   const privateKey = await keyFor(subtle, pkcs8, did);
   return { did, privateKey, pkcs8 };
+}
+
+/**
+ * Opens the encrypted identity.pem written by flop_did.py and returns the same {did, privateKey} an
+ * encrypted recovery file would give: the two files hold the same Ed25519 identity, in two containers.
+ * `didText` is the optional content of did.txt: when given, it must name the same DID.
+ */
+export async function openIdentityPem(subtle, pemText, passphrase, didText) {
+  const pkcs8 = await openPem(subtle, pemText, passphrase);
+  try {
+    if (!samePrefix(pkcs8)) throw new WalletError("format", "This identity file does not hold an Ed25519 key.");
+    // the DID comes from the key itself, since identity.pem does not carry one
+    const did = didOf(await publicFromSeed(subtle, pkcs8.subarray(16)));
+    // a did.txt that was given must hold one DID: only leaving it out skips the check
+    if (didText !== undefined && didText !== null) {
+      const named = didFromText(didText);
+      if (!named) throw new WalletError("mismatch", "This did.txt does not hold one did:key value and nothing else. Nothing was unlocked.");
+      if (named !== did) throw new WalletError("mismatch", "This did.txt names a different DID than the identity file. Nothing was unlocked.");
+    }
+    // keyFor signs a challenge the DID must verify: the key and the DID are proven to be one pair
+    return { did, privateKey: await keyFor(subtle, pkcs8, did) };
+  } finally {
+    forget(pkcs8);
+  }
+}
+
+/**
+ * Seals a Room Census recovery file for the identity held in an identity.pem. It is the same key and
+ * the same DID in another container, never a second identity: the DID it produces is checked against
+ * `did`. The passphrase of the PEM is asked for again rather than kept, so that no page ever holds
+ * the private key in a form it could hand out.
+ */
+export async function backupFromPem(subtle, random, pemText, passphrase, password, did) {
+  const pkcs8 = await openPem(subtle, pemText, passphrase);
+  try {
+    if (!samePrefix(pkcs8) || didOf(await publicFromSeed(subtle, pkcs8.subarray(16))) !== did) {
+      throw new WalletError("mismatch", "This passphrase opened a different identity. Nothing was written.");
+    }
+    return await sealBackup(subtle, random, { did, pkcs8 }, password);
+  } finally {
+    forget(pkcs8);
+  }
 }
 
 /** Overwrites secret bytes held by the page once they are no longer needed. */
