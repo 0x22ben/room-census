@@ -531,24 +531,31 @@ class Artifact(unittest.TestCase):
         script = next(DIST.glob("_astro/write.astro*.js")).read_text(encoding="utf-8")
         self.assertNotRegex(script, r"localStorage|sessionStorage|indexedDB|document\.cookie")
 
-    def test_the_first_message_offers_the_community_room_without_creating_it(self):
+    def test_the_first_message_offers_the_community_room_that_exists(self):
         text = (DIST / "did" / "index.html").read_text(encoding="utf-8")
         visible = self.visible_text(DIST / "did" / "index.html")
         identity = json.loads((DIST / "identity.json").read_text(encoding="utf-8"))
+        latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
+        # the room was opened on Technocore, so it is offered plainly, with no "coming soon" left
         self.assertIn("room-census-community", visible)
-        self.assertIn("Not created yet", visible)
-        self.assertIn("Community room (coming soon)", visible)
-        self.assertNotIn("Proposed room", visible)
-        # the rooms that exist come first, and the one that does not comes after them
-        self.assertLess(visible.index("Choose a room that exists"), visible.index("Community room (coming soon)"))
-        self.assertIn("This room does not exist yet", visible)
-        self.assertIn("It is not offered above until it is created", visible)
+        self.assertIn("Community room", visible)
+        for stale in ("Not created yet", "coming soon", "This room does not exist yet", "Proposed room"):
+            self.assertNotIn(stale, visible)
+        self.assertRegex(visible, r"Open since \d{4}-\d{2}-\d{2}")
         self.assertIn(f"The {identity['room']} room stays for signed censuses only", visible)
-        # the proposed room is never in the list a message can be sent to
+        # it is offered for a first message, while the rooms a census owns never are
         carried = json.loads(html.unescape(re.search(r'<div data-wizard [^>]*data-rooms="([^"]+)"', text).group(1)))
         names = [e["room"] for e in carried]
-        self.assertNotIn("room-census-community", names)
+        self.assertIn("room-census-community", names)
         self.assertNotIn(identity["room"], names)
+        self.assertNotIn("events", names)
+        # no census has measured it yet, so it carries no numbers rather than invented ones
+        community = next(e for e in carried if e["room"] == "room-census-community")
+        self.assertEqual([community["rate"], community["senders"], community["pattern"]], [None, None, None])
+        self.assertNotIn("room-census-community", [r["room"] for r in latest["rooms"]])
+        # the Write page still offers measured rooms only
+        write = json.loads(html.unescape(re.search(r'data-rooms="([^"]+)"', (DIST / "write" / "index.html").read_text(encoding="utf-8")).group(1)))
+        self.assertNotIn("room-census-community", [e["room"] for e in write])
         self.assertIn("I am interested in [topic]", visible)
         self.assertIn("I plan to contribute by [contribution]", visible)
         self.assertIn("Skip for now", visible)

@@ -166,10 +166,14 @@ test("starters and the introduction are editable prompts, with no reward claim",
   assert.match(INTRODUCTION, /\[topic\][\s\S]*\[contribution\]/);
 });
 
-test("the community room is named but stays closed until it is created", () => {
+test("the community room is open, and is still not one of the reserved rooms", () => {
   assert.equal(COMMUNITY.room, "room-census-community");
-  assert.equal(COMMUNITY.ready, false, "nothing may publish there while it does not exist");
-  assert.ok(!RESERVED.includes(COMMUNITY.room));
+  assert.equal(COMMUNITY.ready, true, "it was opened by the publisher DID on 2026-09-23");
+  assert.match(COMMUNITY.since, /^\d{4}-\d{2}-\d{2}$/);
+  assert.ok(!RESERVED.includes(COMMUNITY.room), "it is a room like any other: readable, and never written to by a census");
+  // a message may go there, and never to the rooms a census owns
+  assert.equal(messageProblem(COMMUNITY.room, "A first introduction, written by hand.", [COMMUNITY.room]), null);
+  for (const room of RESERVED) assert.match(messageProblem(room, "x".repeat(40), [room]), /reserved/i);
 });
 
 test("nonces are digit strings from the millisecond clock, and proofs keep the full reply", () => {

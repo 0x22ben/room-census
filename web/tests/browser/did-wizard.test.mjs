@@ -245,15 +245,16 @@ test("the happy path: create, save the recovery file once, write, publish, and s
   assert.equal(await unloadWarns(), false);
   assert.equal(log.requests.length, log.loaded, "creating, sealing and downloading made no request");
 
-  // the introduction is proposed, in a room that does not exist yet
+  // the introduction is proposed, in the community room, which is open
   assert.equal(await page("document.querySelector('[data-message]').value"), "I created my Technocore identity with Room Census. I am interested in [topic], and I plan to contribute by [contribution].");
   assert.match(await text("[data-proposed]"), /room-census-community/);
-  assert.match(await text("[data-proposed]"), /Not created yet/);
-  assert.match(await text("[data-proposed]"), /This room does not exist yet/);
-  assert.equal(await page(`[...document.querySelectorAll('[data-room]')].some(b => b.dataset.room === "room-census-community")`), false, "a room that does not exist is never offered");
+  assert.match(await text("[data-proposed]"), /Open since \d{4}-\d{2}-\d{2}/);
+  assert.doesNotMatch(await text("[data-proposed]"), /Not created yet|coming soon|does not exist/);
+  assert.equal(await page(`[...document.querySelectorAll('[data-room]')].some(b => b.dataset.room === "room-census-community")`), true, "the community room is offered");
   assert.equal(await page(`[...document.querySelectorAll('[data-room]')].some(b => b.dataset.room === "room-census")`), false, "the census room is never offered");
+  // the community room comes already chosen, and the placeholders still have to be replaced
   await submit("[data-compose]");
-  assert.equal(await errorOf("compose"), "Choose a room from the list.");
+  assert.equal(await errorOf("compose"), "Replace every part in [brackets] with your own words.");
   await fill("[data-room-search]", "lobby");
   await until(`[...document.querySelectorAll('[data-room]')].some(b => b.dataset.room === "lobby")`, "the lobby row");
   await click(`[data-room="lobby"]`);

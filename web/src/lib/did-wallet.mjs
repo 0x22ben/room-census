@@ -24,10 +24,9 @@ export const ITERATIONS = 600000;
 export const MIN_PASSWORD = 12;
 export const MAX_TEXT = 4096;
 // Where a first introduction is proposed. The room-census room stays for signed censuses and its
-// track commands, so introductions go to a room of their own. It does not exist yet: until Ben
-// creates it and `ready` becomes true, the page proposes another existing room instead and never
-// writes to it (a first write would create the room).
-export const COMMUNITY = { room: "room-census-community", ready: false };
+// track commands, so introductions go to a room of their own. It was opened on 2026-09-23 by the
+// publisher DID, so it exists and can be written to; a census measures it from the next run on.
+export const COMMUNITY = { room: "room-census-community", ready: true, since: "2026-09-23" };
 // rooms a message may never go to, whatever the reader types
 export const RESERVED = ["room-census", "events"];
 const PKCS8_PREFIX = Uint8Array.from([0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20]);
