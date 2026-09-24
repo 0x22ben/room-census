@@ -47,7 +47,8 @@ export function roomPicker(root: HTMLElement, rooms: Room[], onPick: (room: stri
 
   return {
     get selected() { return selected; },
-    set(room: string) { selected = room; render(); },
+    // the search is filled in too, so the chosen room is always one of the rows on screen
+    set(room: string) { selected = room; search.value = room; render(); },
     reset() { selected = ""; search.value = ""; render(); },
     render,
   };

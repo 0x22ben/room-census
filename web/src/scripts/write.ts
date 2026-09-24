@@ -22,6 +22,11 @@ if (root) {
   const q = <T extends Element>(sel: string) => root.querySelector<T>(sel)!;
   const rooms = (JSON.parse(root.dataset.rooms ?? "[]") as Room[]).filter((r) => typeof r.room === "string");
   const names = rooms.map((r) => r.room);
+  // a room page can hand over its own room. It is checked against the list this page carries and only
+  // fills the choice in: nothing is signed or sent until the reader goes through the review.
+  const handed = new URL(location.href).searchParams.get("room");
+  const wanted = handed && names.includes(handed) ? handed : null;
+  if (handed) history.replaceState(null, "", location.pathname);
   let identity: Identity | null = null;
   let room = "";
   let signed: Signed | null = null;
@@ -131,6 +136,11 @@ if (root) {
       offered = Boolean(opened.pem);
       pw.value = "";
       show("compose");
+      if (wanted) {
+        picker.set(wanted);
+        room = wanted;
+        q<HTMLTextAreaElement>("[data-message]").focus();
+      }
     });
   });
 

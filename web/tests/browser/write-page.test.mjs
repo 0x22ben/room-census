@@ -65,7 +65,7 @@ async function open(technocore = () => ({ body: JSON.stringify({ room: "x", mess
   await send("Fetch.enable", { patterns: [{ urlPattern: "https://technocore.chat/*", requestStage: "Request" }] });
   const { identifier } = await send("Page.addScriptToEvaluateOnNewDocument", { source: CATCH_DOWNLOADS });
   await navigate(path);
-  await until(`!document.querySelector('${path === "/write/" ? "[data-write]" : "[data-did-form]"}').hidden`, "the page script");
+  await until(`!document.querySelector('${path.startsWith("/write/") ? "[data-write]" : "[data-did-form]"}').hidden`, "the page script");
   await send("Page.removeScriptToEvaluateOnNewDocument", { identifier });
   log.loaded = log.requests.length;
   return log;
@@ -461,4 +461,32 @@ test("a handed-over DID fills My DID but never starts a lookup by itself", { ski
   await until("!document.querySelector('[data-did-proof]').hidden", "the lookup to finish", 30000);
   assert.equal(await text("[data-did-heading]"), "Not found in the inspected data");
   assert.ok(log.requests.filter((r) => r.url.startsWith("https://technocore.chat/")).length > 0);
+});
+
+test("a room page can hand over its room, and only a room this page carries", { skip }, async () => {
+  const room = latest.rooms[0].room;
+  const identity = await createIdentity(subtle);
+  // the room comes from the address, the page checks it against its own list, then cleans the address
+  const log = await open((r) => (r.method === "POST" ? { body: stored(r) } : { body: "{}" }), `/write/?room=${room}`);
+  assert.equal(await page("location.search"), "", "the address is cleaned once read");
+  assert.equal(await hidden("[data-panel=room]"), true, "nothing is chosen before the DID is open");
+  await setFile("[data-unlock-file]", await backupFile(identity));
+  await fill("[data-unlock-password]", PASSWORD);
+  await submit("[data-unlock]");
+  await until("!document.querySelector('[data-panel=room]').hidden", "the room picker");
+  assert.equal(await page(`document.querySelector('[data-room="${room}"]').getAttribute("aria-pressed")`), "true", "the handed room is chosen");
+  // and it is a choice, not a publication: the review still has to be asked for
+  assert.equal(await hidden("[data-panel=review]"), true);
+  assert.deepEqual(log.posts, []);
+
+  // a room this page does not carry is ignored, and nothing is chosen
+  await open(() => ({ body: "{}" }), "/write/?room=not-a-measured-room");
+  await setFile("[data-unlock-file]", await backupFile(identity));
+  await fill("[data-unlock-password]", PASSWORD);
+  await submit("[data-unlock]");
+  await until("!document.querySelector('[data-panel=room]').hidden", "the room picker");
+  assert.equal(await page(`[...document.querySelectorAll('[data-room]')].some(b => b.getAttribute("aria-pressed") === "true")`), false);
+  await fill("[data-message]", MESSAGE);
+  await submit("[data-compose]");
+  assert.equal(await errorOf("compose"), "Choose a room from the list.");
 });

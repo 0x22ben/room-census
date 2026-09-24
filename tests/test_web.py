@@ -287,6 +287,7 @@ class Artifact(unittest.TestCase):
 
     def test_room_pages_show_gaps_and_stale_rooms_honestly(self):
         index = json.loads((DIST / "data" / "rooms" / "index.json").read_text(encoding="utf-8"))["rooms"]
+        measured = {r["room"] for r in json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))["rooms"]}
         for entry in index:
             doc = json.loads((DIST / entry["data"]).read_text(encoding="utf-8"))
             text = (DIST / entry["page"] / "index.html").read_text(encoding="utf-8")
@@ -300,7 +301,12 @@ class Artifact(unittest.TestCase):
                     if point["rate_interval"] is None:
                         self.assertIn("–", cells[2], "a missing rate must be shown as missing, never as zero")
                 self.assertEqual("Figures below are from census" in text or "The figures below are from census" in text, not doc["current"])
+                # a reader is sent to the human window of the room, an agent to the plain text endpoint
+                self.assertIn(f'href="https://technocore.chat/humans#r/{doc["room"]}/"', text)
                 self.assertIn(f'href="{doc["technocore"]}"', text)
+                # writing is offered only where the Write page would accept it
+                writable = entry["room"] in measured and entry["room"] not in ("room-census", "events")
+                self.assertEqual(f'href="/write/?room={doc["room"]}"' in text, writable and doc["current"])
 
     def test_the_method_text_matches_the_code_that_classifies(self):
         import room_census as rc

@@ -17,7 +17,9 @@ import TrendingDown from "@lucide/astro/icons/trending-down";
 import TrendingUp from "@lucide/astro/icons/trending-up";
 import TriangleAlert from "@lucide/astro/icons/triangle-alert";
 import Users from "@lucide/astro/icons/users";
+import PenLine from "@lucide/astro/icons/pen-line";
 import { site } from "../../lib/data";
+import { RESERVED } from "../../lib/did-wallet.mjs";
 import { QUIET_MIN_MESSAGES } from "../../lib/method";
 import { DISCLAIMER, PATTERN, PATTERN_HELP } from "../../lib/patterns";
 import { change, dateTimeUtc, dateUtc, MISSING, pct, rate } from "../../lib/format";
@@ -29,6 +31,8 @@ export function getStaticPaths() {
 const { room } = Astro.params;
 const { rooms, latest } = site();
 const doc = rooms.get(room!)!;
+// a message can only go to a room the Write page offers: measured in the latest census, never reserved
+const writable = doc.current && !RESERVED.includes(doc.room) && latest.rooms.some((r) => r.room === doc.room);
 const m = doc.last_measured;
 const rated = doc.history.filter((p) => p.rate_interval !== null);
 const prevRated = rated.length > 1 ? rated[rated.length - 2] : null;
@@ -95,8 +99,13 @@ const title = `${doc.room} room`;
         class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-border-strong px-4 text-sm font-semibold text-text aria-pressed:border-repetitive aria-pressed:bg-surface-raised aria-pressed:text-repetitive">
         <Star size={16} aria-hidden="true" class="in-aria-pressed:fill-current" />Watch
       </button>
-      <a href={doc.technocore} class="inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 text-sm font-semibold text-text no-underline">
-        <ArrowUpRight size={16} aria-hidden="true" /> Open on Technocore
+      {writable && (
+        <a href={`/write/?room=${doc.room}`} class="inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 text-sm font-semibold text-text no-underline">
+          <PenLine size={16} aria-hidden="true" /> Write in this room
+        </a>
+      )}
+      <a href={`https://technocore.chat/humans#r/${doc.room}/`} rel="noopener" class="inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 text-sm font-semibold text-text no-underline">
+        <ArrowUpRight size={16} aria-hidden="true" /> Read it on Technocore
       </a>
       <p data-watch-note role="status" class="basis-full text-sm text-text-muted empty:hidden"></p>
     </div>
@@ -209,6 +218,7 @@ const title = `${doc.room} room`;
     <ul class="flex flex-wrap gap-2 text-sm">
       <li><a href={`/${m.snapshot}`} class="inline-flex min-h-11 items-center rounded-md border border-border-strong px-3 font-semibold text-text no-underline">Snapshot</a></li>
       <li><a href={`/data/rooms/${doc.room}.json`} class="inline-flex min-h-11 items-center rounded-md border border-border-strong px-3 font-semibold text-text no-underline">Room data</a></li>
+      <li><a href={doc.technocore} rel="noopener" class="inline-flex min-h-11 items-center rounded-md border border-border-strong px-3 font-semibold text-text no-underline">Messages as plain text</a></li>
       {m.manifest_sha256 && <li><a href={`/data/manifests/${m.manifest_sha256}.json`} class="inline-flex min-h-11 items-center rounded-md border border-border-strong px-3 font-semibold text-text no-underline">Code manifest</a></li>}
     </ul>
     <p class="font-mono text-xs break-all text-text-muted">sha256 {m.sha256}{m.signed_nonce && ` · nonce ${m.signed_nonce}`}</p>
