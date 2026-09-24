@@ -42,6 +42,8 @@ CSP_REQUIRED = {"default-src": ["'self'"], "script-src": ["'self'"], "object-src
 # the only sources any directive may list: no host, scheme wildcard or other origin anywhere
 # ('unsafe-inline' only for the legacy styles, data: only for inline images such as the favicon)
 CSP_ALLOWED = {"style-src": {"'self'", "'unsafe-inline'"}, "img-src": {"'self'", "data:"}}
+# the one origin a page may reach, and only a page that shows or writes to a room
+TECHNOCORE = "https://technocore.chat"
 # GitHub Pages serves the extensionless data/LICENSE as application/octet-stream (recorded 2026-09-23)
 CONTENT_TYPES = {".html": ("text/html",), ".json": ("application/json",), ".csv": ("text/csv",), ".png": ("image/png",),
                  ".txt": ("text/plain",), "": ("text/plain", "application/octet-stream")}
@@ -108,14 +110,27 @@ def csp_directives(policy):
     return out
 
 
-def csp_problem(policy):
-    """Why a page's Content-Security-Policy is weaker than the contract, None when it holds."""
+def csp_problem(policy, reads_technocore=False):
+    """Why a page's Content-Security-Policy is weaker than the contract, None when it holds.
+
+    A page that shows a room live, or that writes to one, reads technocore.chat from the browser, so
+    its connect-src names that one origin. Everywhere else connect-src stays 'self', and no directive
+    may name a host on any page.
+    """
     d = csp_directives(policy)
-    for name, sources in CSP_REQUIRED.items():
+    allowed = dict(CSP_ALLOWED)
+    required = dict(CSP_REQUIRED)
+    if reads_technocore:
+        # that one origin becomes possible, it never becomes required: a page that reads no room keeps 'self'
+        required.pop("connect-src")
+        allowed["connect-src"] = {"'self'", TECHNOCORE}
+        if "'self'" not in d.get("connect-src", []):
+            return f"connect-src is {d.get('connect-src')}"
+    for name, sources in required.items():
         if d.get(name) != sources:
             return f"{name} is {d.get(name)}"
     for name, sources in d.items():
-        extra = set(sources) - CSP_ALLOWED.get(name, {"'self'", "'none'"})
+        extra = set(sources) - allowed.get(name, {"'self'", "'none'"})
         if extra:
             return f"{name} allows {sorted(extra)}"
     return None
@@ -243,7 +258,7 @@ def check(root, base_url):
         p = parse(f)
         if p.canonical != base_url.rstrip("/") + route:
             bad(f"{route}: canonical is {p.canonical!r}")
-        weak = csp_problem(p.csp)
+        weak = csp_problem(p.csp, reads_technocore=kind == "/rooms/<slug>/")
         if weak:
             bad(f"{route}: missing or weakened Content-Security-Policy ({weak})")
         if p.inline_scripts:

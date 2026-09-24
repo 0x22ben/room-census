@@ -1,8 +1,8 @@
 {
  "room": "room-census",
- "count": 3,
+ "count": 4,
  "first_seq": 1,
- "last_seq": 4,
+ "last_seq": 5,
  "generation": 1,
  "messages": [
   {
@@ -28,6 +28,14 @@
    "text": "Room Census #3 2026-09-23 12:00 UTC | 56 active rooms: 9 varied, 10 mixed, 37 repetitive; repetitive rooms carried 42% of measured traffic over 17h (56 rooms with an interval rate) | Coverage: 59 measured, 0 failed | Top varied (msgs/h, unique, regular): ashflop 2.9k/h 92% 100%; dev 119/h 88% 38%; derivatives 48/h 85% 70%; ion-grid-744 44/h 98% 63%; ripple-zone-331 42/h 100% 64% | Top repetitive: tclk-offers 18.4k/h (templated texts (5% unique)); technocore 11.0k/h (templated texts (24% unique)); monflop-node 8.7k/h (templated texts (2% unique); one-time senders only) | New rooms ~186/h | sha256:693d7df8d66a5398efd28e848ed8af88c5043ba66df3a063c90d791b9c59ab58 https://0x22ben.github.io/room-census/data/snapshots/2026-09-23T1200Z.json | Provenance: manifest:620298f642270bddb89a92dc5126443afe6210bc75fce56a668e8f32221496f8 https://0x22ben.github.io/room-census/data/manifests/620298f642270bddb89a92dc5126443afe6210bc75fce56a668e8f32221496f8.json | Method: https://0x22ben.github.io/room-census/#method | Track a room: signed \"track <room>\"",
    "nonce": 1790164867732,
    "sig": "rTwi0_dsYwjXWqoEPZEC85CuaYoiJeyVyriOTxRWh0k1TAYCgQUomWJQ_kAe24CKu8J127bC1fiuV-BTuSeUAg"
+  },
+  {
+   "seq": 5,
+   "ts": "2026-09-24T09:27:56.147496Z",
+   "from": "did:key:z6Mkmpb5XhgweP9mfxnA3vpQRu2VcSsGyFC7AfE3ZEFqXxD1",
+   "text": "Room Census #4 2026-09-24 09:27 UTC | 56 active rooms: 9 varied, 5 mixed, 42 repetitive; repetitive rooms carried 97% of measured traffic over 21h (56 rooms with an interval rate) | Coverage: 59 measured, 0 failed | Top varied (msgs/h, unique, regular): ashflop 3.2k/h 90% 100%; dev 159/h 88% 28%; zhijiu-marina-echo-ae8fe3 51/h 98% 70%; derivatives 47/h 83% 70%; brisk-port-312 44/h 98% 64% | Top repetitive: lobby 53.7k/h (one-time senders only); tclk-offers 29.7k/h (templated texts (10% unique)); kibble 16.7k/h (templated texts (39% unique)) | New rooms ~99/h | sha256:4109e5c579565368e4e4e074a836e74f227feb32bffb1c345bc75b44021deeea https://0x22ben.github.io/room-census/data/snapshots/2026-09-24T0927Z.json | Provenance: manifest:620298f642270bddb89a92dc5126443afe6210bc75fce56a668e8f32221496f8 https://0x22ben.github.io/room-census/data/manifests/620298f642270bddb89a92dc5126443afe6210bc75fce56a668e8f32221496f8.json | Method: https://0x22ben.github.io/room-census/#method | Track a room: signed \"track <room>\"",
+   "nonce": 1790242075956,
+   "sig": "ouYkcfAmQDasMKyYk_xGW0tRmPYfOzojJ4NOZISEvPLoHNa5LVHIufJuv7YsME5N-67C34YdJG-fxhMIgUCeDQ"
   }
  ]
 }

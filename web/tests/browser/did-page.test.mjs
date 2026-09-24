@@ -112,11 +112,12 @@ test("a lookup reads every room at most four at a time, shows progress and failu
   assert.equal(await page("document.activeElement.id"), "result-title");
   assert.match(await text("[data-did-status]"), /^59 of 60 rooms read, finished .* UTC\. 1 could not be read\.$/);
   assert.equal(await text("[data-did-count]"), "60 of 60 rooms read · 1 could not be read");
-  assert.equal(await text('[data-kpi="signed_messages"]'), "3");
+  const published = JSON.parse(fixture).messages.length;
+  assert.equal(await text('[data-kpi="signed_messages"]'), String(published));
   assert.equal(await text('[data-kpi="rooms_with_activity"]'), "1");
   assert.match(await text("[data-did-bad]"), /^1 message names this DID without a valid signature\. It is not counted\.$/);
   assert.match(await text("[data-did-meaning]"), /newest 200 messages .* Older activity is not included\..*covered only the last/);
-  assert.equal(await page("document.querySelectorAll('[data-did-list] li').length"), 3);
+  assert.equal(await page("document.querySelectorAll('[data-did-list] li').length"), published);
   assert.equal(await page("document.querySelectorAll('[data-did-rooms] tr').length"), 60);
   assert.equal(await page(`[...document.querySelectorAll('[data-did-rooms] td')].filter(t => t.textContent === 'Not read (HTTP 503)').length`), 1);
 
@@ -125,9 +126,9 @@ test("a lookup reads every room at most four at a time, shows progress and failu
   assert.equal(json.did, DID);
   assert.equal(json.all_rooms_read, false);
   assert.equal(json.coverage.rooms.length, 60);
-  assert.equal(json.summary.signed_messages, 3);
+  assert.equal(json.summary.signed_messages, published);
   assert.equal(json.summary.not_verifiable, 1);
-  assert.deepEqual(json.records.map((r) => r.result).sort(), ["bad", "checked", "checked", "checked"]);
+  assert.deepEqual(json.records.map((r) => r.result).sort(), ["bad", ...Array(published).fill("checked")]);
   for (const r of json.records) assert.equal(typeof r.message.nonce, "string");
   assert.match(json.disclaimer, /does not determine ownership, reputation or eligibility for any reward\.$/);
   assert.match(json.verification.not_signed, /not covered by the signature/);

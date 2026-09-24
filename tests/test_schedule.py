@@ -41,8 +41,8 @@ def source_files():
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not (rel == Path(".") and d in GENERATED_DIRS)]
         for name in files:
             path = Path(root) / name
-            if path.suffix in TEXT_SUFFIXES and path.name != Path(__file__).name \
-                    and not (rel == Path(".") and name in GENERATED_FILES):
+            if (path.suffix in TEXT_SUFFIXES and path.name != Path(__file__).name
+                    and not (rel == Path(".") and name in GENERATED_FILES)):
                 yield path
 
 

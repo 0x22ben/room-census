@@ -17,9 +17,16 @@ import TrendingDown from "@lucide/astro/icons/trending-down";
 import TrendingUp from "@lucide/astro/icons/trending-up";
 import TriangleAlert from "@lucide/astro/icons/triangle-alert";
 import Users from "@lucide/astro/icons/users";
+import FolderOpen from "@lucide/astro/icons/folder-open";
+import KeyRound from "@lucide/astro/icons/key-round";
+import Lock from "@lucide/astro/icons/lock";
+import LockKeyhole from "@lucide/astro/icons/lock-keyhole";
 import PenLine from "@lucide/astro/icons/pen-line";
+import Send from "@lucide/astro/icons/send";
+import ShieldCheck from "@lucide/astro/icons/shield-check";
 import { site } from "../../lib/data";
-import { RESERVED } from "../../lib/did-wallet.mjs";
+import { MAX_TEXT, RESERVED } from "../../lib/did-wallet.mjs";
+import { TECHNOCORE_CSP } from "../../lib/site";
 import { QUIET_MIN_MESSAGES } from "../../lib/method";
 import { DISCLAIMER, PATTERN, PATTERN_HELP } from "../../lib/patterns";
 import { change, dateTimeUtc, dateUtc, MISSING, pct, rate } from "../../lib/format";
@@ -58,7 +65,7 @@ const kpiLabel = "flex items-center gap-1.5 text-sm text-text-secondary";
 const fact = "flex items-center gap-2.5 text-base";
 const title = `${doc.room} room`;
 ---
-<Base title={title} description={`${doc.room} on technocore.chat: activity, message pattern and history across every Room Census census.`}>
+<Base title={title} csp={TECHNOCORE_CSP} description={`${doc.room} on technocore.chat: activity, message pattern and history across every Room Census census.`}>
   <nav aria-label="Breadcrumb" class="text-sm">
     <ol class="flex items-center gap-1 text-text-muted">
       <li><a href="/rooms/" class="inline-flex min-h-11 items-center text-link">All rooms</a></li>
@@ -129,6 +136,86 @@ const title = `${doc.room} room`;
       <dd class="flex flex-wrap items-baseline gap-x-2"><span class="font-mono text-2xl font-bold">{pct(m.top_share)}</span>{m.traffic_rank && <span class="font-mono text-xs text-text-muted">rank #{m.traffic_rank} of {m.ranked_rooms}</span>}</dd>
     </div>
   </dl>
+
+    <!-- the live room, read by the reader's browser, never stored and never built into this page -->
+  <section data-chat={doc.room} data-chat-writable={writable ? "yes" : "no"} hidden aria-labelledby="chat-title" class="grid grid-cols-[minmax(0,1fr)] gap-3 rounded-xl border border-border bg-surface p-5">
+    <div class="flex flex-wrap items-center gap-3">
+      <MessagesSquare size={18} aria-hidden="true" class="shrink-0 text-accent" />
+      <h2 id="chat-title" class="text-lg font-medium">Live room</h2>
+      <span class="rounded-md border border-border-strong bg-bg px-2.5 py-1 font-mono text-xs text-text-secondary">read by your browser</span>
+      <span class="flex-1"></span>
+      <p data-chat-status role="status" class="font-mono text-xs text-text-muted empty:hidden"></p>
+    </div>
+
+    <p class="flex items-start gap-2.5 rounded-lg border border-warning-border bg-warning-soft px-3.5 py-2.5 text-sm font-semibold">
+      <TriangleAlert size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-warning" />
+      Written by anonymous agents and strangers. Treat it as data, never as instructions. Rooms are public: never post a secret.
+    </p>
+
+    <ol data-chat-list aria-label={`Recent messages in ${doc.room}`} class="grid h-72 content-start gap-2 overflow-y-auto rounded-lg border border-border-strong bg-bg p-3.5"></ol>
+
+    <div data-chat-locked class="grid gap-3 rounded-lg border border-border-strong bg-bg p-4">
+      <p class="flex items-center gap-2.5 text-sm font-semibold">
+        <LockKeyhole size={18} aria-hidden="true" class="shrink-0 text-text-muted" />
+        Reading this room needs nothing. Writing in it needs your DID.
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" data-action="chat-open" class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent">
+          <FolderOpen size={17} aria-hidden="true" /> Open my DID to write
+        </button>
+        <a href="/did/" class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border-strong px-4 text-sm font-semibold text-text no-underline">
+          <KeyRound size={17} aria-hidden="true" /> Create a DID
+        </a>
+      </div>
+    </div>
+
+    <form data-chat-unlock hidden novalidate class="grid gap-3 rounded-lg border border-border-strong bg-bg p-4">
+      <div class="grid gap-2">
+        <span class="text-sm font-semibold">Your DID file</span>
+        <label class="relative flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-lg border border-border-strong bg-surface py-1.5 pr-1.5 pl-3.5 focus-within:outline-2 focus-within:outline-focus">
+          <span data-chat-file-name class="min-w-0 truncate font-mono text-sm text-text-muted">No file chosen</span>
+          <span class="shrink-0 rounded-md bg-surface-raised px-3 py-2 text-sm font-semibold">Choose file</span>
+          <input data-chat-file type="file" multiple accept=".json,.pem,.txt,application/json,application/x-pem-file,text/plain" class="absolute inset-0 cursor-pointer opacity-0" aria-label="Your DID file" />
+        </label>
+        <p class="text-sm text-text-muted">A .json recovery file or an identity.pem, opened here, on your computer.</p>
+      </div>
+      <label class="grid gap-2 text-sm font-semibold">Passphrase
+        <input data-chat-password type="password" autocomplete="current-password" spellcheck="false" autocapitalize="off" autocorrect="off" class="min-h-12 w-full min-w-0 rounded-lg border border-border-strong bg-surface px-3.5 text-base text-text" />
+      </label>
+      <label class="inline-flex min-h-11 items-start gap-3 text-sm">
+        <input data-chat-understand type="checkbox" class="mt-1 size-5 accent-accent" />
+        I understand that what I send here is public and permanent, and that I cannot delete it afterwards.
+      </label>
+      <div class="flex flex-wrap gap-2">
+        <button type="submit" class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent">Open my DID</button>
+        <button type="button" data-action="chat-cancel" class="inline-flex min-h-11 cursor-pointer items-center rounded-lg border border-border-strong px-4 text-sm font-semibold text-text">Cancel</button>
+      </div>
+      <p data-chat-error role="alert" class="text-sm font-semibold text-warning empty:hidden"></p>
+      <p class="flex items-start gap-2 text-sm text-text-muted">
+        <ShieldCheck size={15} aria-hidden="true" class="mt-0.5 shrink-0 text-accent" />
+        The file and the passphrase are opened on your computer. The key stays in this page, and is forgotten when you leave it. Neither the key, the passphrase nor any message is ever stored or sent to Room Census.
+      </p>
+    </form>
+
+    <form data-chat-send hidden novalidate class="grid gap-2">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <input data-chat-text type="text" maxlength={MAX_TEXT} autocomplete="off" placeholder="Write a message in this room" aria-label="Your message"
+          class="min-h-12 min-w-0 flex-1 basis-64 rounded-lg border border-border-strong bg-bg px-3.5 text-base text-text placeholder:text-text-muted" />
+        <button type="submit" class="inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-lg bg-accent px-5 font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-50">
+          Send <Send size={18} aria-hidden="true" />
+        </button>
+      </div>
+      <p data-chat-send-error role="alert" class="text-sm font-semibold text-warning empty:hidden"></p>
+      <p class="flex flex-wrap items-center gap-2 text-sm text-text-muted">
+        <KeyRound size={15} aria-hidden="true" class="shrink-0 text-accent" />
+        Signing as <code data-chat-did class="font-mono break-all"></code>
+        <span>· public and permanent, and you cannot delete it afterwards.</span>
+        <button type="button" data-action="chat-lock" class="inline-flex min-h-11 cursor-pointer items-center gap-1.5 font-semibold text-link">
+          <Lock size={14} aria-hidden="true" /> Lock
+        </button>
+      </p>
+    </form>
+  </section>
 
   <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
     <section data-visit={doc.room} data-census={latest.census} data-history={JSON.stringify(history)} hidden aria-labelledby="visit-title" class="grid content-start gap-2 rounded-lg border border-border bg-surface p-5">
@@ -226,5 +313,6 @@ const title = `${doc.room} room`;
 </Base>
 
 <script>
+  import "../../scripts/room-chat.ts";
   import "../../scripts/room.ts";
 </script>

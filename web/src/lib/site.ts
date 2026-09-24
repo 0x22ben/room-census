@@ -15,7 +15,8 @@ const policy = (connect: string) => [
   "object-src 'none'",
 ].join("; ");
 export const CSP = policy("'self'");
-// My DID, Write and Verify read or write public room messages on Technocore from the browser;
+// My DID, Write, Verify, the lookup and every room page read or write public room messages on
+// Technocore from the browser;
 // no other page may connect out
 export const TECHNOCORE_CSP = policy("'self' https://technocore.chat");
 
