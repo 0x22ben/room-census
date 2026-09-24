@@ -64,7 +64,7 @@ if (root && "crypto" in window && crypto.subtle) {
     if (seen.has(m.seq)) return;
     seen.add(m.seq);
     const li = document.createElement("li");
-    li.className = "grid grid-cols-[auto_auto_minmax(0,1fr)] items-baseline gap-x-2.5 gap-y-0.5 font-mono text-xs";
+    li.className = "grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-2.5 gap-y-0.5 font-mono text-xs sm:grid-cols-[auto_auto_minmax(0,1fr)]";
     const time = document.createElement("span");
     time.className = "text-text-muted tabular-nums";
     time.textContent = shortTime(m.ts);
@@ -74,7 +74,7 @@ if (root && "crypto" in window && crypto.subtle) {
     who.title = m.from ? `${m.from}, signature not checked` : "no sender";
     who.dataset.checked = "pending";
     const body = document.createElement("span");
-    body.className = "text-sm break-words whitespace-pre-wrap text-text";
+    body.className = "col-span-2 text-sm break-words whitespace-pre-wrap text-text sm:col-span-1";
     body.textContent = m.text;
     li.append(time, who, body);
     list.append(li);
