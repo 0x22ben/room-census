@@ -262,7 +262,7 @@ if (root) {
     try { if (stored?.ts) when = `#${stored.seq}, ${dateTimeUtc(stored.ts.replace(/(\.\d{3})\d+/, "$1"))}`; } catch { when = `#${stored?.seq}`; }
     q<HTMLElement>("[data-out-stored]").textContent = when;
     // My DID needs the public DID only. A fragment stays in the browser: it is never sent with a request.
-    q<HTMLAnchorElement>("[data-action=view]").href = `/did/#did=${encodeURIComponent(signed!.did)}`;
+    q<HTMLAnchorElement>("[data-action=view]").href = `/look-up/#did=${encodeURIComponent(signed!.did)}`;
     q<HTMLElement>("[data-action=view]").hidden = !ok;
     q<HTMLElement>("[data-action=another]").hidden = !ok;
     q<HTMLElement>("[data-action=share]").hidden = !ok;

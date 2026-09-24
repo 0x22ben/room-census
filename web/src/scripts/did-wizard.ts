@@ -25,7 +25,6 @@ type Kind = "published" | "unconfirmed" | "refused";
 const root = document.querySelector<HTMLElement>("[data-wizard]");
 const PANELS: Panel[] = ["start", "create", "restore", "protect", "save", "message", "outcome"];
 const STEP: Record<Panel, number> = { start: -1, create: 0, restore: -1, protect: 1, save: 1, message: 2, outcome: 3 };
-const WITH_LOOKUP: Panel[] = ["start", "outcome"];
 
 if (root) {
   const q = <T extends Element>(sel: string) => root.querySelector<T>(sel)!;
@@ -76,8 +75,6 @@ if (root) {
     });
     const h1 = document.querySelector<HTMLElement>("[data-page-title]");
     if (h1) h1.textContent = panel === "create" || (created && panel !== "start" && panel !== "restore") ? "Create your Technocore DID" : "My DID";
-    const lookup = document.querySelector<HTMLElement>("[data-lookup-area]");
-    if (lookup) lookup.hidden = !WITH_LOOKUP.includes(panel);
     q<HTMLElement>("[data-action=start-over]").hidden = identity === null;
     q<HTMLElement>("[data-confirm-over]").hidden = true;
     // a passphrase shown in clear never stays shown on the next screen
@@ -128,12 +125,6 @@ if (root) {
   q<HTMLButtonElement>("[data-action=begin]").addEventListener("click", () => show("create"));
   q<HTMLButtonElement>("[data-action=begin-restore]").addEventListener("click", () => show("restore"));
 
-  // the lookup lives further down the page: this only takes the reader there, and never reads anything
-  q<HTMLButtonElement>("[data-action=go-lookup]").addEventListener("click", () => {
-    const area = document.querySelector<HTMLElement>("[data-lookup-area]");
-    area?.scrollIntoView({ behavior: "smooth", block: "start" });
-    document.querySelector<HTMLInputElement>("#did-input")?.focus({ preventScroll: true });
-  });
 
   // ---------- 1. create ----------
   q<HTMLButtonElement>("[data-action=create]").addEventListener("click", (e) => guard(e.currentTarget as HTMLButtonElement, async () => {
@@ -395,34 +386,24 @@ if (root) {
     compose();
     text.value = kept;
   });
-  // skipping publishes nothing: the identity stays unlocked and the activity lookup opens
+  // skipping publishes nothing: the message step closes, and the DID is offered to the lookup page
   q<HTMLButtonElement>("[data-action=skip]").addEventListener("click", () => {
     if (attempted || !identity) return;
     signed = null;
     q<HTMLElement>("[data-panel=message]").hidden = true;
-    const area = document.querySelector<HTMLElement>("[data-lookup-area]");
-    const input = document.querySelector<HTMLInputElement>("#did-input");
-    const lookup = document.querySelector<HTMLFormElement>("form[data-did-form]");
-    if (area) area.hidden = false;
-    if (input && lookup) {
-      input.value = identity.did;
-      lookup.requestSubmit();
-      lookup.scrollIntoView({ block: "start" });
-    }
+    const after = q<HTMLElement>("[data-skipped]");
+    q<HTMLAnchorElement>("[data-skipped-link]").href = `/look-up/#did=${encodeURIComponent(identity.did)}`;
+    after.hidden = false;
+    after.scrollIntoView({ block: "center" });
   });
 
   q<HTMLButtonElement>("[data-action=another]").addEventListener("click", () => {
     if (result?.kind === "published") compose();
   });
 
-  // My DID activity uses the public DID only: it is filled here, in the page, never put in a URL
-  q<HTMLButtonElement>("[data-action=view]").addEventListener("click", () => {
-    const input = document.querySelector<HTMLInputElement>("#did-input");
-    const lookup = document.querySelector<HTMLFormElement>("form[data-did-form]");
-    if (!identity || !input || !lookup) return;
-    input.value = identity.did;
-    lookup.requestSubmit();
-    lookup.scrollIntoView({ block: "start" });
+  // the activity of a DID is read on its own page, from the public DID alone
+  q<HTMLElement>("[data-action=view]").addEventListener("click", () => {
+    if (identity) location.href = `/look-up/#did=${encodeURIComponent(identity.did)}`;
   });
 
   // optional, inside Advanced: the complete server reply and what was signed

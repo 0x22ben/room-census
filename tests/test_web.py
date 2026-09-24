@@ -22,7 +22,7 @@ PAGE_CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self'; script-
             "base-uri 'none'; form-action 'none'; object-src 'none'")
 # My DID and Verify are the only pages that may connect out, and only to Technocore's public read API
 DID_CSP = PAGE_CSP.replace("connect-src 'self'", "connect-src 'self' https://technocore.chat")
-CONNECTS = ("/did/", "/verify/", "/write/")
+CONNECTS = ("/did/", "/verify/", "/write/", "/look-up/")
 DID_DISCLAIMER = ("This page summarizes public Technocore activity. It does not determine ownership, reputation or "
                   "eligibility for any reward.")
 # the wizard's own result for a signature it checked itself (ROOM_CENSUS_UX_SPEC.md, exceptions): only in the My DID script
@@ -237,17 +237,17 @@ class Artifact(unittest.TestCase):
             for label in ("Primary", "Menu"):
                 links = self.nav_links(text, label)
                 with self.subTest(page=route, nav=label):
-                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "My DID", "Write", "Verify",
-                                                                "Data", "Method", "Source code"])
+                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "My DID", "Write", "Look up a DID",
+                                                                "Verify", "Data", "Method", "Source code"])
                     for href, _, _ in links:
                         if href.startswith("/"):
                             self.assertTrue(contract.resolve(DIST, route, href).is_file(), href)
                     current = [h for h, _, on in links if on]
-                    own = ("/watched/", "/did/", "/write/", "/verify/", "/open-data/", "/method/")
+                    own = ("/watched/", "/did/", "/write/", "/look-up/", "/verify/", "/open-data/", "/method/")
                     expected = (["/"] if route == "/" else ["/rooms/"] if route.startswith("/rooms/")
                                 else [route] if route in own else [])
                     self.assertEqual(current, expected)
-        for page in ("did", "write", "verify", "open-data", "method"):
+        for page in ("did", "write", "look-up", "verify", "open-data", "method"):
             self.assertTrue((DIST / page / "index.html").is_file())
 
     def test_the_overview_keeps_the_anchors_signed_messages_link_to(self):
@@ -278,7 +278,7 @@ class Artifact(unittest.TestCase):
                 for attrs in scripts:
                     self.assertRegex(attrs, r'type="module" src="/_astro/[\w.-]+\.js"')
                 needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched ", "data-did-form ",
-                                                       "data-verify-summary ", "data-write "))
+                                                       "data-verify-summary ", "data-write ", "data-wizard "))
                 self.assertEqual(len(scripts), needed)
 
     def test_the_built_site_meets_the_legacy_route_contract(self):
@@ -405,28 +405,43 @@ class Artifact(unittest.TestCase):
         self.assertIn("localStorage", store)
         self.assertNotRegex(store, r"fetch\(|XMLHttpRequest|sendBeacon|navigator\.send")
 
-    def test_my_did_runs_in_the_browser_and_says_what_it_inspected(self):
+    def test_my_did_runs_in_the_browser_and_keeps_the_identity_on_the_device(self):
         text = (DIST / "did" / "index.html").read_text(encoding="utf-8")
-        latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
-        identity = json.loads((DIST / "identity.json").read_text(encoding="utf-8"))
         visible = self.visible_text(DIST / "did" / "index.html")
-        # the lookup needs script: without it the form stays hidden, and the policy blocks any submit
-        self.assertRegex(text, r"<form data-did-form [^>]*hidden")
-        self.assertIn("form-action 'none'", DID_CSP)
-        self.assertIn("The lookup needs JavaScript", text)
+        # the identity page no longer carries the lookup: that is a page of its own
+        self.assertNotIn("data-did-form", text)
+        self.assertIn("/look-up/", text)
         self.assertIn(DID_DISCLAIMER, html.unescape(text))
         # what is public and what never leaves the device are two separate lists
         self.assertIn("What becomes public, and what never leaves your device", visible)
-        public = visible.split("Public on Technocore")[1].split("Never sent to Room Census or to Technocore")[1]
-        for kept in ("Your private key", "Your passphrase", "Your recovery files"):
-            self.assertIn(kept, public)
+        kept = visible.split("Never sent anywhere, and never stored by Room Census")[1]
+        for secret in ("Your private key", "Your passphrase", "Your recovery files", "The DIDs you look up"):
+            self.assertIn(secret, kept)
         self.assertNotIn("Your private key", visible.split("Public on Technocore")[1].split("Never sent")[0])
-        self.assertIn("Your private key exists decrypted only in this tab's memory while the DID is unlocked. It never leaves your device.", visible)
+        self.assertIn("Room Census stores nothing about you. No account, no email, no database, no log of what you do here.", visible)
+        self.assertIn("stays on your computer", visible)
+        self.assertIn("There is no server behind it that could receive, or keep, a key, a passphrase, a file or a DID.", visible)
         # one way in for an identity that already exists, whichever local backup holds it
         self.assertIn("Open your Room Census recovery file (.json) or your identity.pem", visible)
         self.assertIn("A .json recovery file or an identity.pem", visible)
         self.assertRegex(text, r'<input data-restore-file type="file" multiple accept="\.json,\.pem,\.txt')
         self.assertIn("Runs locally on this device", visible)
+
+    def test_the_lookup_page_says_what_it_inspects_and_keeps_nothing(self):
+        text = (DIST / "look-up" / "index.html").read_text(encoding="utf-8")
+        visible = self.visible_text(DIST / "look-up" / "index.html")
+        latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
+        identity = json.loads((DIST / "identity.json").read_text(encoding="utf-8"))
+        # the lookup needs script: without it the form stays hidden, and the policy blocks any submit
+        self.assertRegex(text, r"<form data-did-form [^>]*hidden")
+        self.assertIn("form-action 'none'", DID_CSP)
+        self.assertIn("The lookup needs JavaScript", text)
+        self.assertIn(DID_DISCLAIMER, html.unescape(text))
+        # it asks for nothing but a public DID, and says so
+        self.assertIn("No file, no key, nothing to install", visible)
+        self.assertIn("Room Census keeps no record of this", visible)
+        self.assertEqual(len(re.findall(r"<input[^>]*", text)), len(re.findall(r'<input[^>]*id="did-input"', text)),
+                         "the only field on this page is the public DID")
         # the rooms read are exactly the latest census plus the room where Room Census signs
         form = re.search(r"<form data-did-form [^>]*>", text).group(0)
         rooms = json.loads(html.unescape(re.search(r'data-rooms="([^"]+)"', form).group(1)))
@@ -434,7 +449,7 @@ class Artifact(unittest.TestCase):
         self.assertIn(f'the newest 200 messages of each of the {len(latest["rooms"])} rooms in census #{latest["census"]}', visible)
         self.assertIn("Older messages, other rooms and private rooms are not inspected", visible)
         # it never claims a full history, and it keeps "not found" apart from "no activity"
-        script = next(DIST.glob("_astro/did.astro*.js")).read_text(encoding="utf-8")
+        script = next(DIST.glob("_astro/look-up.astro*.js")).read_text(encoding="utf-8")
         for claim in ("Total messages", "First seen", "Rooms visited", "Contest"):
             self.assertNotIn(claim, script + text)
         for phrase in ("Recent activity found in measured rooms", "Not found in the inspected data",
@@ -605,7 +620,7 @@ class Artifact(unittest.TestCase):
             text = page.read_text(encoding="utf-8")
             with self.subTest(page=self.route(page)):
                 # My DID and Write run on the reader's device and say so in the top bar instead
-                local = self.route(page) in ("/did/", "/write/")
+                local = self.route(page) in ("/did/", "/write/", "/look-up/")
                 self.assertIn("Runs locally on this device" if local else expected, text)
                 self.assertNotRegex(text, r"(?i)census #\d+ verified")
                 self.assertNotIn("passed every public check", text)

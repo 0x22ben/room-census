@@ -29,7 +29,6 @@ import TriangleAlert from "@lucide/astro/icons/triangle-alert";
 import { site } from "../lib/data";
 import { DID_DISCLAIMER } from "../lib/patterns";
 import { TECHNOCORE_CSP } from "../lib/site";
-import { WINDOW } from "../lib/did-core.mjs";
 import { COMMUNITY, INTRODUCTION, MIN_PASSWORD, RESERVED } from "../lib/did-wallet.mjs";
 
 const { latest, identity, rooms } = site();
@@ -51,9 +50,6 @@ const measured = latest.rooms.map((r) => r.room);
 const ownRoomExtra = !measured.includes(identity.room);
 const inspected = ownRoomExtra ? [...measured, identity.room] : measured;
 const pages = [...rooms.keys()];
-const kpi = "grid gap-1 rounded-lg border border-border bg-surface p-4";
-const kpiLabel = "flex items-center gap-1.5 text-sm text-text-secondary";
-const kpiValue = "font-mono text-2xl font-bold";
 // the mockup's building blocks
 const card = "grid grid-cols-[minmax(0,1fr)] gap-4 rounded-xl border border-border bg-surface p-5 sm:p-7";
 const tile = "grid size-12 place-items-center rounded-lg border border-accent-border bg-accent-soft text-accent";
@@ -103,23 +99,25 @@ const steps = ["Create", "Protect", "Write", "Publish"];
       <p data-step-now hidden aria-hidden="true" class="-mt-3 text-center text-sm font-semibold sm:hidden"></p>
 
       <!-- landing: the two ways in, as the My DID mockup -->
-      <div data-panel="start" class="grid gap-4 md:grid-cols-2">
+      <div data-panel="start" class="grid gap-4">
         <div class={card}>
           <span class={tile}><KeyRound size={22} aria-hidden="true" /></span>
           <h2 class="text-lg font-semibold">Create a new DID</h2>
           <p class={lede}>Generated in this browser. Nothing secret leaves your device unencrypted.</p>
           <button type="button" data-action="begin" class={primary}>Create my DID <ArrowRight size={18} aria-hidden="true" /></button>
         </div>
-        <div class={card}>
-          <span class={tile}><Search size={22} aria-hidden="true" /></span>
-          <h2 class="text-lg font-semibold">Look up a public DID</h2>
-          <p class={lede}>Read the recent signed activity of any public DID in the measured rooms. No file, no key, nothing to install.</p>
-          <button type="button" data-action="go-lookup" class={secondary}><Search size={18} aria-hidden="true" /> Look up a DID</button>
-        </div>
       </div>
 
       <p data-restore-entry class="text-center text-sm text-text-secondary">
         Already have a DID? <button type="button" data-action="begin-restore" class="cursor-pointer font-semibold text-link">Open your Room Census recovery file (.json) or your identity.pem</button>
+      </p>
+      <p class="flex items-start gap-2.5 rounded-md border border-border bg-surface px-4 py-2.5 text-sm text-text-secondary">
+        <Info size={18} aria-hidden="true" class="mt-0.5 shrink-0" />
+        <span>{DID_DISCLAIMER}</span>
+      </p>
+
+      <p class="text-center text-sm text-text-secondary">
+        Only want to read the public activity of a DID? <a href="/look-up/" class="font-semibold text-link">Look up a public DID</a>, no file needed.
       </p>
 
       <!-- what Room Census can see: shown on the landing, before anything is created -->
@@ -129,13 +127,15 @@ const steps = ["Create", "Protect", "Write", "Publish"];
           <p class="pb-1 text-sm font-semibold text-text-secondary">Public on Technocore</p>
           <div class={row}><span class={rowKey}>Your public DID</span><span class={rowValue}>public</span></div>
           <div class={row}><span class={rowKey}>The messages you choose to publish</span><span class={rowValue}>public</span></div>
-          <p class="pt-4 pb-1 text-sm font-semibold text-text-secondary">Never sent to Room Census or to Technocore</p>
-          <div class={row}><span class={rowKey}>Your private key</span><span class={rowValue}>stays on this device</span></div>
-          <div class={row}><span class={rowKey}>Your passphrase</span><span class={rowValue}>stays on this device</span></div>
-          <div class={row}><span class={rowKey}>Your recovery files</span><span class={rowValue}>stay on this device</span></div>
+          <p class="pt-4 pb-1 text-sm font-semibold text-text-secondary">Never sent anywhere, and never stored by Room Census</p>
+          <div class={row}><span class={rowKey}>Your private key</span><span class={rowValue}>stays on your computer</span></div>
+          <div class={row}><span class={rowKey}>Your passphrase</span><span class={rowValue}>stays on your computer</span></div>
+          <div class={row}><span class={rowKey}>Your recovery files</span><span class={rowValue}>stay on your computer</span></div>
+          <div class={row}><span class={rowKey}>The DIDs you look up</span><span class={rowValue}>stay on your computer</span></div>
         </div>
-        <p class={foot}><ShieldCheck size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-accent" />Your private key exists decrypted only in this tab's memory while the DID is unlocked. It never leaves your device.</p>
-        <p class={foot}><Info size={16} aria-hidden="true" class="mt-0.5 shrink-0" />This site is static files: it has no server that could receive a key, a passphrase or a file.</p>
+        <p class={good}><ShieldCheck size={18} aria-hidden="true" class="shrink-0 text-accent" />Room Census stores nothing about you. No account, no email, no database, no log of what you do here.</p>
+        <p class={foot}><ShieldCheck size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-accent" />Your private key exists decrypted only in this tab's memory, on your computer, while the DID is unlocked. Closing the tab forgets it.</p>
+        <p class={foot}><Info size={16} aria-hidden="true" class="mt-0.5 shrink-0" />This site is a set of static files. There is no server behind it that could receive, or keep, a key, a passphrase, a file or a DID.</p>
       </section>
 
       <!-- step 1: create (mockup "Create DID, step 1") -->
@@ -260,6 +260,10 @@ const steps = ["Create", "Protect", "Write", "Publish"];
           <p data-error="compose" role="alert" class={alert}></p>
           <button type="button" data-action="skip" class="inline-flex min-h-11 cursor-pointer items-center justify-center text-sm font-semibold text-link">Skip for now</button>
         </form>
+        <div data-skipped hidden class="grid gap-3 rounded-lg border border-border bg-bg p-4">
+          <p class="text-sm">Nothing was published. Your DID is ready, and your recovery file is what brings it back.</p>
+          <a data-skipped-link href="/look-up/" class="text-sm font-semibold text-link">See the public activity of this DID</a>
+        </div>
         <section data-preview hidden aria-labelledby="preview-title" class="grid gap-3 rounded-lg border border-border-strong bg-bg p-4">
           <h3 id="preview-title" tabindex="-1" class="font-semibold outline-none">Exactly what will be published</h3>
           <div>
@@ -314,94 +318,6 @@ const steps = ["Create", "Protect", "Write", "Publish"];
       </div>
     </div>
 
-    <div data-lookup-area class="grid grid-cols-[minmax(0,1fr)] gap-4">
-  <section aria-labelledby="lookup-title" class="grid grid-cols-[minmax(0,1fr)] gap-3 rounded-lg border border-border bg-surface p-5">
-    <h2 id="lookup-title" class="flex items-center gap-2 text-lg font-medium">
-      Look up a public DID
-      <Help term="DID" ask="What is a DID?" text="A public identifier (did:key) that can sign Technocore messages. Only messages with a valid signature from this DID are counted." />
-    </h2>
-    <p data-did-noscript class="text-text-muted">The lookup needs JavaScript. It runs only in this browser.</p>
-    <form data-did-form data-rooms={JSON.stringify(inspected)} data-measured={JSON.stringify(measured)} data-pages={JSON.stringify(pages)} data-census={latest.census} hidden novalidate class="grid grid-cols-[minmax(0,1fr)] gap-2">
-      <label for="did-input" class="text-sm font-semibold">Public DID</label>
-      <div class="flex flex-wrap gap-2">
-        <input id="did-input" name="did" type="text" size="1" inputmode="text" autocomplete="off" autocapitalize="off" spellcheck="false"
-          placeholder="did:key:z6Mk…" aria-describedby="did-hint did-error"
-          class="min-h-11 min-w-0 flex-1 basis-64 rounded-md border border-border-strong bg-bg px-3 font-mono text-sm text-text placeholder:text-text-muted aria-invalid:border-warning" />
-        <button type="submit" data-did-submit class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-border-strong px-4 text-sm font-semibold text-text disabled:cursor-wait disabled:opacity-60">
-          <Search size={16} aria-hidden="true" /> Look up
-        </button>
-      </div>
-      <p id="did-hint" class="text-sm text-text-muted">An Ed25519 did:key, starting with did:key:z6Mk.</p>
-      <p data-did-handed hidden role="status" class="text-sm font-semibold">This DID came from the page you arrived from. Choose Look up to read its public activity.</p>
-      <p id="did-error" data-did-error role="alert" class="text-sm font-semibold text-warning empty:hidden"></p>
-    </form>
-    <p class="text-sm text-text-muted">
-      Inspected on each lookup: the newest {WINDOW} messages of each of the {measured.length} rooms in census #{latest.census}{ownRoomExtra && `, plus the ${identity.room} room where Room Census signs`}. In busy rooms that covers only seconds or minutes. Older messages, other rooms and private rooms are not inspected, so this shows recent activity found in the inspected rooms, not a complete history. It needs only the public DID, never a private key.
-    </p>
-  </section>
-
-  <p class="flex items-start gap-2.5 rounded-md border border-border bg-surface px-4 py-2.5 text-sm text-text-secondary">
-    <Info size={18} aria-hidden="true" class="mt-0.5 shrink-0" />
-    <span>{DID_DISCLAIMER}</span>
-  </p>
-
-  <section data-did-result hidden aria-labelledby="result-title" class="grid grid-cols-[minmax(0,1fr)] gap-4">
-    <div class="grid gap-1.5">
-      <h2 id="result-title" tabindex="-1" data-did-heading class="text-2xl font-medium tracking-tight outline-none"></h2>
-      <p data-did-for class="font-mono text-sm break-all text-text-secondary"></p>
-      <p data-did-status role="status" class="text-sm text-text-muted"></p>
-      <progress data-did-progress max="1" value="0" aria-label="Rooms read" class="h-1.5 w-full max-w-md accent-accent"></progress>
-      <p data-did-count class="font-mono text-sm text-text-secondary tabular-nums empty:hidden"></p>
-      <div class="flex flex-wrap gap-2">
-        <button type="button" data-did-cancel class="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-border-strong px-4 text-sm font-semibold text-text">Stop</button>
-        <button type="button" data-did-proof hidden class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-accent-border bg-accent-soft px-4 text-sm font-semibold text-text">
-          <Download size={16} aria-hidden="true" class="text-accent" /> Download activity proof
-        </button>
-      </div>
-    </div>
-
-    <div data-did-summary hidden class="grid gap-3">
-      <p data-did-meaning class="text-text-secondary"></p>
-      <dl data-did-kpis class="grid grid-cols-[repeat(auto-fit,minmax(min(10rem,100%),1fr))] gap-3">
-        <div class={kpi}>
-          <dt class={kpiLabel}>Signed messages found <Help term="Signed messages found" ask="Which messages count?" text="Messages in the inspected data whose Ed25519 signature matches this DID. A message that only names the DID, without a valid signature, is not counted." /></dt>
-          <dd class={kpiValue} data-kpi="signed_messages">0</dd>
-        </div>
-        <div class={kpi}>
-          <dt class={kpiLabel}>Rooms with activity</dt>
-          <dd class={kpiValue} data-kpi="rooms_with_activity">0</dd>
-        </div>
-        <div class={kpi}>
-          <dt class={kpiLabel}>Active days <Help term="Active days" ask="How are active days counted?" text="Different UTC dates with at least one signed message found, in the inspected data only." /></dt>
-          <dd class={kpiValue} data-kpi="active_days">0</dd>
-        </div>
-        <div class={kpi}>
-          <dt class={kpiLabel}>Latest signed message</dt>
-          <dd class="font-mono text-lg font-bold" data-kpi="last_active">–</dd>
-        </div>
-      </dl>
-      <p data-did-bad class="rounded-md border border-warning-border bg-warning-soft px-4 py-2.5 text-sm empty:hidden"></p>
-    </div>
-
-    <section data-did-messages hidden aria-labelledby="messages-title" class="overflow-hidden rounded-lg border border-border bg-surface">
-      <h3 id="messages-title" class="border-b border-border px-4 py-3 text-lg font-medium">Signed messages found</h3>
-      <ol data-did-list></ol>
-    </section>
-
-    <details data-did-coverage hidden class="rounded-lg border border-border bg-surface">
-      <summary class="flex min-h-11 cursor-pointer items-center px-4 font-medium">What was inspected</summary>
-      <div class="overflow-x-auto border-t border-border">
-        <table class="w-full text-left text-sm">
-          <caption class="sr-only">Rooms read for this lookup, with the messages and the time range read in each</caption>
-          <thead class="text-xs text-text-muted uppercase">
-            <tr><th scope="col" class="px-4 py-2 font-mono">Room</th><th scope="col" class="px-4 py-2 font-mono">Read</th><th scope="col" class="px-4 py-2 font-mono">From</th><th scope="col" class="px-4 py-2 font-mono">To</th></tr>
-          </thead>
-          <tbody data-did-rooms></tbody>
-        </table>
-      </div>
-    </details>
-  </section>
-    </div>
     <p class="text-center text-sm text-text-muted">Your key never leaves this browser unencrypted, and your watched rooms stay in it. No account, no email, no tracking.</p>
   </div>
   <template data-room-template>
@@ -418,6 +334,5 @@ const steps = ["Create", "Protect", "Write", "Publish"];
 </Base>
 
 <script>
-  import "../scripts/did.ts";
   import "../scripts/did-wizard.ts";
 </script>

@@ -319,16 +319,18 @@ test("the happy path: create, save the recovery file once, write, publish, and s
   assert.equal(log.posts.length, 2);
   assert.notEqual(JSON.parse(log.posts[1].postData).nonce, body.nonce);
 
-  // View in My DID: the lookup gets the public DID, which never goes into a request or the URL
+  // View: the public DID is handed to the page that reads it, and the address is cleaned there
+  const haystack = await exposure(log);
   await click("[data-action=view]");
-  await until("!document.querySelector('[data-did-proof]').hidden", "the lookup to finish");
+  await until('location.pathname === "/look-up/"', "the lookup page");
+  await until("document.getElementById('did-input').value !== ''", "the filled field");
   assert.equal(await page("document.getElementById('did-input').value"), did);
-  assert.equal(await page("location.hash + location.search"), "");
+  assert.equal(await page("location.hash"), "", "the address is cleaned once read");
+  assert.equal(await hidden("[data-did-result]"), true, "a handed-over DID never starts a lookup by itself");
   for (const r of log.requests.filter((x) => x.method === "GET")) {
     assert.ok(!r.url.includes("z6Mk") && !/did(:|%3A)key/i.test(r.url), `the DID left the browser: ${r.url}`);
   }
 
-  const haystack = await exposure(log);
   for (const secret of await secretsOf(saved[0].text)) assert.ok(!haystack.includes(secret), "a secret leaked");
 });
 
@@ -510,12 +512,13 @@ test("My DID opens an identity.pem too, and says plainly what never leaves the d
   const log = await open();
   // the two lists are separate, and the private key is only ever in the second one
   const seen = await page("document.querySelector('[data-sees]').innerText");
-  const [, publicPart, keptPart] = seen.split(/Public on Technocore|Never sent to Room Census or to Technocore/);
+  const [, publicPart, keptPart] = seen.split(/Public on Technocore|Never sent anywhere, and never stored by Room Census/);
   assert.match(publicPart, /Your public DID/);
   assert.match(publicPart, /The messages you choose to publish/);
   assert.doesNotMatch(publicPart, /private key/i);
   for (const kept of ["Your private key", "Your passphrase", "Your recovery files"]) assert.match(keptPart, new RegExp(kept));
-  assert.match(seen, /Your private key exists decrypted only in this tab's memory while the DID is unlocked\. It never leaves your device\./);
+  assert.match(seen, /Room Census stores nothing about you\./);
+  assert.match(seen, /Your private key exists decrypted only in this tab's memory, on your computer, while the DID is unlocked\./);
 
   // the same entry point takes the other local backup format, with its two optional files
   await click("[data-action=begin-restore]");
@@ -548,15 +551,14 @@ test("My DID opens an identity.pem too, and says plainly what never leaves the d
   }
 });
 
-test("the landing sends the reader to the lookup without reading anything", { skip }, async () => {
+test("My DID is about the identity only, and points at the page that reads one", { skip }, async () => {
   const log = await open();
-  await click("[data-action=go-lookup]");
-  await until("document.activeElement.id === 'did-input'", "the lookup field");
-  assert.equal(await page("document.querySelector('#did-input').value"), "", "nothing is filled in for the reader");
+  // no lookup happens here, and there is nothing to type a DID into
+  assert.equal(await page("document.querySelector('#did-input')"), null);
+  assert.equal(await page(`[...document.querySelectorAll('a')].some(a => a.getAttribute("href") === "/look-up/")`), true);
   await sleep(1200);
-  assert.equal(log.requests.filter((r) => r.url.startsWith("https://technocore.chat/")).length, 0, "a lookup started by itself");
-  assert.equal(await hidden("[data-did-result]"), true);
-  // the DID a reader already has is still one click away
+  assert.equal(log.requests.filter((r) => r.url.startsWith("https://technocore.chat/")).length, 0, "the page read Technocore on its own");
+  // the DID a reader already has is one click away
   await click("[data-action=begin-restore]");
   await until("!document.querySelector('[data-panel=restore]').hidden", "the open panel");
 });

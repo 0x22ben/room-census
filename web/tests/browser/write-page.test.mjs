@@ -221,7 +221,7 @@ test("only a room from the census list can be picked, and publishing needs a rev
   assert.equal(await text("[data-out-room]"), first);
   assert.equal((await downloads()).length, 0, "no receipt is forced on the reader");
   // the DID reaches My DID through a fragment, which a browser never sends with a request
-  assert.equal(decodeURIComponent(await page(`document.querySelector('[data-action=view]').getAttribute("href")`)), `/did/#did=${did}`);
+  assert.equal(decodeURIComponent(await page(`document.querySelector('[data-action=view]').getAttribute("href")`)), `/look-up/#did=${did}`);
   for (const r of log.requests) assert.ok(!r.url.includes("z6Mk"), `the DID left the browser: ${r.url}`);
 
   // the receipt is optional, and nothing secret is anywhere after a publication
@@ -446,7 +446,7 @@ test("Write is reachable from the navigation, under My DID, and stays closed ins
 
 test("a handed-over DID fills My DID but never starts a lookup by itself", { skip }, async () => {
   const identity = await createIdentity(subtle);
-  const log = await open(() => ({ body: JSON.stringify({ room: "x", messages: [] }) }), `/did/#did=${identity.did}`);
+  const log = await open(() => ({ body: JSON.stringify({ room: "x", messages: [] }) }), `/look-up/#did=${identity.did}`);
   await until("document.getElementById('did-input').value !== ''", "the filled field");
   assert.equal(await page("document.getElementById('did-input').value"), identity.did);
   assert.equal(await page("location.hash"), "", "the fragment is removed once read");

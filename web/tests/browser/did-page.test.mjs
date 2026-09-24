@@ -47,7 +47,7 @@ async function open({ answer, delay = 25, hold = false, noEd25519 = false }) {
            crypto.subtle.importKey = (f, k, alg, ...rest) => (alg && alg.name === "Ed25519") ? Promise.reject(new Error("NotSupportedError")) : real(f, k, alg, ...rest); }`
       : "",
   });
-  await navigate("/did/");
+  await navigate("/look-up/");
   await until("!document.querySelector('form[data-did-form]').hidden", "the form to be enabled by the script");
   await send("Page.removeScriptToEvaluateOnNewDocument", { identifier });
   return log;
