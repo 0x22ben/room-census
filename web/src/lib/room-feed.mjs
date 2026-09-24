@@ -55,5 +55,6 @@ export function shortFrom(from, nick) {
 /** The time of a message, as the reader's clock shows it, or an empty string. */
 export function shortTime(ts) {
   const at = new Date(ts);
-  return Number.isNaN(at.getTime()) ? "" : at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  // the same two numbers everywhere, whatever the reader's locale would otherwise do with them
+  return Number.isNaN(at.getTime()) ? "" : at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 }

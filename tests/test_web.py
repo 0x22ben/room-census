@@ -44,7 +44,9 @@ class Staging(unittest.TestCase):
         files = sorted(str(p) for p in (WEB / "tests").glob("*.test.mjs"))
         self.assertTrue(files)
         r = subprocess.run(["node", "--test", *files], cwd=WEB, capture_output=True, text=True, encoding="utf-8")
-        self.assertEqual(r.returncode, 0, r.stdout[-3000:] + r.stderr[-2000:])
+        # what failed, not the tail of what passed: a truncated tail hides the name of the failure
+        failed = "\n".join(re.findall(r"^not ok .*(?:\n(?!not ok |ok ).*)*", r.stdout, re.M))
+        self.assertEqual(r.returncode, 0, (failed or r.stdout[-3000:]) + r.stderr[-2000:])
         self.assertRegex(r.stdout, r"# fail 0")
 
 
