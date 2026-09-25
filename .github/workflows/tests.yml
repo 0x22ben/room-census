@@ -26,6 +26,15 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Compile
         run: python -m py_compile room_census.py census_render.py flop_did.py durable.py manifest.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # the staging tests run by the Python suite import the site's schema, which needs web/node_modules
+      - name: Install the site's dependencies from the lockfile (install scripts are off in web/.npmrc)
+        working-directory: web
+        run: npm ci
       - name: Unit tests (no network)
         run: python -m unittest discover -s tests -t . -v
       - name: Unit tests under python -O (no check may rely on assert)
@@ -49,6 +58,15 @@ jobs:
         run: python -c "import sys, cryptography; print(sys.version); print('cryptography', cryptography.__version__)"
       - name: Compile
         run: python -m py_compile room_census.py census_render.py flop_did.py durable.py manifest.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # the staging tests run by the Python suite import the site's schema, which needs web/node_modules
+      - name: Install the site's dependencies from the lockfile (install scripts are off in web/.npmrc)
+        working-directory: web
+        run: npm ci
       - name: Unit tests (no network)
         run: python -m unittest discover -s tests -t . -v
       - name: Unit tests under python -O (no check may rely on assert)

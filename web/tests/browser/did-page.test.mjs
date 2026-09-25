@@ -73,13 +73,29 @@ const proof = () => page(`(async () => {
 before(start);
 after(stop);
 
+// The rooms a lookup reads follow the day's census: the counts below come from the built page (the
+// look-up form names every room it reads), never from a number written into the test.
 function rooms() {
   const latest = JSON.parse(readFileSync(join(DIST, "data", "latest.json"), "utf8"));
-  return [...latest.rooms.map((r) => r.room), identity.room];
+  const measured = latest.rooms.map((r) => r.room);
+  return measured.includes(identity.room) ? measured : [...measured, identity.room];
 }
+function formRooms() {
+  const html = readFileSync(join(DIST, "look-up", "index.html"), "utf8");
+  const attr = html.match(/<form data-did-form data-rooms="([^"]*)"/);
+  assert.ok(attr, "the look-up form names the rooms it reads");
+  return JSON.parse(attr[1].replace(/&quot;|&#34;/g, '"').replace(/&amp;/g, "&"));
+}
+const ALL = skip ? [] : formRooms();
+const N = ALL.length;
+
+test("the look-up form reads the rooms of the latest census, then the Room Census room", { skip }, () => {
+  assert.ok(N >= 3, `a lookup needs a few rooms to test, found ${N}`);
+  assert.deepEqual(ALL, rooms());
+});
 
 test("a lookup reads every room at most four at a time, shows progress and failures, and counts only checked signatures", { skip }, async () => {
-  const all = rooms();
+  const all = ALL;
   const failing = all[1];
   const forged = JSON.parse(fixture).messages[0];
   const log = await open({
@@ -91,11 +107,14 @@ test("a lookup reads every room at most four at a time, shows progress and failu
   });
   await lookUp(DID);
   // part way through: the count and the failure are already visible
-  await until("/^([1-9]|[1-5]\\d) of 60 rooms read · 1 could not be read$/.test(document.querySelector('[data-did-count]').textContent)",
-    "a partial count that shows the failed room");
+  // a partial count, strictly between 0 and N, with the failed room already counted
+  await until(`(() => {
+    const m = /^(\\d+) of ${N} rooms read · 1 could not be read$/.exec(document.querySelector('[data-did-count]').textContent);
+    return m !== null && Number(m[1]) > 0 && Number(m[1]) < ${N};
+  })()`, "a partial count that shows the failed room");
   assert.ok((await page("document.querySelector('[data-did-progress]').value")) > 0);
-  assert.match(await page("document.querySelector('[data-did-progress]').getAttribute('aria-valuetext')"), /of 60 rooms read/);
-  assert.match(await text("[data-did-status]"), /Reading 60 rooms from technocore\.chat, 4 at a time\./);
+  assert.match(await page("document.querySelector('[data-did-progress]').getAttribute('aria-valuetext')"), new RegExp(`of ${N} rooms read`));
+  assert.match(await text("[data-did-status]"), new RegExp(`Reading ${N} rooms from technocore\\.chat, 4 at a time\\.`));
   await done();
 
   assert.equal(log.technocore.length, all.length);
@@ -110,22 +129,22 @@ test("a lookup reads every room at most four at a time, shows progress and failu
 
   assert.equal(await text("[data-did-heading]"), "Recent activity found in the Room Census room");
   assert.equal(await page("document.activeElement.id"), "result-title");
-  assert.match(await text("[data-did-status]"), /^59 of 60 rooms read, finished .* UTC\. 1 could not be read\.$/);
-  assert.equal(await text("[data-did-count]"), "60 of 60 rooms read · 1 could not be read");
+  assert.match(await text("[data-did-status]"), new RegExp(`^${N - 1} of ${N} rooms read, finished .* UTC\\. 1 could not be read\\.$`));
+  assert.equal(await text("[data-did-count]"), `${N} of ${N} rooms read · 1 could not be read`);
   const published = JSON.parse(fixture).messages.length;
   assert.equal(await text('[data-kpi="signed_messages"]'), String(published));
   assert.equal(await text('[data-kpi="rooms_with_activity"]'), "1");
   assert.match(await text("[data-did-bad]"), /^1 message names this DID without a valid signature\. It is not counted\.$/);
   assert.match(await text("[data-did-meaning]"), /newest 200 messages .* Older activity is not included\..*covered only the last/);
   assert.equal(await page("document.querySelectorAll('[data-did-list] li').length"), published);
-  assert.equal(await page("document.querySelectorAll('[data-did-rooms] tr').length"), 60);
+  assert.equal(await page("document.querySelectorAll('[data-did-rooms] tr').length"), N);
   assert.equal(await page(`[...document.querySelectorAll('[data-did-rooms] td')].filter(t => t.textContent === 'Not read (HTTP 503)').length`), 1);
 
   const { name, json } = await proof();
   assert.match(name, /^did-activity-[1-9A-HJ-NP-Za-km-z]{8}-\d{4}-\d{2}-\d{2}\.json$/);
   assert.equal(json.did, DID);
   assert.equal(json.all_rooms_read, false);
-  assert.equal(json.coverage.rooms.length, 60);
+  assert.equal(json.coverage.rooms.length, N);
   assert.equal(json.summary.signed_messages, published);
   assert.equal(json.summary.not_verifiable, 1);
   assert.deepEqual(json.records.map((r) => r.result).sort(), ["bad", ...Array(published).fill("checked")]);
@@ -143,7 +162,7 @@ test("nothing found is said as not found in the inspected data, without zero tot
   assert.match(await text("[data-did-meaning]"), /This does not mean the DID has no activity/);
   assert.equal(await hidden("[data-did-kpis]"), true);
   assert.equal(await hidden("[data-did-messages]"), true);
-  assert.match(await text("[data-did-status]"), /^60 of 60 rooms read, finished .* UTC\.$/);
+  assert.match(await text("[data-did-status]"), new RegExp(`^${N} of ${N} rooms read, finished .* UTC\\.$`));
   assert.equal((await proof()).json.all_rooms_read, true);
 });
 
@@ -157,17 +176,17 @@ test("Stop ends the lookup, and the rooms left unread are listed as stopped", { 
   await sleep(250);
   assert.equal(log.held.length, 4, "no second lookup while one runs");
   for (const reply of log.held.splice(0, 2)) await reply();
-  await until("document.querySelector('[data-did-count]').textContent.startsWith('2 of 60')", "two rooms read");
+  await until(`document.querySelector('[data-did-count]').textContent.startsWith('2 of ${N} rooms read')`, "two rooms read");
   await page("document.querySelector('[data-did-cancel]').click()");
   await done();
   for (const reply of log.held.splice(0)) await reply();
-  assert.match(await text("[data-did-status]"), /^2 of 60 rooms read, .*Stopped before the end\.$/);
-  assert.ok(log.technocore.length < 60);
+  assert.match(await text("[data-did-status]"), new RegExp(`^2 of ${N} rooms read, .*Stopped before the end\\.$`));
+  assert.ok(log.technocore.length < N);
   const { json } = await proof();
   assert.equal(json.all_rooms_read, false);
-  assert.equal(json.coverage.rooms.length, 60);
+  assert.equal(json.coverage.rooms.length, N);
   assert.equal(json.coverage.rooms.filter((c) => c.status === "read").length, 2);
-  assert.ok(json.coverage.rooms.filter((c) => c.reason === "stopped").length === 58);
+  assert.equal(json.coverage.rooms.filter((c) => c.reason === "stopped").length, N - 2);
 });
 
 test("a malformed DID is refused before any read", { skip }, async () => {

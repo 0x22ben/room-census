@@ -2,22 +2,61 @@
 // the site serves, and checks the signed census message read from the room-census export. Here the
 // test answers every read itself (no network) and can alter, refuse, drop or hold them, to prove that
 // only a real match is ever shown as a pass, and that "failed" and "could not be checked" stay apart.
+//
+// The census message of the day is signed by the Room Census key, which the tests do not hold, and it
+// changes every day. So the test signs its own census message with the public test key: same room,
+// the day's nonce, naming the day's snapshot and manifest fingerprints. It first checks that the built
+// page names the Room Census DID and the day's values, then serves the page to the browser with only
+// its data-did swapped for the test DID. Every other byte of the page and of its script is as built.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 
 import { readReply } from "../../src/lib/did-core.mjs";
+import { openIdentityPem, signMessage } from "../../src/lib/did-wallet.mjs";
 import { DIST, WEB, listeners, navigate, page, send, site, skip, start, stop, until } from "./harness.mjs";
 
-const latest = JSON.parse(readFileSync(join(DIST, "data", "latest.json"), "utf8"));
 const OTHER = "did:key:z6Mkfw79DoBMgePecy4YaXSSimwzHKYz8sB3JB9X7bKSXMkG";
-// the real room-census messages, exact nonces kept, one JSONL line each as the export serves them
-const census = readReply(readFileSync(join(WEB, "tests", "fixtures", "room-census-reply.json"), "utf8"));
+const PEM = readFileSync(join(WEB, "tests", "fixtures", "identity-test-key.pem.txt"), "utf8");
+// public by design, see the fixture's header
+const PASSPHRASE = "correct horse battery staple";
 const line = (m) => JSON.stringify(m).replace(/"nonce":"(\d+)"/, '"nonce":$1');
 const exportOf = (messages) => messages.map(line).join("\n") + "\n";
-const target = census.find((m) => m.nonce === latest.signed_in.nonce);
-const others = census.filter((m) => m !== target);
+
+const latest = skip ? null : JSON.parse(readFileSync(join(DIST, "data", "latest.json"), "utf8"));
+const HTML = skip ? "" : readFileSync(join(DIST, "verify", "index.html"), "utf8");
+/** The data-* attributes of the signature check, as the built page names them. */
+function signatureCheck(html) {
+  const tag = html.match(/<p data-check="signature"[^>]*>/);
+  assert.ok(tag, "the verify page has a signature check");
+  return Object.fromEntries([...tag[0].matchAll(/data-([a-z0-9]+)="([^"]*)"/g)].map(([, k, v]) => [k, v]));
+}
+const named = skip ? null : signatureCheck(HTML);
+
+const identity = await openIdentityPem(globalThis.crypto.subtle, PEM, PASSPHRASE);
+const TEST_DID = identity.did;
+/** The built page, with the DID its signature check expects swapped for the test DID, and nothing else. */
+function testPage() {
+  const from = `data-check="signature" data-room="${named.room}" data-nonce="${named.nonce}" data-did="${latest.publisher}"`;
+  assert.equal(HTML.split(from).length, 2, "the signature check is found exactly once");
+  return HTML.replace(from, from.replace(`data-did="${latest.publisher}"`, `data-did="${TEST_DID}"`));
+}
+
+let census = [];
+let target = null;
+let others = [];
+if (!skip) {
+  const home = "https://0x22ben.github.io/room-census";
+  const text = `Room Census #${latest.census} ${latest.at_utc} | test message signed by the public test key | `
+    + `sha256:${named.sha256} ${home}/${latest.snapshot} | Provenance: manifest:${named.manifest} ${home}/${latest.provenance.manifest}`;
+  const signed = await signMessage(globalThis.crypto.subtle, identity, named.room, named.nonce, text);
+  target = { seq: 99, ts: latest.at_utc, from: TEST_DID, text: signed.text, nonce: signed.nonce, sig: signed.sig };
+  // the real room-census messages around it, exact nonces kept, one JSONL line each as the export serves them
+  others = readReply(readFileSync(join(WEB, "tests", "fixtures", "room-census-reply.json"), "utf8"))
+    .filter((m) => m.nonce !== named.nonce);
+  census = [...others, target];
+}
 const PASS = "All 3 checks that run in your browser passed. The source code still needs the Git command in step 4.";
 
 /**
@@ -43,12 +82,14 @@ async function open({ change = () => null, technocore = () => ({ body: exportOf(
       await fulfill(a.status ?? 200, a.body ?? "", "application/x-ndjson");
       return;
     }
+    if (url.pathname === "/verify/") { await fulfill(200, testPage(), "text/html; charset=utf-8"); return; }
     const bytes = readFileSync(join(DIST, ...url.pathname.split("/").filter(Boolean)));
     const out = change(url.pathname, bytes);
     if (out === null) { await send("Fetch.continueRequest", { requestId }).catch(() => {}); return; }
     await fulfill(out.status ?? 200, out.body ?? bytes);
   });
-  await send("Fetch.enable", { patterns: [{ urlPattern: `${site.origin}/data/*`, requestStage: "Request" },
+  await send("Fetch.enable", { patterns: [{ urlPattern: `${site.origin}/verify/`, requestStage: "Request" },
+    { urlPattern: `${site.origin}/data/*`, requestStage: "Request" },
     { urlPattern: "https://technocore.chat/*", requestStage: "Request" }] });
   const { identifier } = await send("Page.addScriptToEvaluateOnNewDocument", { source: init });
   await navigate("/verify/");
@@ -64,6 +105,18 @@ const MATCH = ["pass", "Matches: checked in this browser"];
 
 before(start);
 after(stop);
+
+test("the built page expects the day's census message from the Room Census DID, with the day's fingerprints", { skip }, () => {
+  const identityFile = JSON.parse(readFileSync(join(WEB, "..", "identity.json"), "utf8"));
+  assert.deepEqual(named, {
+    check: "signature", room: latest.signed_in.room, nonce: latest.signed_in.nonce, did: latest.publisher,
+    sha256: latest.sha256, manifest: latest.provenance.manifest_sha256,
+  });
+  assert.equal(latest.publisher, identityFile.did);
+  assert.notEqual(TEST_DID, latest.publisher, "the test key is never the Room Census key");
+  // the page served to the browser differs from the built one by the expected DID only
+  assert.equal(testPage().replace(TEST_DID, latest.publisher), HTML);
+});
 
 test("the served files and the signed census message pass, and only public reads leave the browser", { skip }, async () => {
   const log = await open();
