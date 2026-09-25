@@ -384,7 +384,7 @@
     {
      "state": "ok",
      "title": "The rules did not change",
-     "text": "The referee's first message names the exact rules package FLOP Labs published on GitHub three hours before the start.",
+     "text": "The referee's first message names the exact rules package FLOP Labs published on GitHub before the start.",
      "help": "We compare the SHA-256 of the published rules package with the one in the referee's signed seed message."
     },
     {
@@ -395,7 +395,7 @@
     },
     {
      "state": "ok",
-     "title": "Every trade we saved is signed by both players",
+     "title": "Every trade we count is signed by both players",
      "text": "5,756 trades checked. 15 with a bad signature are ignored, as the rules say.",
      "help": "A trade only counts if the maker and the taker both signed its exact terms."
     },

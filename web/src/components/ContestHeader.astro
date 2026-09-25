@@ -19,12 +19,12 @@ const { contest: c, current } = Astro.props;
   <h1 id="contest-title" class="text-3xl font-medium tracking-tight sm:text-4xl">{c.title}</h1>
   <p class="text-text-muted">{c.summary}</p>
 </section>
-{SAMPLE && (
-  <p class="mt-3 flex items-start gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-secondary">
-    <Info size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />
-    <span>Sample data: a copy of our capture from {dateTimeUtc(CAPTURED_AT)}. This page does not update yet.</span>
-  </p>
-)}
+<p class="mt-3 flex items-start gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-secondary">
+  <Info size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />
+  {SAMPLE
+    ? <span>Sample data: a copy of our capture from {dateTimeUtc(CAPTURED_AT)}. This page does not update yet.</span>
+    : <span>From our capture of {dateTimeUtc(CAPTURED_AT)}. This page is rebuilt about once an hour.</span>}
+</p>
 <nav aria-label="Contest sections" class="mt-4 border-b border-border">
   <ul class="flex gap-1 overflow-x-auto">
     {tabs(c).map((t) => {

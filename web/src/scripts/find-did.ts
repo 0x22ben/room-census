@@ -1,7 +1,7 @@
 // "Find my DID": looks a did:key up in the ranking file this site serves. Nothing leaves the site and
 // nothing is stored. Every result says where its number comes from.
 type Row = [number, string, string, "official" | "complete" | "partial"];
-type Ranking = { sweep: number; traders: number; owners: number; rows: Row[] };
+type Ranking = { sweep: number; traders: number; owners: number; rows: Row[]; capture_start?: string; notes?: Partial<Record<Row[3], string>> };
 
 const DID = /^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]{44}$/;
 const SOURCES = {
@@ -56,10 +56,10 @@ function init(root: HTMLElement) {
       if (row) {
         const s = SOURCES[row[3]];
         const score = row[2].startsWith("-") || Number(row[2]) === 0 ? row[2] : `+${row[2]}`;
-        out.append(card(`#${row[0]}`, of, `${score} POLF`, s.label, s.tone, s.note));
+        out.append(card(`#${row[0]}`, of, `${score} POLF`, s.label, s.tone, ranking.notes?.[row[3]] ?? s.note));
       } else {
         out.append(card("–", "not ranked", "–", "Not found in the inspected data", "muted",
-          "No settled trade of this DID is in the trades we saved. It may not have traded, may not be registered, or may have traded only before we started saving (13:37 UTC)."));
+          `No settled trade of this DID is in the trades we saved. It may not have traded, may not be registered, or may have traded only before we started saving (${ranking.capture_start ?? "13:37 UTC"}).`));
       }
     } catch {
       data = null;

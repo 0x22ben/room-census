@@ -1,6 +1,14 @@
-// Contests followed by the Room Census witness. Until the live export exists (step 3), the pages read
-// a sample built from the real capture of 25 Sep 2026 (scripts/contests-sample.py) and say so.
+// Contests followed by the Room Census witness. The witness on the server publishes data/contests/
+// (index.json and one ranking per contest); without it, as on a fresh checkout, the pages read a sample
+// built from the real capture of 25 Sep 2026 (scripts/contests-sample.py) and say so on every page.
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import sample from "../fixtures/contests.sample.json";
+import { json } from "./files";
+
+type Doc = { sample?: boolean; captured_at: string; contests: Contest[] };
+const LIVE = existsSync(resolve(process.cwd(), ".public", "data", "contests", "index.json"));
+const doc: Doc = LIVE ? json<Doc>("data/contests/index.json") : (sample as unknown as Doc);
 
 export type CheckState = "ok" | "warn" | "wait";
 export type Check = { state: CheckState; title: string; text: string; help: string };
@@ -26,9 +34,9 @@ export type Contest = {
   checks: Check[];
 };
 
-export const SAMPLE = sample.sample === true;
-export const CAPTURED_AT: string = sample.captured_at;
-export const contests = (): Contest[] => sample.contests as Contest[];
+export const SAMPLE = !LIVE;
+export const CAPTURED_AT: string = doc.captured_at;
+export const contests = (): Contest[] => doc.contests;
 export const contest = (id: string): Contest | undefined => contests().find((c) => c.id === id);
 
 /** Tabs of a contest page; an ended contest without a leaderboard has no Leaderboard tab. */

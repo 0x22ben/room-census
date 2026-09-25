@@ -54,12 +54,12 @@ close1 = {
          "text": "Every referee record we saved carries a valid signature from the referee key.",
          "help": "We check each Ed25519 signature ourselves. A forged or edited record would fail."},
         {"state": "ok", "title": "The rules did not change",
-         "text": "The referee's first message names the exact rules package FLOP Labs published on GitHub three hours before the start.",
+         "text": "The referee's first message names the exact rules package FLOP Labs published on GitHub before the start.",
          "help": "We compare the SHA-256 of the published rules package with the one in the referee's signed seed message."},
         {"state": "wait", "title": "The referee key belongs to FLOP Labs",
          "text": "Not confirmed by two sources yet. It is the key FLOP Labs used for the Sonnet Challenge, but FLOP Labs has not published it for this contest.",
          "help": "We only call a key confirmed when two independent sources published before the start name it."},
-        {"state": "ok", "title": "Every trade we saved is signed by both players",
+        {"state": "ok", "title": "Every trade we count is signed by both players",
          "text": f"{summary['trades_ok']:,} trades checked. {summary['bad_trade_sig']} with a bad signature are ignored, as the rules say.",
          "help": "A trade only counts if the maker and the taker both signed its exact terms."},
         {"state": "ok" if matched else "wait", "title": "Profits recomputed by us",
@@ -99,7 +99,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 # "official" only when the ranking and the matched signed list describe the same sweep
 official = {d for d, _ in pnl[ranking["sweep"]][1]["top"]} if ranking["sweep"] == SWEEP and matched else set()
 (OUT / "close-1.ranking.sample.json").write_text(json.dumps({
-    "schema": "room-census/contest-ranking/1", "sample": True, "sweep": ranking["sweep"], "traders": len(ranking["ranking"]), "owners": state[last][1]["owners"],
+    "schema": "room-census/contest-ranking/1", "contest": "close-1", "sample": True, "sweep": ranking["sweep"], "traders": len(ranking["ranking"]), "owners": state[last][1]["owners"],
     "rows": [[r, d, v, "official" if d in official else "partial"] for r, d, v in ranking["ranking"]]},
     separators=(",", ":")) + "\n", encoding="utf-8")
 print("sample written:", last, len(series), len(ranking["ranking"]))

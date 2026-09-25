@@ -22,12 +22,12 @@ const fact = "grid gap-1";
     <p class="text-text-muted">Every FLOP Labs contest on Technocore, followed live, with what we could check.</p>
   </section>
 
-  {SAMPLE && (
-    <p class="mt-3 flex items-start gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-secondary">
-      <Info size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />
-      <span>Sample data: a copy of our capture from {dateTimeUtc(CAPTURED_AT)}. This page does not update yet.</span>
-    </p>
-  )}
+  <p class="mt-3 flex items-start gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-secondary">
+    <Info size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />
+    {SAMPLE
+      ? <span>Sample data: a copy of our capture from {dateTimeUtc(CAPTURED_AT)}. This page does not update yet.</span>
+      : <span>From our capture of {dateTimeUtc(CAPTURED_AT)}. This page is rebuilt about once an hour.</span>}
+  </p>
 
   <div class="mt-4 flex items-start gap-3 rounded-lg border border-border-strong px-4 py-3.5">
     <Radar size={20} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />

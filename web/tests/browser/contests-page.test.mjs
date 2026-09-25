@@ -2,13 +2,16 @@
 // with "Find my DID" (a ranked key, a key with no trade, a malformed key) and the checks. Set SHOT_DIR
 // to also save a PNG of each page.
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 
 import { DIST, navigate, page, send, skip, start, stop, until } from "./harness.mjs";
 
-const ranking = JSON.parse(readFileSync(join(DIST, "contests", "close-1", "ranking.json"), "utf8"));
+// live when the witness published data/contests/, sample otherwise: the pages must work in both
+const LIVE = existsSync(join(DIST, "data", "contests", "index.json"));
+const ranking = JSON.parse(readFileSync(LIVE ? join(DIST, "data", "contests", "close-1.ranking.json")
+  : join(DIST, "contests", "close-1", "ranking.json"), "utf8"));
 const NOBODY = "did:key:z6Mkfw79DoBMgePecy4YaXSSimwzHKYz8sB3JB9X7bKSXMkG";
 
 async function shot(name, width = 1440) {
@@ -37,7 +40,8 @@ test("the list shows each contest with its status and opens it", { skip }, async
   assert.equal(await page(`document.querySelector("h1").textContent`), "Contests");
   const cards = await page(`[...document.querySelectorAll("article h3")].map((h) => h.textContent)`);
   assert.deepEqual(cards, ["Close Call · NVDA", "Sonnet Challenge"]);
-  assert.match(await page(`document.body.textContent`), /Sample data/);
+  if (LIVE) assert.doesNotMatch(await page(`document.body.textContent`), /Sample data/);
+  else assert.match(await page(`document.body.textContent`), /Sample data/);
   assert.equal(await page(`document.querySelector('a[aria-current="page"]').textContent.trim().startsWith("Contests")`), true);
   await shot("contests-list");
   await shot("contests-list-mobile", 390);
@@ -54,11 +58,12 @@ test("a live contest shows time left, players, price, prize and the top 3", { sk
 
 test("Find my DID gives the rank and its source, or says there is no trade, or refuses a malformed key", { skip }, async () => {
   await navigate("/contests/close-1/leaderboard/");
-  const [rank, did, pnl] = ranking.rows[0];
+  const [rank, did, pnl, source] = ranking.rows[0];
   const found = await find(did);
   assert.match(found, new RegExp(`#${rank}`));
   assert.match(found, new RegExp(pnl.replace(".", "\\.")));
-  assert.match(found, /Signed by the referee/);  // the first row is in the matched signed top list
+  const label = { official: /Signed by the referee/, complete: /Our count/, partial: /may be incomplete/ }[source];
+  assert.match(found, label);
   await shot("contest-leaderboard");
   assert.match(await find(NOBODY), /Not found in the inspected data/);
   assert.match(await find("did:key:nope"), /not a did:key/);

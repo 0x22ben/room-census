@@ -17,6 +17,7 @@ let out;
 beforeEach(() => {
   repo = mkdtempSync(join(tmpdir(), "stage-"));
   for (const name of ["data", "identity.json", "llms.txt"]) cpSync(join(REPO, name), join(repo, name), { recursive: true });
+  rmSync(join(repo, "data", "contests"), { recursive: true, force: true });  // optional: each test adds its own
   // private files a real checkout of the census holds beside the public ones
   writeFileSync(join(repo, "census.jsonl"), "private archive\n");
   writeFileSync(join(repo, ".env"), "SECRET=1\n");
@@ -159,4 +160,47 @@ test("only web/.public can be staged into, so nothing else is ever deleted", () 
     assert.throws(() => stage({ repo, out: other }), /must be web\/\.public/);
   }
   assert.ok(existsSync(join(repo, "data", "latest.json")));
+});
+
+// data/contests/ is optional: the contest witness adds it once a contest runs
+const contests = (index, rankings = {}) => {
+  mkdirSync(join(repo, "data", "contests"));
+  writeFileSync(join(repo, "data", "contests", "index.json"), JSON.stringify(index));
+  for (const [id, doc] of Object.entries(rankings)) writeFileSync(join(repo, "data", "contests", `${id}.ranking.json`), JSON.stringify(doc));
+};
+const INDEX = { schema: "room-census-contests/1", contests: [{ id: "close-1", rules: "https://github.com/flop-labs/x", ranking: { file: "/data/contests/close-1.ranking.json" } }] };
+const RANKING = { schema: "room-census/contest-ranking/1", contest: "close-1", rows: [] };
+
+test("contest data is staged when present and optional when absent", () => {
+  assert.ok(!stage({ repo, out }).files.some((f) => f.path.startsWith("data/contests/")));
+  contests(INDEX, { "close-1": RANKING });
+  const paths = stage({ repo, out }).files.map((f) => f.path);
+  assert.ok(paths.includes("data/contests/index.json") && paths.includes("data/contests/close-1.ranking.json"));
+});
+
+test("a contest ranking named by the index must exist and be its document", () => {
+  contests(INDEX);
+  refused(/ranking of close-1 does not resolve/);
+});
+
+test("a contest file named by no contest is refused", () => {
+  contests({ ...INDEX, contests: [{ id: "close-1", rules: "https://github.com/flop-labs/x" }] }, { "close-1": RANKING });
+  refused(/contest file named by no contest/);
+});
+
+test("an unexpected file or a bad document in data/contests/ is refused", () => {
+  contests(INDEX, { "close-1": { ...RANKING, contest: "other" } });
+  refused(/is not the room-census\/contest-ranking\/1 document of close-1/);
+  writeFileSync(join(repo, "data", "contests", "notes.txt"), "x");
+  refused(/unexpected entry in data\/contests\/: notes\.txt/);
+});
+
+test("a contest rules link that is not https is refused", () => {
+  contests({ ...INDEX, contests: [{ ...INDEX.contests[0], rules: "javascript:alert(1)" }] }, { "close-1": RANKING });
+  refused(/rules link of close-1 is not an https URL/);
+});
+
+test("an unsafe contest id is refused", () => {
+  contests({ schema: "room-census-contests/1", contests: [{ id: "../x" }] });
+  refused(/unsafe or duplicate contest id/);
 });

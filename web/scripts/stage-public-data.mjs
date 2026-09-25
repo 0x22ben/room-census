@@ -10,13 +10,17 @@ import { fileURLToPath } from "node:url";
 export const REQUIRED = ["data/latest.json", "data/history.csv", "data/card.png", "data/LICENSE",
   "data/rooms/index.json", "identity.json", "llms.txt"];
 // every entry allowed directly under data/, and the file names allowed in each data directory
-const DATA_ENTRIES = new Set(["latest.json", "history.csv", "card.png", "LICENSE", "snapshots", "manifests", "rooms"]);
+const DATA_ENTRIES = new Set(["latest.json", "history.csv", "card.png", "LICENSE", "snapshots", "manifests", "rooms", "contests"]);
 const SLUG = /^[a-z0-9][a-z0-9_-]{0,47}$/;
 const RESERVED = new Set(["con", "prn", "aux", "nul", ...[1, 2, 3, 4, 5, 6, 7, 8, 9].flatMap((i) => [`com${i}`, `lpt${i}`])]);
 export const DIRECTORIES = {
   "data/snapshots": (name) => /^\d{4}-\d{2}-\d{2}T\d{4}Z\.json$/.test(name),
   "data/manifests": (name) => /^[0-9a-f]{64}\.json$/.test(name),
   "data/rooms": (name) => name === "index.json" || (name.endsWith(".json") && validSlug(name.slice(0, -5))),
+};
+// directories that may be absent: the contest witness publishes data/contests/ only once a contest runs
+export const OPTIONAL_DIRECTORIES = {
+  "data/contests": (name) => name === "index.json" || (name.endsWith(".ranking.json") && validSlug(name.slice(0, -13))),
 };
 const SNAPSHOT = /^data\/snapshots\/\d{4}-\d{2}-\d{2}T\d{4}Z\.json$/;
 
@@ -62,7 +66,15 @@ export function allowlist(repo) {
   for (const entry of readdirSync(directory(repo, "data"))) {
     if (!DATA_ENTRIES.has(entry)) fail(`unexpected entry in data/: ${entry}`);
   }
-  for (const [dir, allowed] of Object.entries(DIRECTORIES)) {
+  const present = Object.entries(OPTIONAL_DIRECTORIES).filter(([dir]) => {
+    try {
+      lstatSync(join(repo, ...dir.split("/")));
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  for (const [dir, allowed] of [...Object.entries(DIRECTORIES), ...present]) {
     for (const entry of readdirSync(directory(repo, dir), { withFileTypes: true })) {
       const rel = `${dir}/${entry.name}`;
       if (!entry.isFile() || !allowed(entry.name)) fail(`unexpected entry in ${dir}/: ${entry.name}`);
@@ -141,7 +153,34 @@ export function checkConsistency(bytes) {
   for (const rel of bytes.keys()) {
     if (rel.startsWith("data/snapshots/") && !vouched.has(rel)) fail(`snapshot named by no document: ${rel}`);
   }
+  checkContests(bytes, json);
   return { census: latest.census, rooms: listed.size };
+}
+
+/** data/contests/: an index of the followed contests, and one ranking file per contest that names one. */
+function checkContests(bytes, json) {
+  const files = [...bytes.keys()].filter((r) => r.startsWith("data/contests/"));
+  if (files.length === 0) return;
+  if (!bytes.has("data/contests/index.json")) fail("data/contests/ has files but no index.json");
+  const index = json("data/contests/index.json");
+  if (index.schema !== "room-census-contests/1" || !Array.isArray(index.contests)) fail("data/contests/index.json is not a room-census-contests/1 document");
+  const named = new Set(["data/contests/index.json"]);
+  const ids = new Set();
+  for (const c of index.contests) {
+    if (!validSlug(c?.id) || ids.has(c.id)) fail(`unsafe or duplicate contest id: ${JSON.stringify(c?.id)}`);
+    ids.add(c.id);
+    if (typeof c.rules !== "string" || !c.rules.startsWith("https://")) fail(`rules link of ${c.id} is not an https URL`);
+    if (c.ranking) {
+      const rel = `data/contests/${c.id}.ranking.json`;
+      if (c.ranking.file !== `/${rel}` || !bytes.has(rel)) fail(`ranking of ${c.id} does not resolve: ${c.ranking.file}`);
+      const doc = json(rel);
+      if (doc.schema !== "room-census/contest-ranking/1" || doc.contest !== c.id || !Array.isArray(doc.rows)) {
+        fail(`${rel} is not the room-census/contest-ranking/1 document of ${c.id}`);
+      }
+      named.add(rel);
+    }
+  }
+  for (const rel of files) if (!named.has(rel)) fail(`contest file named by no contest: ${rel}`);
 }
 
 /** Rebuilds `out` from the allowlist of `repo`. Returns the inventory of staged files. */
