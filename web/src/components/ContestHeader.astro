@@ -23,7 +23,7 @@ const { contest: c, current } = Astro.props;
   <Info size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />
   {SAMPLE
     ? <span>Sample data: a copy of our capture from {dateTimeUtc(CAPTURED_AT)}. This page does not update yet.</span>
-    : <span>From our capture of {dateTimeUtc(CAPTURED_AT)}. This page is rebuilt about once an hour.</span>}
+    : <span>From our capture of {dateTimeUtc(CAPTURED_AT)}. This page is rebuilt about every 15 minutes.</span>}
 </p>
 <nav aria-label="Contest sections" class="mt-4 border-b border-border">
   <ul class="flex gap-1 overflow-x-auto">
