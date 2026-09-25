@@ -2,12 +2,15 @@
 // The navigation of the sidebar, also used by the mobile menu. Only pages that exist are listed.
 import NavIcon from "./NavIcon.astro";
 import { NAV_FOOTER, isActive, readySections } from "../lib/site";
+import { SAMPLE, contests } from "../lib/contests";
 
 interface Props { label: string }
 const pathname = Astro.url.pathname;
 const sections = readySections();
 const footer = NAV_FOOTER.filter((i) => i.ready);
 const item = "flex h-11 items-center gap-3 rounded-md px-3 text-base transition-colors duration-150";
+// "Live" beside Contests only when the site shows the witness's real data and a contest is running
+const live = !SAMPLE && contests().some((c) => c.status === "live");
 ---
 <nav aria-label={Astro.props.label} class="flex flex-1 flex-col">
   {sections.map((section) => (
@@ -21,6 +24,7 @@ const item = "flex h-11 items-center gap-3 rounded-md px-3 text-base transition-
               <a href={i.href} aria-current={on ? "page" : undefined}
                 class:list={[item, on ? "bg-surface-raised font-semibold text-text" : "font-medium text-text-secondary hover:bg-surface hover:text-text"]}>
                 <NavIcon name={i.icon} /><span>{i.label}</span>
+                {live && i.href === "/contests/" && <span data-nav-badge aria-hidden="true" class="ml-auto rounded border border-accent-border bg-accent-soft px-1.5 font-mono text-[10px] font-bold tracking-widest text-accent uppercase">Live</span>}
               </a>
             </li>
           );

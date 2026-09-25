@@ -229,6 +229,7 @@ class Artifact(unittest.TestCase):
         """(href, visible text, current) of every link of the navigation landmark named `label`."""
         nav = re.search(rf'<nav aria-label="{label}".*?</nav>', text, re.S).group(0)
         out = []
+        nav = re.sub(r"<span data-nav-badge[^>]*>.*?</span>", "", nav, flags=re.S)  # the "Live" tag is decoration
         for attrs, inner in re.findall(r"<a([^>]*)>(.*?)</a>", nav, re.S):
             href = re.search(r'href="([^"]*)"', attrs).group(1)
             out.append((href, re.sub(r"<[^>]+>", "", inner).strip(), 'aria-current="page"' in attrs))
