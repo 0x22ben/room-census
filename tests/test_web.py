@@ -241,7 +241,7 @@ class Artifact(unittest.TestCase):
             for label in ("Primary", "Menu"):
                 links = self.nav_links(text, label)
                 with self.subTest(page=route, nav=label):
-                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "My DID", "Write", "Look up a DID",
+                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "Contests", "My DID", "Write", "Look up a DID",
                                                                 "Verify", "Data", "Method", "Source code"])
                     for href, _, _ in links:
                         if href.startswith("/"):
@@ -249,7 +249,7 @@ class Artifact(unittest.TestCase):
                     current = [h for h, _, on in links if on]
                     own = ("/watched/", "/did/", "/write/", "/look-up/", "/verify/", "/open-data/", "/method/")
                     expected = (["/"] if route == "/" else ["/rooms/"] if route.startswith("/rooms/")
-                                else [route] if route in own else [])
+                                else ["/contests/"] if route.startswith("/contests/") else [route] if route in own else [])
                     self.assertEqual(current, expected)
         for page in ("did", "write", "look-up", "verify", "open-data", "method"):
             self.assertTrue((DIST / page / "index.html").is_file())
@@ -282,7 +282,7 @@ class Artifact(unittest.TestCase):
                 for attrs in scripts:
                     self.assertRegex(attrs, r'type="module" src="/_astro/[\w.-]+\.js"')
                 needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched ", "data-did-form ",
-                                                       "data-verify-summary ", "data-write ", "data-wizard "))
+                                                       "data-verify-summary ", "data-write ", "data-wizard ", "data-find-did "))
                 self.assertEqual(len(scripts), needed)
 
     def test_the_built_site_meets_the_legacy_route_contract(self):
@@ -493,8 +493,10 @@ class Artifact(unittest.TestCase):
         self.assertIn("Older messages, other rooms and private rooms are not inspected", visible)
         # it never claims a full history, and it keeps "not found" apart from "no activity"
         script = next(DIST.glob("_astro/look-up.astro*.js")).read_text(encoding="utf-8")
+        # the navigation names the Contests section on every page; the lookup itself claims nothing about contests
+        own = re.sub(r"<nav\b.*?</nav>", " ", text, flags=re.S)
         for claim in ("Total messages", "First seen", "Rooms visited", "Contest"):
-            self.assertNotIn(claim, script + text)
+            self.assertNotIn(claim, script + own)
         for phrase in ("Recent activity found in measured rooms", "Not found in the inspected data",
                        "This does not mean the DID has no activity"):
             self.assertIn(phrase, script)
@@ -699,7 +701,9 @@ class Artifact(unittest.TestCase):
             with self.subTest(file=rel):
                 self.assertFalse(rel.endswith(".map"), "source map")
                 ok = (rel.endswith(".html") or re.fullmatch(r"_astro/[\w.-]+\.(css|js|woff2?)", rel)
-                      or rel in contract.REQUIRED_FILES or rel.startswith("data/"))
+                      or rel in contract.REQUIRED_FILES or rel.startswith("data/")
+                      # the full ranking of our recount of a contest, for "Find my DID" (PRODUCT_DIRECTION, Ben 2026-09-25)
+                      or re.fullmatch(r"contests/[a-z0-9][a-z0-9_-]{0,47}/ranking\.json", rel))
                 self.assertTrue(ok, "not a page, a built asset or public data")
         text = "".join(f.read_text(encoding="utf-8", errors="replace") for f in DIST.rglob("*") if f.suffix in (".html", ".css", ".js"))
         for leak in ("C:\\", "Users\\", "node_modules", "file://"):

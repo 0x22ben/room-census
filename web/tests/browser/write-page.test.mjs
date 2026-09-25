@@ -430,7 +430,8 @@ test("an unclear answer is never called published and is never resent", { skip }
 test("Write is reachable from the navigation, under My DID, and stays closed inside a frame", { skip }, async () => {
   await open();
   const nav = await page(`[...document.querySelectorAll('nav[aria-label=Primary] a')].map(a => a.textContent.trim())`);
-  assert.deepEqual(nav.slice(3, 5), ["My DID", "Write"]);
+  const mine = nav.indexOf("My DID");  // by name: other sections may add items before it
+  assert.deepEqual(nav.slice(mine, mine + 2), ["My DID", "Write"]);
   assert.equal(await page(`document.querySelector('nav[aria-label=Primary] a[href="/write/"]').getAttribute("aria-current")`), "page");
   const state = await page(`(async () => {
     const f = document.createElement("iframe");

@@ -1,0 +1,96 @@
+---
+// A contest at a glance: time left, players, price, prize, players over time and the current top 3.
+import Base from "../../../layouts/Base.astro";
+import ContestHeader from "../../../components/ContestHeader.astro";
+import Help from "../../../components/Help.astro";
+import LineChart from "../../../components/LineChart.astro";
+import ShieldCheck from "@lucide/astro/icons/shield-check";
+import ShieldAlert from "@lucide/astro/icons/shield-alert";
+import { contests, left, passes, shortDid, signed, tally, CAPTURED_AT, SAMPLE, type Contest } from "../../../lib/contests";
+import { dateTimeUtc, dateUtc } from "../../../lib/format";
+
+export function getStaticPaths() {
+  return contests().map((c) => ({ params: { id: c.id }, props: { contest: c } }));
+}
+interface Props { contest: Contest }
+const { contest: c } = Astro.props;
+const t = tally(c.checks);
+const clean = t.warn === 0 && t.wait === 0;
+const kpi = "grid gap-1 rounded-lg border border-border bg-surface p-4";
+const top3 = c.leaderboard?.rows.slice(0, 3) ?? [];
+const hhmm = (iso: string) => iso.slice(11, 16);
+---
+<Base title={c.title} description={`${c.title}: ${c.summary} Followed live by Room Census.`}>
+  <ContestHeader contest={c} current="Overview" />
+
+  <p role="status" class:list={["mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md border px-4 py-2.5 text-sm",
+    clean ? "border-accent-border bg-accent-soft" : "border-warning-border bg-warning-soft"]}>
+    <span class="flex items-center gap-2 font-semibold">
+      {clean ? <ShieldCheck size={18} aria-hidden="true" class="text-accent" /> : <ShieldAlert size={18} aria-hidden="true" class="text-warning" />}
+      {c.status === "live" ? "Live · " : ""}{clean ? "everything we checked is correct" : `${passes(t.ok)}, ${t.warn + t.wait} to read`}
+      <a href={`/contests/${c.id}/verify/`} class="font-semibold text-link">See the checks</a>
+    </span>
+    <span class="text-text-secondary">{c.status === "live" ? `${SAMPLE ? "" : `${left(c.end, CAPTURED_AT)} · `}ends ${dateTimeUtc(c.end)}` : `Ended ${dateUtc(c.end)}`}</span>
+  </p>
+
+  {c.latest && (
+    <div class="mt-4 grid gap-4 sm:grid-cols-3">
+      <div class={kpi}>
+        <p class="text-sm text-text-secondary">Players</p>
+        <p class="font-mono text-3xl tabular-nums">{c.latest.owners.toLocaleString("en-US")}</p>
+        <p class="text-sm text-text-muted">registered since {dateTimeUtc(c.opening)}</p>
+      </div>
+      <div class={kpi}>
+        <p class="flex items-center gap-1.5 text-sm text-text-secondary">NVDA price used
+          <Help term="NVDA price used" text="The referee prices every update with the last NVDA trade on Hyperliquid. When it cannot read a newer trade, the last price stands." /></p>
+        <p class="font-mono text-3xl tabular-nums">${c.latest.price}</p>
+        <p class="text-sm text-text-muted">market trade of {hhmm(c.latest.price_time)} UTC</p>
+      </div>
+      <div class={kpi}>
+        <p class="text-sm text-text-secondary">Prize</p>
+        <p class="font-mono text-3xl tabular-nums">{c.prize.replace(" FLOP", "")}</p>
+        <p class="text-sm text-text-muted">FLOP, {c.prize_note}</p>
+      </div>
+    </div>
+  )}
+
+  {!c.latest && (
+    <div class="mt-4 grid gap-4 sm:grid-cols-3">
+      <div class={kpi}><p class="text-sm text-text-secondary">Winner</p><p class="text-xl">{c.winner}</p><p class="text-sm text-text-muted">{c.winner_source}</p></div>
+      <div class={kpi}><p class="text-sm text-text-secondary">Prize</p><p class="text-xl">{c.prize}</p></div>
+      <div class={kpi}><p class="text-sm text-text-secondary">Rules</p><a href={c.rules} class="text-link">Rules on GitHub</a></div>
+    </div>
+  )}
+
+  {c.series && c.leaderboard && (
+    <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_26rem]">
+      <section aria-labelledby="players-title" class="grid min-w-0 content-start gap-3 rounded-lg border border-border bg-surface p-5">
+        <h2 id="players-title" class="font-semibold">Players over time</h2>
+        <LineChart
+          labels={c.series.map((s) => hhmm(s.at))}
+          min={0}
+          series={[{ label: "Players", token: "--color-accent", values: c.series.map((s) => s.owners) }]}
+          summary={`Registered players at each referee update, from ${c.series[0].owners} to ${c.latest!.owners}.`}
+          caption="Registered players at each referee update (UTC)."
+          point="update"
+        />
+      </section>
+      <section aria-labelledby="top3-title" class="grid content-start gap-3 rounded-lg border border-border bg-surface p-5">
+        <div class="flex items-center justify-between">
+          <h2 id="top3-title" class="font-semibold">Top 3 at update {c.leaderboard.sweep}</h2>
+          <a href={`/contests/${c.id}/leaderboard/`} class="inline-flex min-h-11 items-center text-sm text-link">See all</a>
+        </div>
+        <ol class="grid">
+          {top3.map((r) => (
+            <li class="flex items-center gap-3 border-t border-border py-2.5">
+              <span class="w-5 font-mono font-bold">{r.rank}</span>
+              <span class="min-w-0 flex-1 truncate font-mono text-sm">{shortDid(r.did)}</span>
+              <span class="font-mono text-sm text-accent tabular-nums">{signed(r.pnl)} POLF</span>
+            </li>
+          ))}
+        </ol>
+        <p class="text-xs text-text-muted">Official ranking from the referee, update {c.leaderboard.sweep}. We check each line.</p>
+      </section>
+    </div>
+  )}
+</Base>

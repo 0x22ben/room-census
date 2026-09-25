@@ -1,0 +1,55 @@
+---
+// What we could check about a contest, in plain words. Each line is a check we ran on the signed
+// records we saved; a warning is something a player should know, never a guess.
+import Base from "../../../layouts/Base.astro";
+import ContestHeader from "../../../components/ContestHeader.astro";
+import Help from "../../../components/Help.astro";
+import ArrowUpRight from "@lucide/astro/icons/arrow-up-right";
+import Check from "@lucide/astro/icons/check";
+import Hourglass from "@lucide/astro/icons/hourglass";
+import ShieldCheck from "@lucide/astro/icons/shield-check";
+import ShieldAlert from "@lucide/astro/icons/shield-alert";
+import TriangleAlert from "@lucide/astro/icons/triangle-alert";
+import { contests, passes, tally, type Contest } from "../../../lib/contests";
+
+export function getStaticPaths() {
+  return contests().map((c) => ({ params: { id: c.id }, props: { contest: c } }));
+}
+interface Props { contest: Contest }
+const { contest: c } = Astro.props;
+const t = tally(c.checks);
+const clean = t.warn === 0 && t.wait === 0;
+const parts = [passes(t.ok), t.warn ? `${t.warn} to know` : "", t.wait ? `${t.wait} not possible yet` : ""].filter(Boolean).join(" · ");
+const button = "inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 text-sm font-semibold text-text no-underline";
+---
+<Base title={`${c.short}: verify`} description={`What Room Census could check about ${c.title}, from the signed records it saved.`}>
+  <ContestHeader contest={c} current="Verify" />
+
+  <p role="status" class:list={["mt-4 flex items-center gap-2 rounded-md border px-4 py-2.5 text-sm font-semibold",
+    clean ? "border-accent-border bg-accent-soft" : "border-warning-border bg-warning-soft"]}>
+    {clean ? <ShieldCheck size={18} aria-hidden="true" class="text-accent" /> : <ShieldAlert size={18} aria-hidden="true" class="text-warning" />}{parts}
+  </p>
+
+  <ul class="mt-4 overflow-hidden rounded-lg border border-border bg-surface">
+    {c.checks.map((k, i) => (
+      <li class="flex items-start gap-4 border-t border-border px-5 py-4 first:border-t-0">
+        <span class:list={["mt-0.5 grid size-8 shrink-0 place-items-center rounded-full",
+          k.state === "ok" ? "bg-accent text-on-accent" : k.state === "warn" ? "bg-warning-soft text-warning" : "bg-surface-raised text-text-secondary"]}>
+          {k.state === "ok" && <Check size={16} aria-hidden="true" />}
+          {k.state === "warn" && <TriangleAlert size={16} aria-hidden="true" />}
+          {k.state === "wait" && <Hourglass size={16} aria-hidden="true" />}
+          <span class="sr-only">{k.state === "ok" ? "Passes" : k.state === "warn" ? "Warning" : "Not possible yet"}</span>
+        </span>
+        <div class="grid gap-1">
+          <h2 class="flex items-center gap-2 font-semibold">{k.title}<Help term={k.title} id={`help-check-${i}`} text={k.help} /></h2>
+          <p class="text-sm text-text-secondary">{k.text}</p>
+        </div>
+      </li>
+    ))}
+  </ul>
+
+  <div class="mt-4 flex flex-wrap gap-2">
+    <a href={c.rules} class={button}>Rules on GitHub <ArrowUpRight size={16} aria-hidden="true" class="text-text-secondary" /></a>
+    <a href="/method/" class={button}>How we check</a>
+  </div>
+</Base>
