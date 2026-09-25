@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import { copyFileSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ContestContractError, checkContests as checkContestContract } from "./contests-contract.mjs";
 
 export const REQUIRED = ["data/latest.json", "data/history.csv", "data/card.png", "data/LICENSE",
   "data/rooms/index.json", "identity.json", "llms.txt"];
@@ -157,30 +158,15 @@ export function checkConsistency(bytes) {
   return { census: latest.census, rooms: listed.size };
 }
 
-/** data/contests/: an index of the followed contests, and one ranking file per contest that names one. */
+/** data/contests/: the full contest contract (scripts/contests-contract.mjs), as a staging failure. */
 function checkContests(bytes, json) {
   const files = [...bytes.keys()].filter((r) => r.startsWith("data/contests/"));
-  if (files.length === 0) return;
-  if (!bytes.has("data/contests/index.json")) fail("data/contests/ has files but no index.json");
-  const index = json("data/contests/index.json");
-  if (index.schema !== "room-census-contests/1" || !Array.isArray(index.contests)) fail("data/contests/index.json is not a room-census-contests/1 document");
-  const named = new Set(["data/contests/index.json"]);
-  const ids = new Set();
-  for (const c of index.contests) {
-    if (!validSlug(c?.id) || ids.has(c.id)) fail(`unsafe or duplicate contest id: ${JSON.stringify(c?.id)}`);
-    ids.add(c.id);
-    if (typeof c.rules !== "string" || !c.rules.startsWith("https://")) fail(`rules link of ${c.id} is not an https URL`);
-    if (c.ranking) {
-      const rel = `data/contests/${c.id}.ranking.json`;
-      if (c.ranking.file !== `/${rel}` || !bytes.has(rel)) fail(`ranking of ${c.id} does not resolve: ${c.ranking.file}`);
-      const doc = json(rel);
-      if (doc.schema !== "room-census/contest-ranking/1" || doc.contest !== c.id || !Array.isArray(doc.rows)) {
-        fail(`${rel} is not the room-census/contest-ranking/1 document of ${c.id}`);
-      }
-      named.add(rel);
-    }
+  try {
+    checkContestContract(files, json);
+  } catch (e) {
+    if (e instanceof ContestContractError) fail(e.message);
+    throw e;
   }
-  for (const rel of files) if (!named.has(rel)) fail(`contest file named by no contest: ${rel}`);
 }
 
 /** Rebuilds `out` from the allowlist of `repo`. Returns the inventory of staged files. */

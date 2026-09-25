@@ -1,13 +1,13 @@
 ---
-// A contest at a glance: time left, players, price, prize, players over time and the current top 3.
+// A contest at a glance: where it stands in time, players, price, prize, players over time and the top 3.
 import Base from "../../../layouts/Base.astro";
 import ContestHeader from "../../../components/ContestHeader.astro";
 import Help from "../../../components/Help.astro";
 import LineChart from "../../../components/LineChart.astro";
 import ShieldCheck from "@lucide/astro/icons/shield-check";
 import ShieldAlert from "@lucide/astro/icons/shield-alert";
-import { contests, left, passes, shortDid, signed, tally, CAPTURED_AT, SAMPLE, type Contest } from "../../../lib/contests";
-import { dateTimeUtc, dateUtc } from "../../../lib/format";
+import { contests, passes, phaseLabel, phaseOf, shortDid, signed, tally, timeLine, type Contest } from "../../../lib/contests";
+import { dateTimeUtc } from "../../../lib/format";
 
 export function getStaticPaths() {
   return contests().map((c) => ({ params: { id: c.id }, props: { contest: c } }));
@@ -27,10 +27,10 @@ const hhmm = (iso: string) => iso.slice(11, 16);
     clean ? "border-accent-border bg-accent-soft" : "border-warning-border bg-warning-soft"]}>
     <span class="flex items-center gap-2 font-semibold">
       {clean ? <ShieldCheck size={18} aria-hidden="true" class="text-accent" /> : <ShieldAlert size={18} aria-hidden="true" class="text-warning" />}
-      {c.status === "live" ? "Live · " : ""}{clean ? "everything we checked is correct" : `${passes(t.ok)}, ${t.warn + t.wait} to read`}
+      {phaseLabel(phaseOf(c))} · {clean ? "everything we checked is correct" : `${passes(t.ok)}, ${t.warn + t.wait} to read`}
       <a href={`/contests/${c.id}/verify/`} class="font-semibold text-link">See the checks</a>
     </span>
-    <span class="text-text-secondary">{c.status === "live" ? `${SAMPLE ? "" : `${left(c.end, CAPTURED_AT)} · `}ends ${dateTimeUtc(c.end)}` : `Ended ${dateUtc(c.end)}`}</span>
+    <span class="text-text-secondary">{timeLine(c)}</span>
   </p>
 
   {c.latest && (
@@ -89,7 +89,7 @@ const hhmm = (iso: string) => iso.slice(11, 16);
             </li>
           ))}
         </ol>
-        <p class="text-xs text-text-muted">Official ranking from the referee, update {c.leaderboard.sweep}. We check each line.</p>
+        <p class="text-xs text-text-muted">{phaseOf(c) === "ended" ? "Final" : "Provisional"} ranking signed by the referee, update {c.leaderboard.sweep}. We check each line.</p>
       </section>
     </div>
   )}

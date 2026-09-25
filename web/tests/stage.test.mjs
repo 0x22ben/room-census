@@ -8,6 +8,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { StagingError, stage } from "../scripts/stage-public-data.mjs";
+import { validIndex, validRanking } from "./fixtures/contests-valid.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -162,45 +163,35 @@ test("only web/.public can be staged into, so nothing else is ever deleted", () 
   assert.ok(existsSync(join(repo, "data", "latest.json")));
 });
 
-// data/contests/ is optional: the contest witness adds it once a contest runs
+// data/contests/ is optional: the contest witness adds it once a contest runs. The full contract has its
+// own mutation tests (contests-contract.test.mjs); here, staging refuses what the contract refuses.
 const contests = (index, rankings = {}) => {
   mkdirSync(join(repo, "data", "contests"));
   writeFileSync(join(repo, "data", "contests", "index.json"), JSON.stringify(index));
   for (const [id, doc] of Object.entries(rankings)) writeFileSync(join(repo, "data", "contests", `${id}.ranking.json`), JSON.stringify(doc));
 };
-const INDEX = { schema: "room-census-contests/1", contests: [{ id: "close-1", rules: "https://github.com/flop-labs/x", ranking: { file: "/data/contests/close-1.ranking.json" } }] };
-const RANKING = { schema: "room-census/contest-ranking/1", contest: "close-1", rows: [] };
 
 test("contest data is staged when present and optional when absent", () => {
   assert.ok(!stage({ repo, out }).files.some((f) => f.path.startsWith("data/contests/")));
-  contests(INDEX, { "close-1": RANKING });
+  contests(validIndex(), { "close-1": validRanking() });
   const paths = stage({ repo, out }).files.map((f) => f.path);
   assert.ok(paths.includes("data/contests/index.json") && paths.includes("data/contests/close-1.ranking.json"));
 });
 
-test("a contest ranking named by the index must exist and be its document", () => {
-  contests(INDEX);
+test("staging refuses contest data the contract refuses", () => {
+  contests(validIndex());
   refused(/ranking of close-1 does not resolve/);
 });
 
-test("a contest file named by no contest is refused", () => {
-  contests({ ...INDEX, contests: [{ id: "close-1", rules: "https://github.com/flop-labs/x" }] }, { "close-1": RANKING });
-  refused(/contest file named by no contest/);
+test("a contest status that its own times contradict stops the build", () => {
+  const index = validIndex();
+  index.contests[0].status = "ended";
+  contests(index, { "close-1": validRanking() });
+  refused(/status ended does not match/);
 });
 
-test("an unexpected file or a bad document in data/contests/ is refused", () => {
-  contests(INDEX, { "close-1": { ...RANKING, contest: "other" } });
-  refused(/is not the room-census\/contest-ranking\/1 document of close-1/);
+test("an unexpected file in data/contests/ is refused", () => {
+  contests(validIndex(), { "close-1": validRanking() });
   writeFileSync(join(repo, "data", "contests", "notes.txt"), "x");
   refused(/unexpected entry in data\/contests\/: notes\.txt/);
-});
-
-test("a contest rules link that is not https is refused", () => {
-  contests({ ...INDEX, contests: [{ ...INDEX.contests[0], rules: "javascript:alert(1)" }] }, { "close-1": RANKING });
-  refused(/rules link of close-1 is not an https URL/);
-});
-
-test("an unsafe contest id is refused", () => {
-  contests({ schema: "room-census-contests/1", contests: [{ id: "../x" }] });
-  refused(/unsafe or duplicate contest id/);
 });

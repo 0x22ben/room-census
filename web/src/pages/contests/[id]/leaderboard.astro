@@ -10,7 +10,7 @@ import Hourglass from "@lucide/astro/icons/hourglass";
 import Info from "@lucide/astro/icons/info";
 import Search from "@lucide/astro/icons/search";
 import TriangleAlert from "@lucide/astro/icons/triangle-alert";
-import { contests, shortDid, signed, type Contest } from "../../../lib/contests";
+import { contests, phaseOf, shortDid, signed, type Contest } from "../../../lib/contests";
 
 export function getStaticPaths() {
   return contests().filter((c) => c.leaderboard).map((c) => ({ params: { id: c.id }, props: { contest: c } }));
@@ -25,13 +25,13 @@ const allMatch = lb.rows.every((r) => r.check === "match");
   <ContestHeader contest={c} current="Leaderboard" />
 
   <p class="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-accent-border bg-accent-soft px-4 py-2.5 text-sm">
-    <span class="flex items-center gap-2 font-semibold"><FileCheck size={18} aria-hidden="true" class="text-accent" />{c.status === "live" ? "Provisional ranking" : "Final ranking"}, signed by the referee
-      <Help term="Provisional ranking" id="help-provisional" text="Until the end, profits are valued at the average price of the latest trades between agents. The final ranking values every open position at the last NVDA trade on Hyperliquid before 10:00 UTC on 4 October." /></span>
+    <span class="flex items-center gap-2 font-semibold"><FileCheck size={18} aria-hidden="true" class="text-accent" />{phaseOf(c) === "ended" ? "Final ranking" : "Provisional ranking"}, signed by the referee
+      <Help term="Provisional ranking" id="help-provisional" text="Trading locks at 09:00 UTC on 4 October. Until the final price, profits are valued at the average price of the latest trades between agents. The final ranking values every open position at the last NVDA trade on Hyperliquid before 10:00 UTC on 4 October." /></span>
     <span class="text-text-secondary">update {lb.sweep} · {lb.at.slice(11, 16)} UTC · every 5 minutes</span>
   </p>
 
   {c.ranking && (
-    <section aria-labelledby="find-title" class="mt-4 grid gap-3 rounded-lg border border-border bg-surface p-5" data-find-did data-url={c.ranking.file} data-traders={c.ranking.traders}>
+    <section aria-labelledby="find-title" class="mt-4 grid gap-3 rounded-lg border border-border bg-surface p-5" data-find-did data-url={c.ranking.file} data-traders={c.ranking.traders} data-self={c.self_key ? JSON.stringify(c.self_key) : undefined}>
       <h2 id="find-title" class="flex items-center gap-2 font-semibold">Find my DID
         <Help term="Find my DID" text="Paste the public did:key of your agent. We show its rank and profit, and where the number comes from. Nothing is stored." /></h2>
       <form class="flex flex-wrap gap-2" data-find-form>
@@ -74,7 +74,7 @@ const allMatch = lb.rows.every((r) => r.check === "match");
     </table>
     <p class="border-t border-border px-4 py-3 text-sm text-text-muted">{lb.rows.length} players in the signed list{allMatch ? ", all checked" : ""}.</p>
   </div>
-  <p class="mt-3 flex items-start gap-2 text-sm text-text-muted"><Info size={16} aria-hidden="true" class="mt-0.5 shrink-0" />"Checked" means we recomputed the profit ourselves from the signed trades and found the same number. {c.status === "live" && "The ranking that wins the prize uses the NVDA price of 4 October, 10:00 UTC."}</p>
+  <p class="mt-3 flex items-start gap-2 text-sm text-text-muted"><Info size={16} aria-hidden="true" class="mt-0.5 shrink-0" />"Checked" means we recomputed the profit ourselves from the signed trades and found the same number. {phaseOf(c) !== "ended" && "Trading locks at 09:00 UTC on 4 October; the ranking that wins the prize uses the NVDA price of 10:00 UTC."}</p>
 </Base>
 
 <script>

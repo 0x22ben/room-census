@@ -2,7 +2,7 @@
 // The top of every contest page: way back to the list, title, one-line summary, sample notice and tabs.
 import ArrowLeft from "@lucide/astro/icons/arrow-left";
 import Info from "@lucide/astro/icons/info";
-import { SAMPLE, CAPTURED_AT, tabs, type Contest } from "../lib/contests";
+import { SAMPLE, CAPTURED_AT, coverageLine, tabs, type Contest } from "../lib/contests";
 import { dateTimeUtc } from "../lib/format";
 
 interface Props { contest: Contest; current: string }
@@ -23,7 +23,7 @@ const { contest: c, current } = Astro.props;
   <Info size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />
   {SAMPLE
     ? <span>Sample data: a copy of our capture from {dateTimeUtc(CAPTURED_AT)}. This page does not update yet.</span>
-    : <span>From our capture of {dateTimeUtc(CAPTURED_AT)}. This page is rebuilt about every 15 minutes.</span>}
+    : <span>From our capture of {dateTimeUtc(CAPTURED_AT)}. This page is rebuilt about every 15 minutes. {coverageLine(c)}</span>}
 </p>
 <nav aria-label="Contest sections" class="mt-4 border-b border-border">
   <ul class="flex gap-1 overflow-x-auto">

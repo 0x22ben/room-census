@@ -13,6 +13,8 @@ const LIVE = existsSync(join(DIST, "data", "contests", "index.json"));
 const ranking = JSON.parse(readFileSync(LIVE ? join(DIST, "data", "contests", "close-1.ranking.json")
   : join(DIST, "contests", "close-1", "ranking.json"), "utf8"));
 const NOBODY = "did:key:z6Mkfw79DoBMgePecy4YaXSSimwzHKYz8sB3JB9X7bKSXMkG";
+const index = JSON.parse(readFileSync(LIVE ? join(DIST, "data", "contests", "index.json") : join(DIST, "..", "src", "fixtures", "contests.sample.json"), "utf8"));
+const SELF = index.contests.find((c) => c.id === "close-1").self_key;
 
 async function shot(name, width = 1440) {
   if (!process.env.SHOT_DIR) return;
@@ -37,7 +39,11 @@ after(stop);
 
 test("the list shows each contest with its status and opens it", { skip }, async () => {
   await navigate("/contests/");
-  assert.equal(await page(`document.querySelector("h1").textContent`), "Contests");
+  assert.equal(await page(`document.querySelector("h1").textContent`), "Contests we follow");
+  const text = await page(`document.querySelector("main").textContent`);
+  assert.match(text, /We hold every referee update since the opening\. Our copy of the trading room starts .* after the opening/);
+  assert.doesNotMatch(text, /We hold nothing from before/);
+  assert.doesNotMatch(text, /appear here on their own|from the first minute/);
   const cards = await page(`[...document.querySelectorAll("article h3")].map((h) => h.textContent)`);
   assert.deepEqual(cards, ["Close Call · NVDA", "Sonnet Challenge"]);
   if (LIVE) assert.doesNotMatch(await page(`document.body.textContent`), /Sample data/);
@@ -50,7 +56,9 @@ test("the list shows each contest with its status and opens it", { skip }, async
 test("a live contest shows time left, players, price, prize and the top 3", { skip }, async () => {
   await navigate("/contests/close-1/");
   const text = await page(`document.querySelector("main").textContent`);
-  for (const part of ["Players", "NVDA price used", "Prize", "Players over time", "Top 3 at update", "See the checks"]) assert.match(text, new RegExp(part));
+  for (const part of ["Players", "NVDA price used", "Prize", "Players over time", "Top 3 at update", "See the checks", "Trading closes 4 Oct 2026, 09:00 UTC"]) {
+    assert.match(text, new RegExp(part));
+  }
   assert.equal(await page(`document.querySelectorAll("section[aria-labelledby=top3-title] li").length`), 3);
   await shot("contest-overview");
   await shot("contest-overview-mobile", 390);
@@ -65,8 +73,20 @@ test("Find my DID gives the rank and its source, or says there is no trade, or r
   const label = { official: /Signed by the referee/, complete: /Our count/, partial: /may be incomplete/ }[source];
   assert.match(found, label);
   await shot("contest-leaderboard");
-  assert.match(await find(NOBODY), /Not found in the inspected data/);
+  const nobody = await find(NOBODY);
+  assert.match(nobody, /Not found in the inspected data/);
+  assert.match(nobody, /Registration and mint: not independently established/);
+  assert.doesNotMatch(nobody, /not registered/i);
   assert.match(await find("did:key:nope"), /not a did:key/);
+  if (SELF && !SELF.settled_trade) {
+    // our own key: its registration post is evidence we hold; its mint is not claimed
+    const ours = await find(SELF.did);
+    assert.match(ours, new RegExp(`Registration:\\s*observed from our own signed posting record \\(not from the referee\\): close1, seq ${SELF.registration.seq}`));
+    assert.match(ours, /Mint of 10,000 POLF:\s*not independently confirmed/);
+    assert.match(ours, /Settled trade:\s*no settled trade found in the trades we saved/);
+    // never presented as confirmed without a signed referee record
+    assert.doesNotMatch(ours, /registration (is )?confirmed|mint(ed)? confirmed|officially registered/i);
+  }
 });
 
 test("the checks list every state in plain words", { skip }, async () => {

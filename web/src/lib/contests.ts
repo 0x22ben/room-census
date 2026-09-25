@@ -5,6 +5,8 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import sample from "../fixtures/contests.sample.json";
 import { json } from "./files";
+import { PHASE_LABEL, after, phase, until } from "./contest-time.mjs";
+import { dateTimeUtc } from "./format";
 
 type Doc = { sample?: boolean; captured_at: string; contests: Contest[] };
 const LIVE = existsSync(resolve(process.cwd(), ".public", "data", "contests", "index.json"));
@@ -18,9 +20,11 @@ export type Contest = {
   title: string;
   short: string;
   summary: string;
-  status: "live" | "ended";
+  status: Phase;
   opening: string;
-  end: string;
+  trading_lock_at: string;
+  final_price_at: string | null;
+  coverage_start: string | null;
   prize: string;
   prize_note?: string;
   winner?: string;
@@ -32,7 +36,9 @@ export type Contest = {
   leaderboard?: { sweep: number; at: string; rows: LeaderRow[] };
   ranking?: { sweep: number; traders: number; file: string };
   checks: Check[];
+  self_key?: { did: string; registration: { room: string; seq: number; at: string } | null; mint: "confirmed" | "not_established"; settled_trade: boolean };
 };
+export type Phase = "upcoming" | "live" | "closed" | "ended";
 
 export const SAMPLE = !LIVE;
 export const CAPTURED_AT: string = doc.captured_at;
@@ -55,13 +61,28 @@ export const shortDid = (did: string): string => `${did.slice(8, 16)}…${did.sl
 /** Signed profit with its unit: "+71.87", "-3.20", "0.00". */
 export const signed = (v: string): string => (v.startsWith("-") || Number(v) === 0 ? v : `+${v}`);
 
-/** "8 days 20 h left", "2 h 5 min left", or "ended". */
-export function left(endIso: string, nowIso: string): string {
-  const ms = Date.parse(endIso) - Date.parse(nowIso);
-  if (ms <= 0) return "ended";
-  const h = Math.floor(ms / 3_600_000);
-  const d = Math.floor(h / 24);
-  return d > 0 ? `${d} days ${h % 24} h left` : `${h} h ${Math.floor((ms % 3_600_000) / 60_000)} min left`;
+/** The phase of a contest at the time of our capture (not the build time: a build must be reproducible). */
+export const phaseOf = (c: Contest): Phase => phase(c, CAPTURED_AT) as Phase;
+export const phaseLabel = (p: Phase): string => PHASE_LABEL[p];
+
+/** The one line that says where a contest stands in time. */
+export function timeLine(c: Contest): string {
+  const p = phaseOf(c);
+  if (p === "upcoming") return `Starts ${dateTimeUtc(c.opening)}`;
+  // a sample is frozen: no countdown that would already be wrong
+  if (p === "live") return `Trading closes ${dateTimeUtc(c.trading_lock_at)}${SAMPLE ? "" : ` · ${until(c.trading_lock_at, CAPTURED_AT)} left`}`;
+  if (p === "closed") return `Trading closed · final price at ${dateTimeUtc(c.final_price_at!)}`;
+  return `Ended ${dateTimeUtc(c.final_price_at ?? c.trading_lock_at)}`;
+}
+
+/** What we hold of a contest and from when; never implies records we do not hold. `coverage_start` is
+ * where our copy of the trading room begins; the referee's own updates are kept from its first one. */
+export function coverageLine(c: Contest): string {
+  if (!c.coverage_start) return "Not followed live: checked from what the referee published after the end.";
+  const late = Date.parse(c.coverage_start) - Date.parse(c.opening);
+  return late < 60_000
+    ? `We hold the referee's updates and the trading room from the opening, ${dateTimeUtc(c.coverage_start)}.`
+    : `We hold every referee update since the opening. Our copy of the trading room starts ${dateTimeUtc(c.coverage_start)}, ${after(c.coverage_start, c.opening)} after the opening: earlier trading-room messages were already deleted by Technocore.`;
 }
 
 /** "1 check passes", "5 checks pass" */
