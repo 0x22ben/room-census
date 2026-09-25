@@ -11,6 +11,7 @@ const DID = /^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]{44}$/;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/;
 const PNL = /^-?\d{1,9}\.\d{2}$/;
 const PRICE = /^\d{1,7}\.\d{2}$/;
+const QTY = /^-?\d{1,5}\.\d{2}$/;
 const STATES = new Set(["ok", "warn", "wait"]);
 const ROW_CHECK = new Set(["match", "pending", "differs"]);
 const SOURCE = new Set(["official", "complete", "partial"]);
@@ -21,6 +22,8 @@ const need = (ok, msg) => { if (!ok) fail(msg); };
 const text = (v, max = 400) => typeof v === "string" && v.trim().length > 0 && v.length <= max;
 const int = (v, min = 0) => Number.isInteger(v) && v >= min;
 const iso = (v) => typeof v === "string" && ISO.test(v) && !Number.isNaN(Date.parse(v));
+// an open position: [signed net contracts, average entry price]; null when the key holds none
+const position = (v) => v === null || (Array.isArray(v) && v.length === 2 && typeof v[0] === "string" && typeof v[1] === "string" && QTY.test(v[0] ?? "") && Number(v[0]) !== 0 && PRICE.test(v[1] ?? "") && Number(v[1]) > 0);
 const https = (v) => typeof v === "string" && /^https:\/\/[^\s"<>]+$/.test(v);
 
 function checks(c, where) {
@@ -75,6 +78,7 @@ function contest(c, capturedAt, where) {
       need(DID.test(r.did ?? "") && !seen.has(r.did), `${where}: leaderboard row ${i + 1} has a bad or repeated DID`);
       seen.add(r.did);
       need(PNL.test(r.pnl ?? "") && ROW_CHECK.has(r.check), `${where}: leaderboard row ${i + 1} is malformed`);
+      need(r.position === undefined || position(r.position), `${where}: leaderboard row ${i + 1} has a malformed position`);
     });
   }
   if (c.self_key !== undefined) {
@@ -96,8 +100,9 @@ function ranking(doc, c, where) {
   const seen = new Set();
   let previous = Infinity;
   doc.rows.forEach((r, i) => {
-    need(Array.isArray(r) && r.length === 4, `${where}: row ${i + 1} is not [rank, did, pnl, source]`);
+    need(Array.isArray(r) && (r.length === 4 || r.length === 5), `${where}: row ${i + 1} is not [rank, did, pnl, source, position?]`);
     const [rank, did, pnl, source] = r;
+    need(r.length === 4 || position(r[4]), `${where}: row ${i + 1} has a malformed position`);
     need(rank === i + 1, `${where}: ranks are not 1, 2, 3...`);
     need(DID.test(did ?? "") && !seen.has(did), `${where}: row ${i + 1} has a bad or repeated DID`);
     seen.add(did);

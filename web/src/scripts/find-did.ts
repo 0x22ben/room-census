@@ -1,6 +1,7 @@
 // "Find my DID": looks a did:key up in the ranking file this site serves. Nothing leaves the site and
 // nothing is stored. Every result says where its number comes from.
-type Row = [number, string, string, "official" | "complete" | "partial"];
+// the fifth field, when present, is the open position rebuilt by our recount: [signed contracts, entry] or null
+type Row = [number, string, string, "official" | "complete" | "partial", ([string, string] | null)?];
 type Ranking = { sweep: number; traders: number; owners: number; rows: Row[]; capture_start?: string; notes?: Partial<Record<Row[3], string>> };
 type SelfKey = { did: string; registration: { room: string; seq: number; at: string } | null; mint: "confirmed" | "not_established"; settled_trade: boolean };
 
@@ -18,11 +19,18 @@ function el(tag: string, cls: string, text?: string): HTMLElement {
   return e;
 }
 
-function card(rank: string, of: string, score: string, badge: string, tone: string, note: string): HTMLElement {
+function positionText(p: Row[4]): string | undefined {
+  if (p === undefined) return undefined;
+  if (p === null) return "Flat";
+  return p[0].startsWith("-") ? `Short ${p[0].slice(1)} @ ${p[1]}` : `Long ${p[0]} @ ${p[1]}`;
+}
+
+function card(rank: string, of: string, score: string, badge: string, tone: string, note: string, position?: string): HTMLElement {
   const box = el("div", "grid gap-2.5 rounded-md border border-border bg-bg px-4 py-3.5");
   const top = el("div", "flex flex-wrap items-end justify-between gap-2");
-  const left = el("p", "flex items-end gap-2.5");
+  const left = el("p", "flex flex-wrap items-end gap-x-2.5 gap-y-1");
   left.append(el("span", "font-mono text-2xl font-semibold", rank), el("span", "text-sm text-text-secondary", of));
+  if (position) left.append(el("span", "font-mono text-sm text-text-secondary", `· ${position}`));
   const scoreTone = score.startsWith("-") ? "text-warning" : score.startsWith("+") ? "text-accent" : "text-text-secondary";
   top.append(left, el("p", `font-mono text-xl tabular-nums ${scoreTone}`, score));
   const bottom = el("p", "flex flex-wrap items-center gap-2.5 text-sm text-text-muted");
@@ -72,7 +80,7 @@ function init(root: HTMLElement) {
       if (row) {
         const s = SOURCES[row[3]];
         const score = row[2].startsWith("-") || Number(row[2]) === 0 ? row[2] : `+${row[2]}`;
-        out.append(card(`#${row[0]}`, of, `${score} POLF`, s.label, s.tone, ranking.notes?.[row[3]] ?? s.note));
+        out.append(card(`#${row[0]}`, of, `${score} POLF`, s.label, s.tone, ranking.notes?.[row[3]] ?? s.note, positionText(row[4])));
       } else {
         const box = card("–", "not ranked", "–", "Not found in the inspected data", "muted",
           `No settled trade of this DID is in the trades we saved. That alone does not tell whether it registered or traded: it may have traded only before we started saving (${ranking.capture_start ?? "the start of our capture"}).`);

@@ -21,7 +21,7 @@ export function validIndex() {
         checks: [check("ok", "The records are genuine"), check("warn", "Part of the trading room is lost")],
         latest: { sweep: 2, at: "2026-09-25T17:31:00Z", owners: 600784, price: "224.87", price_time: "2026-09-25T17:34:00Z", price_age_s: 0 },
         series: [{ n: 1, at: "2026-09-25T12:05:22Z", owners: 10, price: "226.26" }, { n: 2, at: "2026-09-25T17:31:00Z", owners: 600784, price: "224.87" }],
-        leaderboard: { sweep: 2, at: "2026-09-25T17:31:00Z", rows: [{ rank: 1, did: DIDS[0], pnl: "76.35", check: "match" }, { rank: 2, did: DIDS[1], pnl: "68.41", check: "pending" }] },
+        leaderboard: { sweep: 2, at: "2026-09-25T17:31:00Z", rows: [{ rank: 1, did: DIDS[0], pnl: "76.35", check: "match", position: ["44.66", "221.65"] }, { rank: 2, did: DIDS[1], pnl: "68.41", check: "pending", position: null }] },
         ranking: { sweep: 2, traders: 3, file: "/data/contests/close-1.ranking.json" },
         self_key: { did: SELF, registration: { room: "close1", seq: 152370, at: "2026-09-25T13:30:28.129773Z" }, mint: "not_established", settled_trade: false },
       },
@@ -42,6 +42,6 @@ export function validRanking() {
     schema: "room-census/contest-ranking/1", contest: "close-1", sweep: 2, at: "2026-09-25T17:31:00Z",
     traders: 3, owners: 600784, capture_start: "13:32 UTC",
     notes: { official: "official note", complete: "complete note", partial: "partial note" },
-    rows: [[1, DIDS[0], "76.35", "official"], [2, DIDS[1], "68.40", "partial"], [3, DIDS[2], "-3.10", "complete"]],
+    rows: [[1, DIDS[0], "76.35", "official", ["44.66", "221.65"]], [2, DIDS[1], "68.40", "partial", null], [3, DIDS[2], "-3.10", "complete", ["-12.40", "229.40"]]],
   };
 }

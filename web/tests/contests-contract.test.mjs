@@ -53,6 +53,13 @@ const MUTATIONS = [
   ["unknown number source", (i, r) => { r.rows[2][3] = "guess"; }, /is malformed/],
   ["official without a checked line", (i, r) => { r.rows[1][3] = "official"; }, /marked official but not checked/],
   ["official showing our number, not the referee's", (i, r) => { r.rows[0][2] = "76.22"; }, /does not show the referee's signed profit/],
+  // positions
+  ["leaderboard position of zero contracts", (i, r, c) => { c.leaderboard.rows[0].position = ["0.00", "221.65"]; }, /malformed position/],
+  ["leaderboard position without an entry price", (i, r, c) => { c.leaderboard.rows[0].position = ["44.66"]; }, /malformed position/],
+  ["ranking position with a text side", (i, r) => { r.rows[0][4] = ["long", "221.65"]; }, /malformed position/],
+  ["ranking position with a three-decimal price", (i, r) => { r.rows[2][4] = ["-12.40", "229.405"]; }, /malformed position/],
+  ["ranking position given as numbers", (i, r) => { r.rows[0][4] = [44.66, 221.65]; }, /malformed position/],
+  ["ranking row with a sixth field", (i, r) => { r.rows[0].push("x"); }, /is not \[rank, did, pnl, source, position\?\]/],
   // consistency between files
   ["trader count off", (i, r) => { r.traders = 4; }, /trader count/],
   ["ranking of another contest", (i, r) => { r.contest = "close-2"; }, /contest-ranking\/1 document of close-1/],
@@ -73,6 +80,13 @@ for (const [name, mutate, pattern] of MUTATIONS) {
     assert.throws(run(mutate), (e) => e instanceof ContestContractError && pattern.test(e.message), `${name}: ${pattern}`);
   });
 }
+
+test("rows without a position still pass (exports made before positions were published)", () => {
+  assert.doesNotThrow(run((i, r, c) => {
+    for (const row of c.leaderboard.rows) delete row.position;
+    r.rows = r.rows.map((row) => row.slice(0, 4));
+  }));
+});
 
 test("refused: an incomplete set of files", () => {
   assert.throws(run(() => {}, ["data/contests/index.json"]), /does not resolve/);
