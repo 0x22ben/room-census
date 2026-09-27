@@ -229,7 +229,7 @@ function init(root: HTMLElement) {
     const cardData: Card = { did, score, rank: row[0], traders: found.traders, contest: root.dataset.contest ?? "", official,
       sweep: found.sweep, position: pos === undefined ? undefined : pos === null ? "Flat" : `${Number(pos[0]) > 0 ? "Long" : "Short"} ${Math.abs(Number(pos[0])).toFixed(1)}`,
       line: signedList.length >= 3 ? Number(signedList[2].pnl) : undefined,
-      prices: curve.length > 1 ? curve.map((p) => p.v) : marks.map((m) => m[1]), curveLabel: curve.length > 1 ? "SCORE" : "NVDA" };
+      prices: curve.length > 1 ? curve.map((p) => p.v) : marks.map((m) => m[1]), curveLabel: curve.length > 1 ? "SCORE" : "NVDA", mine: false };
     let ready: Blob | undefined;
     drawCard(cardData).then((b) => { ready = b; }).catch(() => undefined);
     q("[data-share]").addEventListener("click", () => {

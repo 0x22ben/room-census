@@ -7,6 +7,8 @@ export type Card = {
   position?: string; line?: number; prices: number[]; official?: boolean;
   /** what the curve shows: the NVDA price by default, or the key's own score */
   curveLabel?: string;
+  /** false when the card is shared from someone's trader page: then it says SCORE, not MY SCORE */
+  mine?: boolean;
 };
 
 const W = 1200, H = 675;
@@ -100,7 +102,7 @@ export async function drawCard(card: Card): Promise<Blob> {
   ctx.arc(82, 226, 18, 0, Math.PI * 2);
   ctx.fill();
   text(ctx, `${card.did.slice(8, 14)}…${card.did.slice(-6)}`, 110, 236, mono(26), C.soft);
-  text(ctx, "MY SCORE", 64, 280, `400 20px ${PIXEL}`, C.muted, 2);
+  text(ctx, card.mine === false ? "SCORE" : "MY SCORE", 64, 280, `400 20px ${PIXEL}`, C.muted, 2);
   const sw = text(ctx, signed(card.score), 62, 380, mono(80, true), col);
   text(ctx, "POLF", 62 + sw + 12, 378, mono(24), C.muted);
 
@@ -183,7 +185,7 @@ export async function shareCard(card: Card, pageUrl: string, ready?: Blob): Prom
   const blob = ready ?? await drawCard(card);
   const name = `room-census-${card.did.slice(-8)}.png`;
   const file = new File([blob], name, { type: "image/png" });
-  const post = `My score in ${card.contest.replace(" · ", " ")}: ${signed(card.score)} POLF, #${n(card.rank)} of ${n(card.traders)} traders${card.official ? ", signed by the referee" : " (Room Census recount)"}.`;
+  const post = `${card.mine === false ? "Score" : "My score"} in ${card.contest.replace(" · ", " ")}: ${signed(card.score)} POLF, #${n(card.rank)} of ${n(card.traders)} traders${card.official ? ", signed by the referee" : " (Room Census recount)"}.`;
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], text: `${post} ${pageUrl}` });
