@@ -11,6 +11,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # the contest witness publishes data/contests/ to the contest-data branch, replaced at every
+  # publication (every 15 minutes, a few minutes after :10, :25, :40 and :55): rebuild just after
+  schedule:
+    - cron: "3,18,33,48 * * * *"
 
 permissions:
   contents: read
@@ -43,6 +47,15 @@ jobs:
       - name: Install from the lockfile (install scripts are off in web/.npmrc)
         working-directory: web
         run: npm ci
+      - name: Contest data from the contest-data branch
+        # One commit, replaced at every publication, so the contest files never pile up in main's history
+        # (27 Sep 2026: about 100 MB per publication). Without that branch, main's own copy is used.
+        run: |
+          if git fetch --depth=1 --no-tags origin contest-data; then
+            rm -rf data/contests
+            git checkout FETCH_HEAD -- data/contests
+            echo "CONTEST_DATA_REF=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"
+          fi
       - name: Production build
         working-directory: web
         run: npm run build

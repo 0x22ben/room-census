@@ -6,6 +6,7 @@ without a build, so the artifact checks skip there. Nothing here installs packag
 import hashlib
 import html
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -33,8 +34,10 @@ BUILT = (DIST / "index.html").is_file()
 
 
 def blob(rel):
-    """Bytes of a file as committed (Git blob), independent of checkout line endings."""
-    return subprocess.run(["git", "-C", str(REPO), "cat-file", "blob", f"HEAD:{rel}"],
+    """Bytes of a file as committed (Git blob), independent of checkout line endings. Contest files come
+    from the contest-data branch commit the Pages build used (CONTEST_DATA_REF), when it used one."""
+    ref = os.environ.get("CONTEST_DATA_REF") if rel.startswith("data/contests/") else None
+    return subprocess.run(["git", "-C", str(REPO), "cat-file", "blob", f"{ref or 'HEAD'}:{rel}"],
                           check=True, capture_output=True).stdout
 
 
