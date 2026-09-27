@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import sample from "../fixtures/contests.sample.json";
 import { json } from "./files";
+import sampleRanking from "../fixtures/close-1.ranking.sample.json";
 import { PHASE_LABEL, after, phase, until } from "./contest-time.mjs";
 import { dateTimeUtc } from "./format";
 
@@ -63,14 +64,35 @@ export function tabs(c: Contest): { label: string; href: string }[] {
   ];
 }
 
-/** Rows of the signed top list grouped by equal score: the first key of each group, and how many more
- * share its score (they share the places they span, per the rules). */
-export function tieGroups(rows: LeaderRow[]): { row: LeaderRow; tied: number }[] {
-  const out: { row: LeaderRow; tied: number }[] = [];
-  for (const r of rows) {
-    const last = out[out.length - 1];
-    if (last && last.row.pnl === r.pnl) last.tied += 1;
-    else out.push({ row: r, tied: 0 });
+/** One line of a contest's full ranking file: rank, DID, profit, source of the number, open position. */
+export type RankRow = [number, string, string, "official" | "signed" | "complete" | "partial", Position?];
+/** Ranking v1 holds every row; v2 holds the first places and 256 shard files next to it. */
+type RankingDoc = { rows: RankRow[] } | { top: RankRow[]; shards: number };
+
+export type TopRow = { rank: number; did: string; pnl: string; source: "signed" | "complete" | "partial"; check?: LeaderRow["check"]; position?: Position };
+
+/** The first `limit` places: every line of the referee's signed top list first, with its rank, its
+ * signed score and our check, then the next keys of our recount of the signed trades (the file "Find
+ * my DID" searches), numbered on from there. A key of the signed list is never shown twice. */
+export function topTraders(c: Contest, limit = 100): TopRow[] {
+  const signedRows = c.leaderboard?.rows ?? [];
+  const doc = !c.ranking ? undefined : !LIVE ? (c.id === "close-1" ? (sampleRanking as RankingDoc) : undefined)
+    : json<RankingDoc>(c.ranking.file.replace(/^\//, ""));
+  // ranking v2 already lists the signed list first, with the referee's ranks: read its first places
+  if (doc && "top" in doc) {
+    const checks = new Map(signedRows.map((r) => [r.did, r.check]));
+    return doc.top.slice(0, limit).map(([rank, did, pnl, source, position]) => source === "official" || source === "signed"
+      ? { rank, did, pnl, source: "signed", check: source === "official" ? "match" : (checks.get(did) ?? "pending"), position }
+      : { rank, did, pnl, source, position });
+  }
+  const out: TopRow[] = signedRows.slice(0, limit).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, source: "signed", check: r.check, position: r.position }));
+  if (!doc || out.length >= limit) return out;
+  const file: RankRow[] = doc.rows;
+  const seen = new Set(out.map((r) => r.did));
+  for (const [, did, pnl, source, position] of file) {
+    if (out.length >= limit) break;
+    if (seen.has(did)) continue;
+    out.push({ rank: out.length + 1, did, pnl, source: source === "partial" ? "partial" : "complete", position });
   }
   return out;
 }

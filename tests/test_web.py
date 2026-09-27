@@ -284,7 +284,7 @@ class Artifact(unittest.TestCase):
                     self.assertRegex(attrs, r'type="module" src="/_astro/[\w.-]+\.js"')
                 needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched ", "data-did-form ",
                                                        "data-verify-summary ", "data-write ", "data-wizard ", "data-find-did ",
-                                                       "data-trading-chart="))
+                                                       "data-trading-chart=", "data-did-page "))
                 self.assertEqual(len(scripts), needed)
 
     def test_the_built_site_meets_the_legacy_route_contract(self):
@@ -341,7 +341,7 @@ class Artifact(unittest.TestCase):
 
     def test_the_licenses_page_publishes_the_official_texts(self):
         text = html.unescape((DIST / "licenses" / "index.html").read_text(encoding="utf-8"))
-        shipped = {"@fontsource-variable/inter": "LICENSE", "@fontsource/ibm-plex-mono": "LICENSE", "chart.js": "LICENSE.md",
+        shipped = {"@fontsource-variable/inter": "LICENSE", "@fontsource/ibm-plex-mono": "LICENSE", "@fontsource/silkscreen": "LICENSE", "chart.js": "LICENSE.md",
                    "@kurkle/color": "LICENSE.md", "pixelarticons": "LICENSE", "tailwindcss": "LICENSE", "astro": "LICENSE"}
         for name, file in shipped.items():
             with self.subTest(package=name):
@@ -350,7 +350,7 @@ class Artifact(unittest.TestCase):
         for own in (REPO / "LICENSE", REPO / "data" / "LICENSE"):
             with self.subTest(file=own.name):
                 self.assertIn(own.read_text(encoding="utf-8").strip().replace("\r\n", "\n"), text)
-        self.assertEqual(text.count("SIL OPEN FONT LICENSE"), 2, "both self-hosted fonts ship their OFL text")
+        self.assertEqual(text.count("SIL OPEN FONT LICENSE"), 3, "the three self-hosted fonts ship their OFL text")
         for page in self.html_pages():
             with self.subTest(page=self.route(page)):
                 self.assertIn('href="/licenses/"', page.read_text(encoding="utf-8"))
@@ -705,7 +705,9 @@ class Artifact(unittest.TestCase):
                 ok = (rel.endswith(".html") or re.fullmatch(r"_astro/[\w.-]+\.(css|js|woff2?)", rel)
                       or rel in contract.REQUIRED_FILES or rel.startswith("data/")
                       # the full ranking of our recount of a contest, for "Find my DID" (PRODUCT_DIRECTION, Ben 2026-09-25)
-                      or re.fullmatch(r"contests/[a-z0-9][a-z0-9_-]{0,47}/ranking\.json", rel))
+                      or re.fullmatch(r"contests/[a-z0-9][a-z0-9_-]{0,47}/ranking\.json", rel)
+                      # the one picture shown when a page is shared on social networks (Ben 2026-09-27)
+                      or re.fullmatch(r"_astro/social-card\.[\w-]+\.png", rel))
                 self.assertTrue(ok, "not a page, a built asset or public data")
         text = "".join(f.read_text(encoding="utf-8", errors="replace") for f in DIST.rglob("*") if f.suffix in (".html", ".css", ".js"))
         for leak in ("C:\\", "Users\\", "node_modules", "file://"):

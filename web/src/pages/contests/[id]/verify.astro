@@ -17,7 +17,7 @@ const clean = t.warn === 0 && t.wait === 0;
 const parts = [passes(t.ok), t.warn ? `${t.warn} to know` : "", t.wait ? `${t.wait} not possible yet` : ""].filter(Boolean).join(" · ");
 const button = "inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 text-sm font-semibold text-text no-underline";
 ---
-<Base title={`${c.short}: verify`} description={`What Room Census could check about ${c.title}, from the signed records it saved.`}>
+<Base title={`${c.title}: checks`} description={`What Room Census could check about ${c.title}, from the signed records it saved.`}>
   <ContestHeader contest={c} current="Verify" />
 
   <p role="status" class:list={["mt-4 flex items-center gap-2 rounded-md border px-4 py-2.5 text-sm font-semibold",

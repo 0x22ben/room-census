@@ -3,6 +3,7 @@
 // server runs that same staging step on a clone before it commits, so a malformed, incomplete or altered
 // export can never reach the site.
 import { phase } from "../src/lib/contest-time.mjs";
+import { SHARDS, shard } from "../src/lib/did-shard.mjs";
 
 export class ContestContractError extends Error {}
 
@@ -15,6 +16,11 @@ const QTY = /^-?\d{1,5}\.\d{2}$/;
 const STATES = new Set(["ok", "warn", "wait"]);
 const ROW_CHECK = new Set(["match", "pending", "differs"]);
 const SOURCE = new Set(["official", "complete", "partial"]);
+// ranking v2 also names a line of the referee's signed list that our recount has not confirmed
+const SOURCE2 = new Set(["official", "signed", "complete", "partial"]);
+const HEX2 = /^[0-9a-f]{2}$/;
+const AMOUNT = /^\d{1,9}(\.\d{1,2})?$/;
+const FEE = /^\d{1,12}(\.\d{1,30})?$/;
 const MINT = new Set(["confirmed", "not_established"]);
 
 const fail = (msg) => { throw new ContestContractError(msg); };
@@ -94,6 +100,86 @@ function contest(c, capturedAt, where) {
   }
 }
 
+/** Ranking v2: a summary with the first places, and every key in one of 256 files by the hash of its
+ * DID. The referee's signed list comes first with its own ranks and signed scores, then our recount. */
+function rankingV2(doc, c, where, files, read) {
+  need(doc.sweep === c.ranking.sweep && int(doc.sweep, 1), `${where}: its update differs from the index`);
+  need(int(doc.traders) && c.ranking.traders === doc.traders && doc.shards === SHARDS, `${where}: trader count or shard count differs`);
+  need(int(doc.owners) && text(doc.capture_start, 40) && doc.notes && [...SOURCE2].every((k) => text(doc.notes[k])),
+    `${where}: owners, capture start or notes missing`);
+  const row = (r, w) => {
+    need(Array.isArray(r) && (r.length === 4 || r.length === 5), `${w} is not [rank, did, pnl, source, position?]`);
+    need(int(r[0], 1) && DID.test(r[1] ?? "") && PNL.test(r[2] ?? "") && SOURCE2.has(r[3]), `${w} is malformed`);
+    need(r.length === 4 || position(r[4]), `${w} has a malformed position`);
+  };
+  need(Array.isArray(doc.top) && doc.top.length <= Math.min(1000, doc.traders), `${where}: top list missing or too long`);
+  const signedRows = c.leaderboard && c.leaderboard.sweep === doc.sweep ? c.leaderboard.rows : null;
+  let previous = Infinity;
+  doc.top.forEach((r, i) => {
+    row(r, `${where}: top row ${i + 1}`);
+    need(r[0] === i + 1, `${where}: top ranks are not 1, 2, 3...`);
+    const signed = r[3] === "official" || r[3] === "signed";
+    if (signedRows) {
+      if (i < signedRows.length) {
+        const l = signedRows[i];
+        need(signed && r[1] === l.did && r[2] === l.pnl, `${where}: top row ${i + 1} is not line ${i + 1} of the referee's signed list`);
+        need((r[3] === "official") === (l.check === "match"), `${where}: top row ${i + 1} is marked ${r[3]} but checked ${l.check}`);
+      } else {
+        need(!signed, `${where}: top row ${i + 1} is marked as signed but is not in the referee's list`);
+        need(Number(r[2]) <= previous, `${where}: rows after the signed list are not sorted by profit`);
+        previous = Number(r[2]);
+      }
+    }
+  });
+  // every key in its shard, every rank once
+  const ranks = new Uint8Array(doc.traders + 1);
+  const byDid = new Map();
+  for (let k = 0; k < SHARDS; k++) {
+    const hh = k.toString(16).padStart(2, "0");
+    const rel = `data/contests/${c.id}.ranking.${hh}.json`;
+    need(files.includes(rel), `${where}: shard ${hh} is missing`);
+    const d = read(rel);
+    need(d && d.schema === "room-census/contest-ranking-shard/1" && d.contest === c.id && d.sweep === doc.sweep && d.shard === hh && Array.isArray(d.rows),
+      `${rel} is not shard ${hh} of this ranking`);
+    d.rows.forEach((r, i) => {
+      row(r, `${rel}: row ${i + 1}`);
+      need(shard(r[1]) === hh, `${rel}: ${r[1]} belongs to shard ${shard(r[1])}`);
+      need(r[0] <= doc.traders && ranks[r[0]] === 0, `${rel}: rank ${r[0]} is out of range or repeated`);
+      ranks[r[0]] = 1;
+      need(!byDid.has(r[1]), `${rel}: ${r[1]} is listed twice`);
+      byDid.set(r[1], r);
+    });
+  }
+  need(byDid.size === doc.traders, `${where}: the shards hold ${byDid.size} keys, not ${doc.traders}`);
+  for (const r of doc.top) {
+    const same = byDid.get(r[1]);
+    need(same && same[0] === r[0] && same[2] === r[2] && same[3] === r[3], `${where}: ${r[1]} differs between the top list and its shard`);
+  }
+  if (c.self_key) need(c.self_key.settled_trade === byDid.has(c.self_key.did), `${where}: our key's settled-trade status disagrees with the ranking`);
+}
+
+/** The settled trades of every key, in the same 256 shards: optional, published once an hour. */
+function trades(c, sweep, files, read) {
+  const rels = files.filter((f) => f.startsWith(`data/contests/${c.id}.trades.`));
+  if (rels.length === 0) return rels;
+  need(rels.length === SHARDS, `the trades of ${c.id} are in ${rels.length} files, not ${SHARDS}`);
+  for (const rel of rels) {
+    const hh = rel.slice(`data/contests/${c.id}.trades.`.length, -5);
+    need(HEX2.test(hh), `unexpected trades file ${rel}`);
+    const d = read(rel);
+    need(d && d.schema === "room-census/contest-trades/1" && d.contest === c.id && d.shard === hh && int(d.sweep, 1) && d.sweep <= sweep
+      && d.keys && typeof d.keys === "object" && !Array.isArray(d.keys), `${rel} is not trades shard ${hh} of ${c.id}`);
+    for (const [did, list] of Object.entries(d.keys)) {
+      need(DID.test(did) && shard(did) === hh && Array.isArray(list) && list.length > 0, `${rel}: bad key ${did}`);
+      for (const t of list) {
+        need(Array.isArray(t) && t.length === 5 && int(t[0], 1) && t[0] <= d.sweep && ["b", "s", "x"].includes(t[1])
+          && AMOUNT.test(t[2] ?? "") && AMOUNT.test(t[3] ?? "") && FEE.test(t[4] ?? ""), `${rel}: a trade of ${did} is malformed`);
+      }
+    }
+  }
+  return rels;
+}
+
 function ranking(doc, c, where) {
   need(doc && doc.schema === "room-census/contest-ranking/1" && doc.contest === c.id, `${where} is not the room-census/contest-ranking/1 document of ${c.id}`);
   need(doc.sweep === c.ranking.sweep && int(doc.sweep, 1), `${where}: its update differs from the index`);
@@ -141,8 +227,15 @@ export function checkContests(files, read) {
     if (c.ranking) {
       const rel = `data/contests/${c.id}.ranking.json`;
       need(c.ranking.file === `/${rel}` && files.includes(rel), `ranking of ${c.id} does not resolve: ${c.ranking.file}`);
-      ranking(read(rel), c, rel);
+      const doc = read(rel);
+      if (doc && doc.schema === "room-census/contest-ranking/2" && doc.contest === c.id) {
+        rankingV2(doc, c, rel, files, read);
+        for (let k = 0; k < SHARDS; k++) named.add(`data/contests/${c.id}.ranking.${k.toString(16).padStart(2, "0")}.json`);
+      } else {
+        ranking(doc, c, rel);
+      }
       named.add(rel);
+      for (const t of trades(c, c.ranking.sweep, files, read)) named.add(t);
     }
   }
   for (const rel of files) need(named.has(rel), `contest file named by no contest: ${rel}`);

@@ -31,6 +31,7 @@ export function licenses(): { project: Entry[]; shipped: Entry[] } {
     shipped: [
       npm("@fontsource-variable/inter", "LICENSE", "SIL Open Font License 1.1", "Inter, the text font, served from this site.", "https://github.com/rsms/inter"),
       npm("@fontsource/ibm-plex-mono", "LICENSE", "SIL Open Font License 1.1", "IBM Plex Mono, the font for numbers and labels, served from this site.", "https://github.com/IBM/plex"),
+      npm("@fontsource/silkscreen", "LICENSE", "SIL Open Font License 1.1", "Silkscreen, the pixel font of the score card, served from this site.", "https://kottke.org/plus/type/silkscreen/"),
       npm("chart.js", "LICENSE.md", "MIT", "Draws the line charts.", "https://www.chartjs.org/"),
       npm("@kurkle/color", "LICENSE.md", "MIT", "Color handling inside Chart.js.", "https://github.com/kurkle/color"),
       npm("pixelarticons", "LICENSE", "MIT", "Interface icons, in pixel style.", "https://pixelarticons.com/"),

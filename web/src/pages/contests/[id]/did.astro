@@ -1,0 +1,99 @@
+---
+// The trading page of one key in a contest (Pencil mockup uzbN9): rank and score, best trades, score
+// over time, open position and every settled trade. One static page for every key: the script reads
+// the key from ?k=, then the two small files that hold it (its ranking line and its trades).
+import Base from "../../../layouts/Base.astro";
+import Px from "../../../components/Px.astro";
+import { contests, type Contest } from "../../../lib/contests";
+
+export function getStaticPaths() {
+  return contests().filter((c) => c.ranking).map((c) => ({ params: { id: c.id }, props: { contest: c } }));
+}
+interface Props { contest: Contest }
+const { contest: c } = Astro.props;
+const s = c.series ?? [];
+// the mark of each update: the agents' own price the referee scores with, else the market price
+const marks = s.map((p) => [p.n, Number(p.global ?? p.price ?? 0), p.at] as const).filter(([, v]) => v > 0);
+const card = "rounded-xl border border-border bg-surface";
+const stat = "grid gap-0.5";
+---
+<Base title={`${c.title}: a trader's page`} description={`Rank, score over time, position and every settled trade of one key in ${c.title}, recounted from the signed trades.`}>
+  <div data-did-page data-url={c.ranking!.file} data-contest={c.title.toUpperCase()} data-sweep={c.ranking!.sweep}
+    data-signed={JSON.stringify((c.leaderboard?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check })))}
+    data-marks={JSON.stringify(marks)} data-opening={c.opening} data-page={new URL(`/contests/${c.id}/did/`, Astro.site).href}>
+    <nav aria-label="Breadcrumb" class="text-sm">
+      <ol class="flex flex-wrap items-center gap-1.5">
+        <li><a href="/contests/" class="inline-flex min-h-11 items-center gap-1.5 text-link no-underline hover:underline"><Px name="arrow-left" size={12} />Contests</a></li>
+        <li aria-hidden="true" class="text-text-muted">/</li>
+        <li><a href={`/contests/${c.id}/`} class="text-link no-underline hover:underline">{c.short}</a></li>
+        <li aria-hidden="true" class="text-text-muted">/</li>
+        <li aria-current="page" class="font-mono text-text-secondary" data-crumb>DID</li>
+      </ol>
+    </nav>
+
+    <p class="mt-4 hidden rounded-md border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning" data-problem role="status"></p>
+
+    <section class="mt-2 flex flex-wrap items-center justify-between gap-4" aria-label="Trader" data-head hidden>
+      <div class="flex min-w-0 items-center gap-4">
+        <span aria-hidden="true" class="size-13 shrink-0 rounded-full bg-linear-135 from-accent to-[#3b6fd6]"></span>
+        <div class="grid min-w-0 gap-1">
+          <h1 class="flex items-center gap-2 font-mono text-2xl font-semibold">
+            <span data-short></span>
+            <button type="button" class="grid size-8 place-items-center rounded-md text-text-muted hover:text-text" data-copy aria-label="Copy the full DID"><Px name="copy" size={24} /></button>
+          </h1>
+          <p class="text-sm text-text-secondary">{c.title} · <span data-source></span></p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-6">
+        <p class={stat}><span class="font-mono text-lg font-semibold" data-rank>–</span><span class="flex items-center gap-1 text-xs text-text-muted"><Px name="trophy" size={12} />Rank</span></p>
+        <p class={stat}><span class="font-mono text-lg font-semibold" data-count>–</span><span class="flex items-center gap-1 text-xs text-text-muted"><Px name="coins" size={12} />Trades</span></p>
+        <p class={stat}><span class="font-mono text-lg font-semibold" data-fees>–</span><span class="flex items-center gap-1 text-xs text-text-muted"><Px name="minus" size={12} />Fees</span></p>
+        <button type="button" data-share class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border-strong px-4 text-sm font-semibold"><Px name="share" size={24} />Share</button>
+      </div>
+    </section>
+
+    <ul class="mt-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-5" aria-label="Best trades" data-best hidden></ul>
+
+    <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_27rem]" data-body hidden>
+      <div class="grid content-start gap-4">
+        <section class={`${card} grid gap-3 p-4 sm:p-5`} aria-labelledby="score-title">
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <div class="grid gap-0.5">
+              <h2 id="score-title" class="flex items-end gap-2"><Px name="chart-line" size={24} class="text-accent" />
+                <span class="font-mono text-3xl font-bold tabular-nums" data-score>–</span><span class="font-mono text-sm text-text-muted">POLF</span></h2>
+              <p class="font-mono text-xs" data-day></p>
+            </div>
+          </div>
+          <div class="relative h-64 min-w-0"><canvas role="img" aria-label="Score after each referee update" tabindex="0" data-chart></canvas></div>
+          <p class="hidden text-sm text-text-muted" data-no-trades>The trades of this key appear here within the hour.</p>
+        </section>
+
+        <section class={`${card} overflow-hidden`} aria-labelledby="position-title">
+          <h2 id="position-title" class="flex items-center gap-2 px-4 py-3.5 font-semibold sm:px-5"><Px name="analytics" size={24} class="text-accent" />Open position</h2>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-surface-raised text-xs text-text-muted"><tr><th scope="col" class="px-4 py-2 sm:px-5">Side</th><th scope="col" class="px-4 py-2">Contracts</th><th scope="col" class="px-4 py-2">Entry</th><th scope="col" class="px-4 py-2">Mark</th><th scope="col" class="px-4 py-2 text-right sm:px-5">Unrealized</th></tr></thead>
+              <tbody data-position></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <section class={`${card} overflow-hidden self-start`} aria-labelledby="trades-title">
+        <div class="flex items-center justify-between gap-2 px-4 py-3 sm:px-5">
+          <h2 id="trades-title" class="flex items-center gap-2 font-semibold"><Px name="bulletlist" size={24} class="text-accent" />Trades</h2>
+          <div class="flex gap-1" role="group" aria-label="Filter">
+            {["All", "Buy", "Sell"].map((l, i) => <button type="button" data-filter={l} aria-pressed={i === 0 ? "true" : "false"} class="inline-flex min-h-9 items-center rounded-lg border border-transparent px-3 text-sm text-text-secondary aria-pressed:border-border-strong aria-pressed:bg-surface-raised aria-pressed:font-semibold aria-pressed:text-text">{l}</button>)}
+          </div>
+        </div>
+        <div class="max-h-[36rem] overflow-y-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="sticky top-0 bg-surface-raised text-xs text-text-muted"><tr><th scope="col" class="px-4 py-2 sm:px-5">Side</th><th scope="col" class="px-4 py-2">Qty</th><th scope="col" class="px-4 py-2 text-right">Price</th><th scope="col" class="px-4 py-2 text-right sm:px-5">Time</th></tr></thead>
+            <tbody data-trades></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+  <script>import "../../../scripts/did-page.ts";</script>
+</Base>

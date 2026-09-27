@@ -10,8 +10,10 @@ import { DIST, navigate, page, send, skip, start, stop, until } from "./harness.
 
 // live when the witness published data/contests/, sample otherwise: the pages must work in both
 const LIVE = existsSync(join(DIST, "data", "contests", "index.json"));
-const ranking = JSON.parse(readFileSync(LIVE ? join(DIST, "data", "contests", "close-1.ranking.json")
+const rankingDoc = JSON.parse(readFileSync(LIVE ? join(DIST, "data", "contests", "close-1.ranking.json")
   : join(DIST, "contests", "close-1", "ranking.json"), "utf8"));
+// ranking v1 lists every key; v2 lists the first places, the others are in 256 shard files
+const ranking = { rows: rankingDoc.rows ?? rankingDoc.top };
 const NOBODY = "did:key:z6Mkfw79DoBMgePecy4YaXSSimwzHKYz8sB3JB9X7bKSXMkG";
 
 async function shot(name, width = 1440) {
@@ -60,11 +62,15 @@ test("a live contest shows five numbers, the chart, Find my DID and the top trad
   assert.deepEqual(await page(`[...document.querySelectorAll('nav[aria-label="Contest sections"] a')].map((a) => a.textContent.trim())`), ["Live", "Verify"]);
   assert.ok(await page(`document.querySelector("[data-trading-chart] canvas") !== null`), "the chart is drawn");
   assert.match(await page(`document.querySelector("[data-view]").textContent`), /Price/);
-  const rows = await page(`document.querySelectorAll("section[aria-labelledby=top-title] tbody tr").length`);
-  assert.ok(rows >= 1, "the signed top list has rows");
-  // equal scores share one row
-  const scores = await page(`[...document.querySelectorAll("section[aria-labelledby=top-title] tbody tr td:nth-child(3)")].map((t) => t.textContent)`);
-  assert.equal(new Set(scores).size, scores.length);
+  // one key per row, ranked 1, 2, 3... up to 100
+  const ranks = await page(`[...document.querySelectorAll("section[aria-labelledby=top-title] tbody tr td:first-child")].map((t) => Number(t.textContent.trim()))`);
+  assert.equal(ranks.length, Math.min(100, ranking.rows.length));
+  assert.deepEqual(ranks, ranks.map((_, i) => i + 1));
+  // the referee's signed list comes first, each key with its signed score
+  const idx = JSON.parse(readFileSync(LIVE ? join(DIST, "data", "contests", "index.json") : join(DIST, "..", "src", "fixtures", "contests.sample.json"), "utf8"));
+  const signedRows = idx.contests.find((c) => c.id === "close-1").leaderboard.rows;
+  const shown = await page(`[...document.querySelectorAll("section[aria-labelledby=top-title] tbody tr")].slice(0, ${signedRows.length}).map((tr) => tr.querySelector("td:nth-child(3)").textContent.trim())`);
+  assert.deepEqual(shown, signedRows.map((r) => (r.pnl.startsWith("-") || Number(r.pnl) === 0 ? r.pnl : `+${r.pnl}`)));
   await shot("contest-live");
   await shot("contest-live-mobile", 390);
 });
@@ -82,7 +88,7 @@ test("Find my DID gives the rank, says a key has not traded yet, or refuses a ma
   const result = await page(`document.querySelector("[data-find-result]").textContent`);
   assert.match(result, new RegExp(`#${rank}`));
   assert.match(result, new RegExp(pnl.replace("-", "").replace(".", "\\.")));
-  const label = { official: /Signed by the referee/, complete: /Our recount/, partial: /may miss early trades/ }[source];
+  const label = { official: /Signed by the referee/, complete: /Our recount/, partial: /Our recount/ }[source];
   assert.match(result, label);
   assert.ok(found.length > 0);
   await shot("contest-find");
@@ -92,6 +98,24 @@ test("Find my DID gives the rank, says a key has not traded yet, or refuses a ma
   assert.match(await find("did:key:nope"), /Not a did:key/);
 });
 
+test("a ranked key can share its score as a 1200 x 675 picture", { skip }, async () => {
+  await navigate("/contests/close-1/");
+  const [, did] = ranking.rows[0];
+  await find(did);
+  await until(`[...document.querySelectorAll("[data-find-result] button")].some((b) => /Share my score/.test(b.textContent))`, "the share button");
+  // the test stands in for the system share sheet and keeps what it was given
+  await page(`(() => { navigator.canShare = () => true; navigator.share = async (d) => { window.__shared = d; }; return true; })()`);
+  await page(`[...document.querySelectorAll("[data-find-result] button")].find((b) => /Share my score/.test(b.textContent)).click()`);
+  await until(`window.__shared !== undefined`, "the shared picture");
+  const info = await page(`(async () => { const f = window.__shared.files[0]; const b = await createImageBitmap(f);
+    const r = new FileReader(); const url = await new Promise((ok) => { r.onload = () => ok(r.result); r.readAsDataURL(f); });
+    return { type: f.type, w: b.width, h: b.height, text: window.__shared.text, url }; })()`);
+  assert.equal(info.type, "image/png");
+  assert.deepEqual([info.w, info.h], [1200, 675]);
+  assert.match(info.text, /POLF, #1 of/);
+  if (process.env.SHOT_DIR) writeFileSync(join(process.env.SHOT_DIR, "score-card.png"), Buffer.from(info.url.split(",")[1], "base64"));
+});
+
 test("the checks list every state in plain words", { skip }, async () => {
   await navigate("/contests/close-1/verify/");
   const items = await page(`document.querySelectorAll("main ul > li").length`);
@@ -99,3 +123,34 @@ test("the checks list every state in plain words", { skip }, async () => {
   assert.match(await page(`document.querySelector("[role=status]").textContent`), /checks pass/);
   await shot("contest-verify");
 });
+
+test("Find my DID gives each key the rank the Top 100 shows", { skip }, async () => {
+  await navigate("/contests/close-1/");
+  const table = await page(`[...document.querySelectorAll("section[aria-labelledby=top-title] tbody tr")].slice(0, 30).map((tr) =>
+    [Number(tr.querySelector("td").textContent.trim()), tr.querySelector("td:nth-child(2) a").getAttribute("href").split("k=")[1]])`);
+  for (const [rank, did] of [table[0], table[1], table[5], table[table.length - 1]]) {
+    await find(did);
+    await until(`!document.querySelector("[data-find-result]").textContent.includes("Searching")`, "the search to finish");
+    const text = await page(`document.querySelector("[data-find-result] .text-3xl").textContent`);
+    assert.equal(text, `#${rank.toLocaleString("en-US")}`, `${did} is #${rank} in the table`);
+  }
+});
+
+test("a trader's page opens from the table with its rank, score and position", { skip }, async () => {
+  await navigate("/contests/close-1/");
+  const href = await page(`document.querySelector("section[aria-labelledby=top-title] tbody tr td:nth-child(2) a").getAttribute("href")`);
+  const score = await page(`document.querySelector("section[aria-labelledby=top-title] tbody tr td:nth-child(3)").textContent.trim()`);
+  // the whole row opens it: a click on the score cell lands on the row's link
+  assert.equal(await page(`(() => { const td = document.querySelector("section[aria-labelledby=top-title] tbody tr td:nth-child(3)");
+    const r = td.getBoundingClientRect(); td.scrollIntoView({ block: "center" }); const b = td.getBoundingClientRect();
+    return document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2).closest("a")?.getAttribute("href"); })()`), href);
+  await navigate(href);
+  await until(`!document.querySelector("[data-head]").hidden || !document.querySelector("[data-problem]").classList.contains("hidden")`, "the trader page");
+  assert.equal(await page(`document.querySelector("[data-rank]").textContent`), "#1");
+  assert.equal(await page(`document.querySelector("[data-score]").textContent`), score.replace("-", "−"));
+  assert.match(await page(`document.querySelector("[data-position]").textContent`), /Long|Short|Flat|–/);
+  await shot("contest-did");
+  await navigate("/contests/close-1/did/?k=nope");
+  assert.match(await page(`document.querySelector("[data-problem]").textContent`), /Open this page from the contest/);
+});
+

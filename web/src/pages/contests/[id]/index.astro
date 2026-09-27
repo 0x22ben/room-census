@@ -7,7 +7,7 @@ import ContestHeader from "../../../components/ContestHeader.astro";
 import Help from "../../../components/Help.astro";
 import Px from "../../../components/Px.astro";
 import TradingChart, { type View } from "../../../components/TradingChart.astro";
-import { change, contests, countdown, phaseOf, positionParts, shortDid, signed, tabs, tieGroups, type Contest } from "../../../lib/contests";
+import { change, contests, countdown, phaseOf, positionParts, shortDid, signed, tabs, topTraders, type Contest } from "../../../lib/contests";
 
 export function getStaticPaths() {
   return contests().map((c) => ({ params: { id: c.id }, props: { contest: c } }));
@@ -45,8 +45,8 @@ const move = change(s[0]?.price, price);
 const actives = s.map((p) => p.active).filter((v): v is number => v !== undefined);
 const traders = c.ranking?.traders;
 const hourAgo = actives.length > 12 ? actives[actives.length - 1] - actives[actives.length - 13] : undefined;
-const groups = lb ? tieGroups(lb.rows) : [];
-const withPosition = lb?.rows.some((r) => r.position !== undefined) ?? false;
+const top = topTraders(c, 100);
+const withPosition = top.some((r) => r.position !== undefined);
 const line = lb && lb.rows.length >= 3 ? lb.rows[2].pnl : undefined;
 const prizeN = Number(c.prize.replace(/[^0-9]/g, ""));
 const clock = phase === "live" ? { label: "Locks in", value: countdown(c.trading_lock_at) }
@@ -63,7 +63,7 @@ const cells = [
 const tile = { accent: "bg-accent-soft text-accent", warning: "bg-warning-soft text-warning" } as const;
 const current = tabs(c)[0].label;
 ---
-<Base title={c.title} description={`${c.title}, live: price, active traders, the signed top list and a search for any DID.`}>
+<Base title={`${c.title}: live leaderboard and PnL`} description={`${c.title}, live: price, active traders, the referee's signed top list and our recount, and every trader's page.`}>
   <ContestHeader contest={c} current={current} />
 
   {c.latest ? (
@@ -96,7 +96,9 @@ const current = tabs(c)[0].label;
 
       {c.ranking && (
         <section aria-labelledby="find-title" class="grid content-start gap-3 rounded-xl border border-border bg-surface p-4 sm:p-5"
-          data-find-did data-url={c.ranking.file} data-traders={c.ranking.traders} data-line={line}
+          data-find-did data-url={c.ranking.file} data-traders={c.ranking.traders} data-line={line} data-signed={JSON.stringify((lb?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check })))} data-contest={c.title.toUpperCase()} data-sweep={c.ranking.sweep}
+          data-prices={JSON.stringify(s.slice(-288).map((q) => num(q.price)).filter((v) => v !== null))}
+          data-page={new URL(`/contests/${c.id}/`, Astro.site).href}
           data-lock={phase === "live" ? countdown(c.trading_lock_at) : undefined}>
           <h2 id="find-title" class="flex items-center gap-2 font-semibold"><Px name="search" size={24} class="text-accent" />Find my DID</h2>
           <form class="flex min-h-11 items-center gap-2 rounded-lg border border-border-strong bg-bg pr-1.5 pl-3" data-find-form>
@@ -111,11 +113,11 @@ const current = tabs(c)[0].label;
     </div>
   )}
 
-  {lb && (
+  {top.length > 0 && (
     <section aria-labelledby="top-title" class="mt-4 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3.5 sm:px-5">
-        <h2 id="top-title" class="flex items-center gap-2 font-semibold"><Px name="trending-up" size={24} class="text-accent" />Top traders
-          <Help term="Top traders" text="The referee's signed top list at its latest update, each score recomputed by us from the signed trades. Keys with equal scores share the places they span." /></h2>
+        <h2 id="top-title" class="flex items-center gap-2 font-semibold"><Px name="trending-up" size={24} class="text-accent" />Top {top.length}
+          <Help term="Top traders" text="The first places are the referee's signed top list, with our check next to each score. The next places come from our recount of the signed trades. Keys with equal scores share the places they span." /></h2>
         {traders !== undefined && <p class="font-mono text-xs text-text-muted">{traders.toLocaleString("en-US")} active</p>}
       </div>
       <div class="overflow-x-auto">
@@ -126,34 +128,37 @@ const current = tabs(c)[0].label;
               <th scope="col" class="px-4 py-2 font-semibold">Trader</th>
               <th scope="col" class="px-4 py-2 text-right font-semibold">Score</th>
               {withPosition && <th scope="col" class="hidden px-4 py-2 font-semibold sm:table-cell">Position</th>}
-              <th scope="col" class="w-12 px-4 py-2 sm:px-5"><span class="sr-only">Our check</span></th>
+              <th scope="col" class="w-12 px-4 py-2 sm:px-5"><span class="sr-only">Source</span></th>
+              <th scope="col" class="w-8 pr-4 sm:pr-5"><span class="sr-only">Open</span></th>
             </tr>
           </thead>
           <tbody>
-            {groups.map(({ row: r, tied }, k) => {
-              const pos = positionParts(r.position);
+            {top.map(({ rank, did, pnl, source, check, position }) => {
+              const pos = positionParts(position);
               const side = pos?.side === "Short" ? "text-down" : pos?.side === "Flat" ? "text-text-muted" : "text-accent";
               return (
-                <tr class:list={["border-t border-border", k < 3 && "bg-accent-soft/40"]}>
-                  <td class="px-4 py-3 sm:px-5">
-                    <span class:list={["inline-flex items-center gap-1.5 font-mono", k < 3 ? "font-bold text-text" : "text-text-secondary"]}>
-                      {r.rank === 1 && <Px name="crown" size={12} class="text-warning" label="First place" />}{r.rank}
+                <tr class:list={["relative border-t border-border transition-colors hover:bg-surface-raised focus-within:bg-surface-raised", rank <= 3 && "bg-accent-soft/40"]}>
+                  <td class="px-4 py-2.5 sm:px-5">
+                    <span class:list={["inline-flex items-center gap-1.5 font-mono", rank <= 3 ? "font-bold text-text" : "text-text-secondary"]}>
+                      {rank === 1 && <Px name="crown" size={12} class="text-warning" label="First place" />}{rank}
                     </span>
                   </td>
-                  <td class="px-4 py-3">
-                    <span class="inline-flex flex-wrap items-center gap-2">
-                      <span class="font-mono">{shortDid(r.did)}</span>
-                      {tied > 0 && <span class="rounded-md border border-border bg-surface-raised px-1.5 py-0.5 text-xs font-semibold text-text-secondary">{tied} tied</span>}
-                    </span>
+                  <td class="px-4 py-2.5">
+                    {/* the whole row opens the trader's page: the link covers it */}
+                    <a class="font-mono text-text no-underline outline-none after:absolute after:inset-0 after:content-[''] focus-visible:underline" href={`/contests/${c.id}/did/?k=${did}`}
+                      aria-label={`${shortDid(did)}, rank ${rank}: open its trades`}>{shortDid(did)}</a>
                     {pos && <span class:list={["mt-0.5 block font-mono text-xs sm:hidden", side]}>{pos.side} {pos.detail}</span>}
                   </td>
-                  <td class="px-4 py-3 text-right font-mono font-semibold whitespace-nowrap text-accent tabular-nums">{signed(r.pnl)}</td>
-                  {withPosition && <td class:list={["hidden px-4 py-3 font-mono text-xs whitespace-nowrap sm:table-cell", side]}>{pos ? `${pos.side} ${pos.detail}`.trim() : ""}</td>}
-                  <td class="px-4 py-3 text-right sm:px-5">
-                    {r.check === "match" && <Px name="check" size={24} class="inline text-accent" label="Checked: our recount finds the same score" />}
-                    {r.check === "pending" && <Px name="hourglass" size={12} class="inline text-text-muted" label="Not checked yet" />}
-                    {r.check === "differs" && <Px name="warning-diamond" size={12} class="inline text-warning" label="Our recount finds a different score" />}
+                  <td class:list={["px-4 py-2.5 text-right font-mono font-semibold whitespace-nowrap tabular-nums", Number(pnl) < 0 ? "text-down" : "text-accent"]}>{signed(pnl)}</td>
+                  {withPosition && <td class:list={["hidden px-4 py-2.5 font-mono text-xs whitespace-nowrap sm:table-cell", side]}>{pos ? `${pos.side} ${pos.detail}`.trim() : ""}</td>}
+                  <td class="px-4 py-2.5 text-right sm:px-5">
+                    {source === "signed" && check === "differs" && <Px name="warning-diamond" size={12} class="inline text-warning" label="Signed by the referee; our recount finds a different score" />}
+                    {source === "signed" && check === "pending" && <Px name="hourglass" size={12} class="inline text-text-muted" label="Signed by the referee; not checked by our recount yet" />}
+                    {source === "signed" && check === "match" && <Px name="check" size={24} class="inline text-accent" label="Signed by the referee and checked by our recount" />}
+                    {source !== "signed" && <Px name="calculator" size={12} class:list={["inline", source === "partial" ? "text-text-muted" : "text-text-secondary"]}
+                            label={source === "partial" ? "Our recount; it may miss trades from before our capture" : "Our recount of the signed trades"} />}
                   </td>
+                  <td class="pr-4 text-right text-text-muted sm:pr-5"><Px name="chevron-right" size={12} class="inline" /></td>
                 </tr>
               );
             })}

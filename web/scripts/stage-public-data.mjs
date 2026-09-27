@@ -21,7 +21,9 @@ export const DIRECTORIES = {
 };
 // directories that may be absent: the contest witness publishes data/contests/ only once a contest runs
 export const OPTIONAL_DIRECTORIES = {
-  "data/contests": (name) => name === "index.json" || (name.endsWith(".ranking.json") && validSlug(name.slice(0, -13))),
+  // the index, one ranking per contest, and its 256 shards of rankings and of settled trades
+  "data/contests": (name) => name === "index.json" || (name.endsWith(".ranking.json") && validSlug(name.slice(0, -13)))
+    || (/^[a-z0-9][a-z0-9_-]{0,47}\.(ranking|trades)\.[0-9a-f]{2}\.json$/.test(name) && validSlug(name.replace(/\.(ranking|trades)\.[0-9a-f]{2}\.json$/, ""))),
 };
 const SNAPSHOT = /^data\/snapshots\/\d{4}-\d{2}-\d{2}T\d{4}Z\.json$/;
 

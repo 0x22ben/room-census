@@ -1,15 +1,17 @@
-// "Find my DID": looks a did:key up in the ranking file this site serves. Nothing leaves the site and
+// "Find my DID": looks a did:key up in the ranking files this site serves. Nothing leaves the site and
 // nothing is stored. Only keys with at least one settled trade are ranked: any other key has not
-// traded yet, as far as our capture shows.
+// traded yet, as far as our capture shows. Ranks are the same as in the Top 100 (ranking-lookup.ts).
 // the fifth field, when present, is the open position rebuilt by our recount: [signed contracts, entry] or null
-type Row = [number, string, string, "official" | "complete" | "partial", ([string, string] | null)?];
-type Ranking = { sweep: number; traders: number; owners: number; rows: Row[]; capture_start?: string; notes?: Partial<Record<Row[3], string>> };
+import { drawCard, shareCard, type Card } from "./pnl-card";
+import { lookup, type Row, type Signed } from "./ranking-lookup";
 
 const DID = /^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]{44}$/;
 const SOURCE = {
   official: { label: "Signed by the referee", tone: "border-accent-border bg-accent-soft text-accent" },
+  signed: { label: "Signed by the referee", tone: "border-border bg-surface-raised text-text-secondary" },
   complete: { label: "Our recount", tone: "border-accent-border bg-accent-soft text-accent" },
-  partial: { label: "Our recount · may miss early trades", tone: "border-warning-border bg-warning-soft text-warning" },
+  // the caveat of a partial count stays in the badge's title, not on screen (Ben 2026-09-27)
+  partial: { label: "Our recount", tone: "border-border bg-surface-raised text-text-secondary" },
 } as const;
 
 function el(tag: string, cls: string, text?: string): HTMLElement {
@@ -49,8 +51,27 @@ function ranked(row: Row, traders: number, line: number | undefined, note: strin
   const source = SOURCE[row[3]];
   const badge = el("span", `justify-self-start rounded-md border px-2 py-0.5 text-xs font-semibold ${source.tone}`, source.label);
   if (note) badge.title = note;
-  box.append(top, ...(list.childElementCount ? [list] : []), badge);
+  const open = el("a", "text-sm font-semibold text-link", "Open its trades");
+  open.setAttribute("href", `${location.pathname.replace(/\/?$/, "/")}did/?k=${encodeURIComponent(row[1])}`);
+  const foot = el("div", "flex flex-wrap items-center justify-between gap-2");
+  foot.append(badge, open);
+  box.append(top, ...(list.childElementCount ? [list] : []), foot);
   return box;
+}
+
+/** "Share on X": the score card is drawn as soon as the result shows, so a click opens the share
+ * sheet (or X) right away, inside the click, as browsers require. */
+function shareButton(root: HTMLElement, row: Row, traders: number, line: number | undefined): HTMLElement {
+  const button = el("button", "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent", "Share my score on X");
+  button.setAttribute("type", "button");
+  const card: Card = { did: row[1], score: Number(row[2]), rank: row[0], traders, line, contest: root.dataset.contest ?? "", official: row[3] === "official" || row[3] === "signed",
+    sweep: Number(root.dataset.sweep), position: positionText(row[4]), prices: JSON.parse(root.dataset.prices ?? "[]") };
+  let ready: Blob | undefined;
+  drawCard(card).then((b) => { ready = b; }).catch(() => undefined);
+  button.addEventListener("click", () => {
+    shareCard(card, root.dataset.page ?? location.href, ready).catch(() => undefined);
+  });
+  return button;
 }
 
 function noTrade(lock: string | undefined): HTMLElement {
@@ -75,7 +96,7 @@ function init(root: HTMLElement) {
   const input = form.querySelector<HTMLInputElement>("input")!;
   const out = root.querySelector<HTMLElement>("[data-find-result]")!;
   const line = root.dataset.line ? Number(root.dataset.line) : undefined;
-  let data: Promise<Ranking> | null = null;
+  const signed: Signed[] = JSON.parse(root.dataset.signed ?? "[]");
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const did = input.value.trim();
@@ -85,16 +106,17 @@ function init(root: HTMLElement) {
       return;
     }
     out.append(el("p", "text-sm text-text-muted", "Searching…"));
-    data ??= fetch(root.dataset.url!).then((r) => {
-      if (!r.ok) throw new Error(String(r.status));
-      return r.json() as Promise<Ranking>;
-    });
     try {
-      const ranking = await data;
-      const row = ranking.rows.find((r) => r[1] === did);
-      out.replaceChildren(row ? ranked(row, ranking.traders, line, ranking.notes?.[row[3]]) : noTrade(root.dataset.lock));
+      const ranking = await lookup(root.dataset.url!, did, signed);
+      const row = ranking.row;
+      if (row) {
+        const card = ranked(row, ranking.traders, line, ranking.notes[row[3]]);
+        card.append(shareButton(root, row, ranking.traders, line));
+        out.replaceChildren(card);
+      } else {
+        out.replaceChildren(noTrade(root.dataset.lock));
+      }
     } catch {
-      data = null;
       out.replaceChildren(el("p", "text-sm text-warning", "The ranking could not be read. Try again in a moment."));
     }
   });
