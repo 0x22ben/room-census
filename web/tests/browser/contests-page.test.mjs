@@ -80,39 +80,49 @@ test("the old leaderboard address lands on the Live page", { skip }, async () =>
   await until(`location.pathname === "/contests/close-1/"`, "the redirect to Live");
 });
 
-test("Find my DID gives the rank, says a key has not traded yet, or refuses a malformed key", { skip }, async () => {
+/** Searches a ranked key: the trader page opens, and its rank is read there. */
+async function openFromSearch(did) {
   await navigate("/contests/close-1/");
-  const [rank, did, pnl, source] = ranking.rows[0];
-  const found = await find(did);
-  await until(`!document.querySelector("[data-find-result]").textContent.includes("Searching")`, "the search to finish");
-  const result = await page(`document.querySelector("[data-find-result]").textContent`);
-  assert.match(result, new RegExp(`#${rank}`));
-  assert.match(result, new RegExp(pnl.replace("-", "").replace(".", "\\.")));
-  const label = { official: /Signed by the referee/, complete: /Our recount/, partial: /Our recount/ }[source];
-  assert.match(result, label);
-  assert.ok(found.length > 0);
-  await shot("contest-find");
+  await page(`(() => { const i = document.querySelector("#find-input"); i.value = ${JSON.stringify(did)};
+    document.querySelector("[data-find-form]").requestSubmit(); return true; })()`);
+  await until(`location.pathname === "/contests/close-1/did/"`, "the trader page");
+  await until(`!document.querySelector("[data-head]").hidden`, "the trader's rank");
+  return page(`document.querySelector("[data-rank]").textContent`);
+}
+
+test("Find my DID opens a ranked key's page, says a key has not traded yet, or refuses a malformed key", { skip }, async () => {
+  const [rank, did, pnl] = ranking.rows[0];
+  assert.equal(await openFromSearch(did), `#${rank}`);
+  assert.equal(await page(`new URLSearchParams(location.search).get("k")`), did);
+  assert.match(await page(`document.querySelector("[data-score]").textContent`), new RegExp(pnl.replace("-", "").replace(".", "\\.")));
+  await navigate("/contests/close-1/");
   await find(NOBODY);
   await until(`!document.querySelector("[data-find-result]").textContent.includes("Searching")`, "the search to finish");
   assert.match(await page(`document.querySelector("[data-find-result]").textContent`), /No trade yet/);
+  assert.equal(await page(`location.pathname`), "/contests/close-1/");
+  await shot("contest-find");
   assert.match(await find("did:key:nope"), /Not a did:key/);
 });
 
-test("a ranked key can share its score as a 1200 x 675 picture", { skip }, async () => {
-  await navigate("/contests/close-1/");
+test("Share on X opens a prefilled post on X and puts the 1200 x 675 card on the clipboard", { skip }, async () => {
   const [, did] = ranking.rows[0];
-  await find(did);
-  await until(`[...document.querySelectorAll("[data-find-result] button")].some((b) => /Share my score/.test(b.textContent))`, "the share button");
-  // the test stands in for the system share sheet and keeps what it was given
-  await page(`(() => { navigator.canShare = () => true; navigator.share = async (d) => { window.__shared = d; }; return true; })()`);
-  await page(`[...document.querySelectorAll("[data-find-result] button")].find((b) => /Share my score/.test(b.textContent)).click()`);
-  await until(`window.__shared !== undefined`, "the shared picture");
-  const info = await page(`(async () => { const f = window.__shared.files[0]; const b = await createImageBitmap(f);
+  await navigate(`/contests/close-1/did/?k=${did}`);
+  await until(`!document.querySelector("[data-head]").hidden`, "the trader page");
+  // the test stands in for X and for the clipboard, and keeps what they were given
+  await page(`(() => { window.open = (u) => { window.__opened = u; return null; };
+    navigator.clipboard.write = async (items) => { window.__copied = await items[0].getType("image/png"); }; return true; })()`);
+  await until(`(async () => { await new Promise((r) => setTimeout(r, 300)); return true; })()`, "the card to be drawn");
+  await page(`document.querySelector("[data-share]").click()`);
+  await until(`window.__opened !== undefined && window.__copied !== undefined`, "X and the clipboard");
+  const opened = await page(`window.__opened`);
+  assert.match(opened, /^https:\/\/x\.com\/intent\/post\?text=/);
+  assert.match(decodeURIComponent(opened), /Score in .* POLF, #1 of/);
+  assert.match(await page(`document.querySelector("[data-share-status]").textContent`), /Ctrl\+V/);
+  const info = await page(`(async () => { const f = window.__copied; const b = await createImageBitmap(f);
     const r = new FileReader(); const url = await new Promise((ok) => { r.onload = () => ok(r.result); r.readAsDataURL(f); });
-    return { type: f.type, w: b.width, h: b.height, text: window.__shared.text, url }; })()`);
+    return { type: f.type, w: b.width, h: b.height, url }; })()`);
   assert.equal(info.type, "image/png");
   assert.deepEqual([info.w, info.h], [1200, 675]);
-  assert.match(info.text, /POLF, #1 of/);
   if (process.env.SHOT_DIR) writeFileSync(join(process.env.SHOT_DIR, "score-card.png"), Buffer.from(info.url.split(",")[1], "base64"));
 });
 
@@ -129,10 +139,7 @@ test("Find my DID gives each key the rank the Top 100 shows", { skip }, async ()
   const table = await page(`[...document.querySelectorAll("section[aria-labelledby=top-title] tbody tr")].slice(0, 30).map((tr) =>
     [Number(tr.querySelector("td").textContent.trim()), tr.querySelector("td:nth-child(2) a").getAttribute("href").split("k=")[1]])`);
   for (const [rank, did] of [table[0], table[1], table[5], table[table.length - 1]]) {
-    await find(did);
-    await until(`!document.querySelector("[data-find-result]").textContent.includes("Searching")`, "the search to finish");
-    const text = await page(`document.querySelector("[data-find-result] .text-3xl").textContent`);
-    assert.equal(text, `#${rank.toLocaleString("en-US")}`, `${did} is #${rank} in the table`);
+    assert.equal(await openFromSearch(did), `#${rank.toLocaleString("en-US")}`, `${did} is #${rank} in the table`);
   }
 });
 

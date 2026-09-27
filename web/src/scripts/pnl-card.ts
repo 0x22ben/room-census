@@ -179,21 +179,7 @@ export async function drawCard(card: Card): Promise<Blob> {
   return new Promise((ok, fail) => canvas.toBlob((b) => (b ? ok(b) : fail(new Error("no image"))), "image/png"));
 }
 
-/** Shares the card through the system share sheet when it can carry a file (phones), otherwise
- * downloads it and opens a prefilled post on X, where the reader attaches the picture. */
-export async function shareCard(card: Card, pageUrl: string, ready?: Blob): Promise<void> {
-  const blob = ready ?? await drawCard(card);
-  const name = `room-census-${card.did.slice(-8)}.png`;
-  const file = new File([blob], name, { type: "image/png" });
-  const post = `${card.mine === false ? "Score" : "My score"} in ${card.contest.replace(" · ", " ")}: ${signed(card.score)} POLF, #${n(card.rank)} of ${n(card.traders)} traders${card.official ? ", signed by the referee" : " (Room Census recount)"}.`;
-  if (navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], text: `${post} ${pageUrl}` });
-      return;
-    } catch (e) {
-      if ((e as Error).name === "AbortError") return;
-    }
-  }
+function download(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -202,5 +188,25 @@ export async function shareCard(card: Card, pageUrl: string, ready?: Blob): Prom
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+/** "Share on X", straight away: opens a post on X with the text and the link filled in, and puts the
+ * score card on the clipboard so the reader pastes it into the post (X lets no site attach a picture
+ * itself); when the clipboard refuses, the card is downloaded instead. Returns how the picture was
+ * handed over. Must run inside the click, with the card already drawn, or the browser blocks X. */
+export function shareOnX(card: Card, pageUrl: string, blob: Blob | undefined): "copied" | "downloaded" | "none" {
+  const post = `${card.mine === false ? "Score" : "My score"} in ${card.contest.replace(" · ", " ")}: ${signed(card.score)} POLF, #${n(card.rank)} of ${n(card.traders)} traders${card.official ? ", signed by the referee" : " (Room Census recount)"}.`;
+  const name = `room-census-${card.did.slice(-8)}.png`;
+  let handed: "copied" | "downloaded" | "none" = "none";
+  if (blob) {
+    if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
+      navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]).catch(() => download(blob, name));
+      handed = "copied";
+    } else {
+      download(blob, name);
+      handed = "downloaded";
+    }
+  }
   window.open(`https://x.com/intent/post?text=${encodeURIComponent(post)}&url=${encodeURIComponent(pageUrl)}`, "_blank", "noopener");
+  return handed;
 }

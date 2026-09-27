@@ -5,7 +5,7 @@
 import { CategoryScale, Chart, Filler, LinearScale, LineController, LineElement, PointElement, Tooltip } from "chart.js";
 import { Account, MINT } from "../lib/fold-lite.mjs";
 import { robustRange } from "../lib/robust-range.mjs";
-import { drawCard, shareCard, type Card } from "./pnl-card";
+import { drawCard, shareOnX, type Card } from "./pnl-card";
 import { lookup, tradesOf, type Signed } from "./ranking-lookup";
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler);
@@ -203,7 +203,9 @@ function init(root: HTMLElement) {
     let ready: Blob | undefined;
     drawCard(cardData).then((b) => { ready = b; }).catch(() => undefined);
     q("[data-share]").addEventListener("click", () => {
-      shareCard(cardData, `${root.dataset.page}?k=${encodeURIComponent(did)}`, ready).catch(() => undefined);
+      const how = shareOnX(cardData, `${root.dataset.page}?k=${encodeURIComponent(did)}`, ready);
+      q("[data-share-status]").textContent = how === "copied" ? "Picture copied: paste it in your post (Ctrl+V)."
+        : how === "downloaded" ? "Picture downloaded: add it to your post." : "";
     });
   })();
 }

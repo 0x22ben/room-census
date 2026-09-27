@@ -48,7 +48,6 @@ const hourAgo = actives.length > 12 ? actives[actives.length - 1] - actives[acti
 const top = topTraders(c, 100);
 const sparks = sparklines(c, top.map((r) => r.did));
 const withPosition = top.some((r) => r.position !== undefined);
-const line = lb && lb.rows.length >= 3 ? lb.rows[2].pnl : undefined;
 const prizeN = Number(c.prize.replace(/[^0-9]/g, ""));
 const clock = phase === "live" ? { label: "Locks in", value: countdown(c.trading_lock_at) }
   : phase === "closed" && c.final_price_at ? { label: "Final price in", value: countdown(c.final_price_at) }
@@ -97,9 +96,8 @@ const current = tabs(c)[0].label;
 
       {c.ranking && (
         <section aria-labelledby="find-title" class="grid content-start gap-3 rounded-xl border border-border bg-surface p-4 sm:p-5"
-          data-find-did data-url={c.ranking.file} data-traders={c.ranking.traders} data-line={line} data-signed={JSON.stringify((lb?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check })))} data-contest={c.title.toUpperCase()} data-sweep={c.ranking.sweep}
-          data-prices={JSON.stringify(s.slice(-288).map((q) => num(q.price)).filter((v) => v !== null))}
-          data-page={new URL(`/contests/${c.id}/`, Astro.site).href}
+          data-find-did data-url={c.ranking.file}
+          data-signed={JSON.stringify((lb?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check })))}
           data-lock={phase === "live" ? countdown(c.trading_lock_at) : undefined}>
           <h2 id="find-title" class="flex items-center gap-2 font-semibold"><Px name="search" size={24} class="text-accent" />Find my DID</h2>
           <form class="flex min-h-11 items-center gap-2 rounded-lg border border-border-strong bg-bg pr-1.5 pl-3" data-find-form>
