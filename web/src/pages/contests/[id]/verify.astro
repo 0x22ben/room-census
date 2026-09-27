@@ -5,7 +5,7 @@ import Base from "../../../layouts/Base.astro";
 import ContestHeader from "../../../components/ContestHeader.astro";
 import Help from "../../../components/Help.astro";
 import Px from "../../../components/Px.astro";
-import { contests, passes, tally, type Contest } from "../../../lib/contests";
+import { contests, coverageLine, passes, tally, type Contest } from "../../../lib/contests";
 
 export function getStaticPaths() {
   return contests().map((c) => ({ params: { id: c.id }, props: { contest: c } }));
@@ -42,6 +42,8 @@ const button = "inline-flex min-h-11 items-center gap-2 rounded-md border border
       </li>
     ))}
   </ul>
+
+  <p class="mt-4 flex items-start gap-2 text-sm text-text-muted"><Px name="info-box" size={12} class="mt-1 shrink-0" />{coverageLine(c)}</p>
 
   <div class="mt-4 flex flex-wrap gap-2">
     <a href={c.rules} class={button}>Rules on GitHub <Px name="external-link" size={16} aria-hidden="true" class="text-text-secondary" /></a>

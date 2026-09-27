@@ -42,6 +42,9 @@ const MUTATIONS = [
   ["series going backwards", (i, r, c) => { c.series[1].n = 1; }, /increasing order/],
   ["players going down", (i, r, c) => { c.series[1].owners = 5; }, /went down/],
   ["series not ending at the latest update", (i, r, c) => { c.latest.sweep = 3; c.leaderboard.sweep = 3; c.ranking.sweep = 3; r.sweep = 3; }, /does not end at the latest/],
+  ["agents' price with three decimals", (i, r, c) => { c.series[0].global = "224.875"; }, /malformed agents' price/],
+  ["top score without cents", (i, r, c) => { c.series[1].top = "76"; }, /malformed top score/],
+  ["negative long count", (i, r, c) => { c.series[1].long = -1; }, /malformed long count/],
   ["price with three decimals", (i, r, c) => { c.latest.price = "224.875"; }, /latest update is malformed/],
   // DIDs, ranks and profits
   ["leaderboard DID malformed", (i, r, c) => { c.leaderboard.rows[0].did = "did:key:nope"; }, /bad or repeated DID/],

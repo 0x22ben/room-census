@@ -61,6 +61,10 @@ function contest(c, capturedAt, where) {
     need(Array.isArray(c.series) && c.series.length > 0, `${where}: empty series`);
     c.series.forEach((s, i) => {
       need(int(s.n, 1) && iso(s.at) && int(s.owners) && (s.price === null || PRICE.test(s.price)), `${where}: series point ${i} is malformed`);
+      // optional numbers: absent when the export cannot establish them, never guessed
+      need(s.global === undefined || s.global === null || PRICE.test(s.global), `${where}: series point ${i} has a malformed agents' price`);
+      for (const k of ["top", "line"]) need(s[k] === undefined || s[k] === null || PNL.test(s[k]), `${where}: series point ${i} has a malformed ${k} score`);
+      for (const k of ["settled", "void", "active", "long", "short"]) need(s[k] === undefined || int(s[k]), `${where}: series point ${i} has a malformed ${k} count`);
       if (i > 0) {
         const p = c.series[i - 1];
         need(s.n > p.n, `${where}: series updates are not in increasing order`);

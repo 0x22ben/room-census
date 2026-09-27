@@ -5,12 +5,13 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-interface Props { name: string; size?: number; class?: string; label?: string }
-const { name, size = 24, class: cls, label } = Astro.props;
+// any other attribute (data-*, id...) is passed to the <svg>: scripts find some icons by them
+interface Props { name: string; size?: number; class?: string; label?: string; [attr: string]: unknown }
+const { name, size = 24, class: cls, label, "aria-hidden": _hidden, ...rest } = Astro.props;
 const px = size >= 16 ? 24 : 12;
 const svg = readFileSync(resolve(process.cwd(), "node_modules", "pixelarticons", "svg", `${name}.svg`), "utf8");
 const inner = svg.replace(/^[\s\S]*?<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "").trim();
 ---
-<svg xmlns="http://www.w3.org/2000/svg" width={px} height={px} viewBox="0 0 24 24" fill="currentColor"
+<svg {...rest} xmlns="http://www.w3.org/2000/svg" width={px} height={px} viewBox="0 0 24 24" fill="currentColor"
   shape-rendering="crispEdges" class={cls} role={label ? "img" : undefined} aria-label={label}
   aria-hidden={label ? undefined : "true"} set:html={inner} />

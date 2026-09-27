@@ -11,8 +11,9 @@ import { censusStatus, latest } from "../lib/data";
 // indexable: false for pages served at any missing address (404), which have no canonical URL
 // csp: My DID, Write and Verify pass their own policy (they may connect to Technocore)
 // local: a page that runs on the reader's device (My DID) shows that in the top bar, as its mockup
-interface Props { title: string; description: string; indexable?: boolean; csp?: string; local?: boolean }
-const { title, description, indexable = true, csp = CSP, local = false } = Astro.props;
+// refresh: a page that moved sends the reader to its new address (no script, the policy stays strict)
+interface Props { title: string; description: string; indexable?: boolean; csp?: string; local?: boolean; refresh?: string }
+const { title, description, indexable = true, csp = CSP, local = false, refresh } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 const fullTitle = title === SITE_NAME ? title : `${title} | ${SITE_NAME}`;
 const favicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0D10'/%3E%3Cpath d='M9 8v16M14 8v16M19 8v16M24 8v16M6 21l22-10' stroke='%232EC4A6' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E";
@@ -26,6 +27,7 @@ const status = censusStatus(census);
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta http-equiv="Content-Security-Policy" content={csp} />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
+    {refresh && <meta http-equiv="refresh" content={`0;url=${refresh}`} />}
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     {indexable ? <link rel="canonical" href={canonical} /> : <meta name="robots" content="noindex" />}

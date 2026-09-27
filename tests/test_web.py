@@ -283,7 +283,8 @@ class Artifact(unittest.TestCase):
                 for attrs in scripts:
                     self.assertRegex(attrs, r'type="module" src="/_astro/[\w.-]+\.js"')
                 needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched ", "data-did-form ",
-                                                       "data-verify-summary ", "data-write ", "data-wizard ", "data-find-did "))
+                                                       "data-verify-summary ", "data-write ", "data-wizard ", "data-find-did ",
+                                                       "data-trading-chart="))
                 self.assertEqual(len(scripts), needed)
 
     def test_the_built_site_meets_the_legacy_route_contract(self):
@@ -341,7 +342,7 @@ class Artifact(unittest.TestCase):
     def test_the_licenses_page_publishes_the_official_texts(self):
         text = html.unescape((DIST / "licenses" / "index.html").read_text(encoding="utf-8"))
         shipped = {"@fontsource-variable/inter": "LICENSE", "@fontsource/ibm-plex-mono": "LICENSE", "chart.js": "LICENSE.md",
-                   "@kurkle/color": "LICENSE.md", "@lucide/astro": "LICENSE", "tailwindcss": "LICENSE", "astro": "LICENSE"}
+                   "@kurkle/color": "LICENSE.md", "pixelarticons": "LICENSE", "tailwindcss": "LICENSE", "astro": "LICENSE"}
         for name, file in shipped.items():
             with self.subTest(package=name):
                 official = (WEB / "node_modules" / name / file).read_text(encoding="utf-8").strip()

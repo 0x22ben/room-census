@@ -34,27 +34,59 @@ export type Contest = {
   rules: string;
   check: { level: "ok" | "partial"; label: string };
   latest?: { sweep: number; at: string; owners: number; price: string; price_time: string; price_age_s: number };
-  series?: { n: number; at: string; owners: number; price: string | null }[];
+  series?: SeriesPoint[];
   leaderboard?: { sweep: number; at: string; rows: LeaderRow[] };
   ranking?: { sweep: number; traders: number; file: string };
   checks: Check[];
   self_key?: { did: string; registration: { room: string; seq: number; at: string } | null; mint: "confirmed" | "not_established"; settled_trade: boolean };
 };
 export type Phase = "upcoming" | "live" | "closed" | "ended";
+/** One referee update. Beyond players and price, every field is optional: an export that cannot
+ * establish a number leaves it out. global: the agents' own price (volume-weighted, signed by the
+ * referee); top and line: the #1 score and the score holding the last prize place, from its signed top
+ * list; settled and void: trades it settled and voided; active, long and short: keys holding a trade,
+ * a long or a short position in our recount. */
+export type SeriesPoint = { n: number; at: string; owners: number; price: string | null; global?: string | null;
+  top?: string | null; line?: string | null; settled?: number; void?: number; active?: number; long?: number; short?: number };
 
 export const SAMPLE = !LIVE;
 export const CAPTURED_AT: string = doc.captured_at;
 export const contests = (): Contest[] => doc.contests;
 export const contest = (id: string): Contest | undefined => contests().find((c) => c.id === id);
 
-/** Tabs of a contest page; an ended contest without a leaderboard has no Leaderboard tab. */
+/** Tabs of a contest page: Live (the numbers, the chart and the ranking) and Verify (the checks). */
 export function tabs(c: Contest): { label: string; href: string }[] {
   const base = `/contests/${c.id}/`;
   return [
-    { label: "Overview", href: base },
-    ...(c.leaderboard ? [{ label: "Leaderboard", href: `${base}leaderboard/` }] : []),
+    { label: phase(c, CAPTURED_AT) === "ended" ? "Results" : "Live", href: base },
     { label: "Verify", href: `${base}verify/` },
   ];
+}
+
+/** Rows of the signed top list grouped by equal score: the first key of each group, and how many more
+ * share its score (they share the places they span, per the rules). */
+export function tieGroups(rows: LeaderRow[]): { row: LeaderRow; tied: number }[] {
+  const out: { row: LeaderRow; tied: number }[] = [];
+  for (const r of rows) {
+    const last = out[out.length - 1];
+    if (last && last.row.pnl === r.pnl) last.tied += 1;
+    else out.push({ row: r, tied: 0 });
+  }
+  return out;
+}
+
+/** "−0.53%" between two prices, or undefined when one is missing. */
+export function change(from: string | null | undefined, to: string | null | undefined): string | undefined {
+  if (!from || !to) return undefined;
+  const v = (Number(to) / Number(from) - 1) * 100;
+  return `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}%`;
+}
+
+/** "6d 21h", "3h 05m" or "12m" until `iso`, counted from our capture (a build must be reproducible). */
+export function countdown(iso: string): string {
+  const m = Math.max(0, Math.floor((Date.parse(iso) - Date.parse(CAPTURED_AT)) / 60_000));
+  const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60), mm = m % 60;
+  return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${String(mm).padStart(2, "0")}m` : `${mm}m`;
 }
 
 /** "did:key:z6MkgTDg…u7Hne": the start and the end, enough to recognise a key. */

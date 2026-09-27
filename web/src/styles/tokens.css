@@ -23,6 +23,8 @@
   --color-warning: #e39b4b;
   --color-warning-soft: #2a1d0f;
   --color-warning-border: #5c3d1d;
+  --color-down: #f0616d;
+  --color-down-soft: #2a1518;
   --color-border: #262d35;
   --color-border-strong: #3a444f;
   --color-on-accent: #090c0f;
@@ -56,6 +58,8 @@
     --color-warning: #9a5416;
     --color-warning-soft: #fbeee0;
     --color-warning-border: #e7c29b;
+    --color-down: #b8323f;
+    --color-down-soft: #fbe9ea;
     --color-border: #dfe3dc;
     --color-border-strong: #b5bcb4;
     --color-on-accent: #ffffff;

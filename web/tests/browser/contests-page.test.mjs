@@ -1,5 +1,5 @@
-// The built Contests pages in a real headless browser: the list, a contest overview, the leaderboard
-// with "Find my DID" (a ranked key, a key with no trade, a malformed key) and the checks. Set SHOT_DIR
+// The built Contests pages in a real headless browser: the list, a contest's Live page with "Find my
+// DID" (a ranked key, a key with no trade, a malformed key) and the checks. Set SHOT_DIR
 // to also save a PNG of each page.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -13,8 +13,6 @@ const LIVE = existsSync(join(DIST, "data", "contests", "index.json"));
 const ranking = JSON.parse(readFileSync(LIVE ? join(DIST, "data", "contests", "close-1.ranking.json")
   : join(DIST, "contests", "close-1", "ranking.json"), "utf8"));
 const NOBODY = "did:key:z6Mkfw79DoBMgePecy4YaXSSimwzHKYz8sB3JB9X7bKSXMkG";
-const index = JSON.parse(readFileSync(LIVE ? join(DIST, "data", "contests", "index.json") : join(DIST, "..", "src", "fixtures", "contests.sample.json"), "utf8"));
-const SELF = index.contests.find((c) => c.id === "close-1").self_key;
 
 async function shot(name, width = 1440) {
   if (!process.env.SHOT_DIR) return;
@@ -53,40 +51,45 @@ test("the list shows each contest with its status and opens it", { skip }, async
   await shot("contests-list-mobile", 390);
 });
 
-test("a live contest shows time left, players, price, prize and the top 3", { skip }, async () => {
+test("a live contest shows five numbers, the chart, Find my DID and the top traders", { skip }, async () => {
   await navigate("/contests/close-1/");
   const text = await page(`document.querySelector("main").textContent`);
-  for (const part of ["Players", "NVDA price used", "Prize", "Players over time", "Top 3 at update", "See the checks", "Trading closes 4 Oct 2026, 09:00 UTC"]) {
-    assert.match(text, new RegExp(part));
+  for (const part of ["NVDA", "Active traders", "#1 score", "Prize · top 3", "Find my DID", "Top traders"]) {
+    assert.ok(text.includes(part), `the page shows "${part}"`);
   }
-  assert.equal(await page(`document.querySelectorAll("section[aria-labelledby=top3-title] li").length`), 3);
-  await shot("contest-overview");
-  await shot("contest-overview-mobile", 390);
+  assert.deepEqual(await page(`[...document.querySelectorAll('nav[aria-label="Contest sections"] a')].map((a) => a.textContent.trim())`), ["Live", "Verify"]);
+  assert.ok(await page(`document.querySelector("[data-trading-chart] canvas") !== null`), "the chart is drawn");
+  assert.match(await page(`document.querySelector("[data-view]").textContent`), /Price/);
+  const rows = await page(`document.querySelectorAll("section[aria-labelledby=top-title] tbody tr").length`);
+  assert.ok(rows >= 1, "the signed top list has rows");
+  // equal scores share one row
+  const scores = await page(`[...document.querySelectorAll("section[aria-labelledby=top-title] tbody tr td:nth-child(3)")].map((t) => t.textContent)`);
+  assert.equal(new Set(scores).size, scores.length);
+  await shot("contest-live");
+  await shot("contest-live-mobile", 390);
 });
 
-test("Find my DID gives the rank and its source, or says there is no trade, or refuses a malformed key", { skip }, async () => {
+test("the old leaderboard address lands on the Live page", { skip }, async () => {
   await navigate("/contests/close-1/leaderboard/");
+  await until(`location.pathname === "/contests/close-1/"`, "the redirect to Live");
+});
+
+test("Find my DID gives the rank, says a key has not traded yet, or refuses a malformed key", { skip }, async () => {
+  await navigate("/contests/close-1/");
   const [rank, did, pnl, source] = ranking.rows[0];
   const found = await find(did);
-  assert.match(found, new RegExp(`#${rank}`));
-  assert.match(found, new RegExp(pnl.replace(".", "\\.")));
-  const label = { official: /Signed by the referee/, complete: /Our count/, partial: /may be incomplete/ }[source];
-  assert.match(found, label);
-  await shot("contest-leaderboard");
-  const nobody = await find(NOBODY);
-  assert.match(nobody, /Not found in the inspected data/);
-  assert.match(nobody, /Registration and mint: not independently established/);
-  assert.doesNotMatch(nobody, /not registered/i);
-  assert.match(await find("did:key:nope"), /not a did:key/);
-  if (SELF && !SELF.settled_trade) {
-    // our own key: its registration post is evidence we hold; its mint is not claimed
-    const ours = await find(SELF.did);
-    assert.match(ours, new RegExp(`Registration:\\s*observed from our own signed posting record \\(not from the referee\\): close1, seq ${SELF.registration.seq}`));
-    assert.match(ours, /Mint of 10,000 POLF:\s*not independently confirmed/);
-    assert.match(ours, /Settled trade:\s*no settled trade found in the trades we saved/);
-    // never presented as confirmed without a signed referee record
-    assert.doesNotMatch(ours, /registration (is )?confirmed|mint(ed)? confirmed|officially registered/i);
-  }
+  await until(`!document.querySelector("[data-find-result]").textContent.includes("Searching")`, "the search to finish");
+  const result = await page(`document.querySelector("[data-find-result]").textContent`);
+  assert.match(result, new RegExp(`#${rank}`));
+  assert.match(result, new RegExp(pnl.replace("-", "").replace(".", "\\.")));
+  const label = { official: /Signed by the referee/, complete: /Our recount/, partial: /may miss early trades/ }[source];
+  assert.match(result, label);
+  assert.ok(found.length > 0);
+  await shot("contest-find");
+  await find(NOBODY);
+  await until(`!document.querySelector("[data-find-result]").textContent.includes("Searching")`, "the search to finish");
+  assert.match(await page(`document.querySelector("[data-find-result]").textContent`), /No trade yet/);
+  assert.match(await find("did:key:nope"), /Not a did:key/);
 });
 
 test("the checks list every state in plain words", { skip }, async () => {

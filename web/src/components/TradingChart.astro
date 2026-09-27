@@ -1,0 +1,50 @@
+---
+// The contest chart: one Chart.js line chart (src/scripts/trading-chart.ts) with a tab per view and
+// a time range. A view only exists when the export carries its numbers. The canvas takes the keyboard
+// focus: the arrow keys move from update to update. The numbers are also available as a table.
+export interface View { id: string; label: string; unit?: string; min?: number;
+  series: { label: string; token: string; values: (number | null)[]; dashed?: boolean }[] }
+interface Props { views: View[]; at: string[]; summary: string }
+const { views, at, summary } = Astro.props;
+const spec = JSON.stringify({ views, at });
+// the table keeps one row an hour (every 12th update) and the latest one, to stay readable
+const rows = at.map((_, i) => i).filter((i) => i % 12 === 0 || i === at.length - 1);
+const hhmm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)} ${iso.slice(11, 16)}`;
+const pill = "inline-flex min-h-9 items-center rounded-lg border px-3 text-sm aria-pressed:border-border-strong aria-pressed:bg-surface-raised aria-pressed:font-semibold aria-pressed:text-text border-transparent text-text-secondary hover:text-text";
+---
+<section aria-label="Chart" class="grid min-w-0 content-start gap-3 rounded-xl border border-border bg-surface p-4 sm:p-5" data-trading-chart={spec}>
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <div class="flex flex-wrap gap-1" role="group" aria-label="View">
+      {views.map((v, i) => <button type="button" class={pill} data-view={v.id} aria-pressed={i === 0 ? "true" : "false"}>{v.label}</button>)}
+    </div>
+    <div class="flex gap-1" role="group" aria-label="Time range">
+      {[["6H", 72], ["1D", 288], ["All", 0]].map(([l, n]) => <button type="button" class={pill} data-range={n} aria-pressed={l === "All" ? "true" : "false"}>{l}</button>)}
+    </div>
+  </div>
+  <div class="relative h-64 min-w-0 sm:h-80">
+    <canvas role="img" aria-label={summary} tabindex="0" class="rounded-md"></canvas>
+  </div>
+  <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary" data-legend></div>
+  <details class="text-sm">
+    <summary class="inline-flex min-h-11 cursor-pointer items-center font-semibold text-link">Numbers, hour by hour</summary>
+    <div class="max-h-72 overflow-auto">
+      <table class="w-full text-left font-mono text-xs tabular-nums">
+        <thead class="sticky top-0 bg-surface text-text-muted">
+          <tr><th scope="col" class="py-1.5 pr-4">UTC</th>{views.flatMap((v) => v.series).map((s) => <th scope="col" class="py-1.5 pr-4">{s.label}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((i) => (
+            <tr class="border-t border-border">
+              <th scope="row" class="py-1 pr-4 font-normal">{hhmm(at[i])}</th>
+              {views.flatMap((v) => v.series).map((s) => <td class="py-1 pr-4">{s.values[i] ?? "–"}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>
+
+<script>
+  import "../scripts/trading-chart.ts";
+</script>
