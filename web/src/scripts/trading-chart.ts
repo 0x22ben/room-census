@@ -2,6 +2,7 @@
 // range, an area under the first line and the latest value tagged on the right. Colors come from the
 // design tokens and follow the reader's theme. Points can be read with a pointer, by touch or with the
 // arrow keys.
+import { robustRange } from "../lib/robust-range.mjs";
 import { CategoryScale, Chart, Filler, LinearScale, LineController, LineElement, PointElement, Tooltip, type Plugin } from "chart.js";
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler);
@@ -89,7 +90,7 @@ function build(root: HTMLElement, spec: Spec) {
         x: { grid: { display: false }, border: { color: grid },
           ticks: { color: muted, font: mono, maxRotation: 0, autoSkip: true, maxTicksLimit: canvas.clientWidth < 500 ? 3 : 5,
             callback(this: { getLabelForValue(v: number): string }, v: string | number) { return tick(this.getLabelForValue(Number(v))); } } },
-        y: { min: view.min, position: "right" as const, grid: { color: grid }, border: { display: false },
+        y: { ...(robustRange(view.series.flatMap((s) => slice(s.values)), view.min) ?? { min: view.min }), position: "right" as const, grid: { color: grid }, border: { display: false },
           ticks: { color: muted, font: mono, maxTicksLimit: 5, callback: (v: string | number) => fmt(Number(v)) } },
       },
       plugins: {

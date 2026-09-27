@@ -7,7 +7,7 @@ import ContestHeader from "../../../components/ContestHeader.astro";
 import Help from "../../../components/Help.astro";
 import Px from "../../../components/Px.astro";
 import TradingChart, { type View } from "../../../components/TradingChart.astro";
-import { change, contests, countdown, phaseOf, positionParts, shortDid, signed, tabs, topTraders, type Contest } from "../../../lib/contests";
+import { change, contests, countdown, phaseOf, positionParts, shortDid, signed, sparklines, tabs, topTraders, type Contest } from "../../../lib/contests";
 
 export function getStaticPaths() {
   return contests().map((c) => ({ params: { id: c.id }, props: { contest: c } }));
@@ -46,6 +46,7 @@ const actives = s.map((p) => p.active).filter((v): v is number => v !== undefine
 const traders = c.ranking?.traders;
 const hourAgo = actives.length > 12 ? actives[actives.length - 1] - actives[actives.length - 13] : undefined;
 const top = topTraders(c, 100);
+const sparks = sparklines(c, top.map((r) => r.did));
 const withPosition = top.some((r) => r.position !== undefined);
 const line = lb && lb.rows.length >= 3 ? lb.rows[2].pnl : undefined;
 const prizeN = Number(c.prize.replace(/[^0-9]/g, ""));
@@ -73,8 +74,8 @@ const current = tabs(c)[0].label;
           <span class:list={["grid size-10 shrink-0 place-items-center rounded-lg", tile[k.tone as keyof typeof tile]]}><Px name={k.icon} size={24} /></span>
           <span class="grid min-w-0 gap-0.5">
             <span class="text-xs text-text-secondary">{k.label}</span>
-            <span class="flex items-baseline gap-2 whitespace-nowrap">
-              <span class:list={["font-mono text-xl font-semibold tabular-nums", k.valueTone ?? "text-text"]}>{k.value}</span>
+            <span class="flex flex-wrap items-baseline gap-x-2">
+              <span class:list={["font-mono text-lg font-semibold whitespace-nowrap tabular-nums sm:text-xl", k.valueTone ?? "text-text"]}>{k.value}</span>
               {k.delta && <span class:list={["font-mono text-xs", k.deltaTone]}>{k.delta}</span>}
             </span>
           </span>
@@ -128,6 +129,7 @@ const current = tabs(c)[0].label;
               <th scope="col" class="px-4 py-2 font-semibold">Trader</th>
               <th scope="col" class="px-4 py-2 text-right font-semibold">Score</th>
               {withPosition && <th scope="col" class="hidden px-4 py-2 font-semibold sm:table-cell">Position</th>}
+              {sparks.size > 0 && <th scope="col" class="hidden px-4 py-2 font-semibold md:table-cell">24h</th>}
               <th scope="col" class="w-12 px-4 py-2 sm:px-5"><span class="sr-only">Source</span></th>
               <th scope="col" class="w-8 pr-4 sm:pr-5"><span class="sr-only">Open</span></th>
             </tr>
@@ -151,6 +153,12 @@ const current = tabs(c)[0].label;
                   </td>
                   <td class:list={["px-4 py-2.5 text-right font-mono font-semibold whitespace-nowrap tabular-nums", Number(pnl) < 0 ? "text-down" : "text-accent"]}>{signed(pnl)}</td>
                   {withPosition && <td class:list={["hidden px-4 py-2.5 font-mono text-xs whitespace-nowrap sm:table-cell", side]}>{pos ? `${pos.side} ${pos.detail}`.trim() : ""}</td>}
+                  {sparks.size > 0 && (
+                    <td class="hidden px-4 py-2.5 md:table-cell">
+                      {sparks.get(did) && <svg width="96" height="26" viewBox="0 0 96 26" aria-hidden="true" class:list={["block", sparks.get(did)!.up ? "text-accent" : "text-down"]}>
+                        <path d={sparks.get(did)!.d} fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>}
+                    </td>
+                  )}
                   <td class="px-4 py-2.5 text-right sm:px-5">
                     {source === "signed" && check === "differs" && <Px name="warning-diamond" size={12} class="inline text-warning" label="Signed by the referee; our recount finds a different score" />}
                     {source === "signed" && check === "pending" && <Px name="hourglass" size={12} class="inline text-text-muted" label="Signed by the referee; not checked by our recount yet" />}

@@ -3,6 +3,8 @@
 // to draw the score after each referee update, the best trades and the open position. Numbers here are
 // floating point, for display: the ranking line carries the recounted score itself.
 import { CategoryScale, Chart, Filler, LinearScale, LineController, LineElement, PointElement, Tooltip } from "chart.js";
+import { Account, MINT } from "../lib/fold-lite.mjs";
+import { robustRange } from "../lib/robust-range.mjs";
 import { drawCard, shareCard, type Card } from "./pnl-card";
 import { lookup, tradesOf, type Signed } from "./ranking-lookup";
 
@@ -12,7 +14,6 @@ type Trade = [number, "b" | "s" | "x", string, string, string];
 type Mark = [number, number, string];
 
 const DID = /^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]{44}$/;
-const MINT = 10_000;
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const signed = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}`;
 const tone = (v: number) => (v > 0 ? "text-accent" : v < 0 ? "text-down" : "text-text-secondary");
@@ -23,36 +24,6 @@ function el(tag: string, cls: string, text?: string): HTMLElement {
   e.className = cls;
   if (text !== undefined) e.textContent = text;
   return e;
-}
-
-/** One account, as the contest counts it. */
-class Account {
-  cash = MINT;
-  fees = 0;
-  lots: [number, number][] = [];
-  /** Applies a trade and returns what it realized, fees included. */
-  apply(side: number, qty: number, px: number, fee: number): number {
-    this.cash -= fee;
-    this.fees += fee;
-    let left = qty, realized = -fee;
-    while (left > 0 && this.lots.length && this.lots[0][0] * side < 0) {
-      const [lq, lp] = this.lots[0];
-      const size = Math.min(left, Math.abs(lq));
-      this.cash += side < 0 ? size * px : size * (2 * lp - px);
-      realized += side < 0 ? size * (px - lp) : size * (lp - px);
-      left -= size;
-      if (size === Math.abs(lq)) this.lots.shift();
-      else this.lots[0][0] = lq + side * size;
-    }
-    if (left > 0) {
-      this.cash -= left * px;
-      this.lots.push([side * left, px]);
-    }
-    return realized;
-  }
-  value(mark: number): number {
-    return this.cash + this.lots.reduce((v, [q, p]) => v + (q > 0 ? q * mark : -q * (2 * p - mark)), 0);
-  }
 }
 
 function ago(iso: string): string {
@@ -114,9 +85,8 @@ function init(root: HTMLElement) {
       const settle = (upTo: number) => {
         for (; i < trades.length && trades[i][0] <= upTo; i++) {
           const t = trades[i];
-          const side = t[1] === "b" ? 1 : t[1] === "s" ? -1 : 0;
-          if (side === 0) { acct.cash -= Number(t[4]); acct.fees += Number(t[4]); continue; }
-          best.push({ gain: acct.apply(side, Number(t[2]), Number(t[3]), Number(t[4])), t });
+          const gain = acct.applyTrade(t);
+          if (t[1] !== "x") best.push({ gain, t });
         }
       };
       for (const [sweep, mark, at] of marks) {
@@ -169,7 +139,7 @@ function init(root: HTMLElement) {
         options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
           scales: { x: { grid: { display: false }, ticks: { color: css("--color-text-muted"), maxTicksLimit: 4, maxRotation: 0,
             callback(this: { getLabelForValue(v: number): string }, v: string | number) { const s = this.getLabelForValue(Number(v)); return `${s.slice(8, 10)}/${s.slice(5, 7)} ${s.slice(11, 16)}`; } } },
-            y: { position: "right", grid: { color: css("--color-border") }, ticks: { color: css("--color-text-muted"), maxTicksLimit: 5 } } },
+            y: { ...(robustRange(curve.map((p) => p.v)) ?? {}), position: "right", grid: { color: css("--color-border") }, ticks: { color: css("--color-text-muted"), maxTicksLimit: 5 } } },
           plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c: { parsed: { y: number | null } }) => `Score: ${signed(c.parsed.y ?? 0)}` } } } },
       });
     } else {

@@ -6,6 +6,11 @@ import { resolve } from "node:path";
 import sample from "../fixtures/contests.sample.json";
 import { json } from "./files";
 import sampleRanking from "../fixtures/close-1.ranking.sample.json";
+import { shard, shardFile } from "./did-shard.mjs";
+import { scoreCurve } from "./fold-lite.mjs";
+import { robustRange } from "./robust-range.mjs";
+
+type Trade = [number, "b" | "s" | "x", string, string, string];
 import { PHASE_LABEL, after, phase, until } from "./contest-time.mjs";
 import { dateTimeUtc } from "./format";
 
@@ -93,6 +98,33 @@ export function topTraders(c: Contest, limit = 100): TopRow[] {
     if (out.length >= limit) break;
     if (seen.has(did)) continue;
     out.push({ rank: out.length + 1, did, pnl, source: source === "partial" ? "partial" : "complete", position });
+  }
+  return out;
+}
+
+/** The last day of each key's score (288 updates), replayed at build time from the published trades,
+ * as a 96 x 26 SVG path, and whether it went up. Keys without published trades get nothing. */
+export function sparklines(c: Contest, dids: string[]): Map<string, { d: string; up: boolean }> {
+  const out = new Map<string, { d: string; up: boolean }>();
+  if (!c.ranking || !LIVE) return out;
+  const marks = (c.series ?? []).map((p) => [p.n, Number(p.global ?? p.price ?? 0)] as [number, number]).filter(([, v]) => v > 0);
+  const recent = marks.slice(-289);
+  const files = new Map<string, Record<string, Trade[]> | null>();
+  for (const did of dids) {
+    const s = shard(did);
+    if (!files.has(s)) {
+      const rel = shardFile(c.ranking.file, "trades", s).replace(/^\//, "");
+      files.set(s, existsSync(resolve(process.cwd(), ".public", rel)) ? json<{ keys: Record<string, Trade[]> }>(rel).keys : null);
+    }
+    const trades = files.get(s)?.[did];
+    if (!trades?.length) continue;
+    const all = scoreCurve(trades, marks).slice(-recent.length);
+    const [w, h] = [96, 26];
+    const range = robustRange(all);
+    const lo = range?.min ?? Math.min(...all), hi = range?.max ?? Math.max(...all);
+    const y = (v: number) => (h - 2 - ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo || 1)) * (h - 4)).toFixed(1);
+    const d = all.map((v, i) => `${i ? "L" : "M"}${((i / Math.max(1, all.length - 1)) * w).toFixed(1)} ${y(v)}`).join(" ");
+    out.set(did, { d, up: all[all.length - 1] >= all[0] });
   }
   return out;
 }
