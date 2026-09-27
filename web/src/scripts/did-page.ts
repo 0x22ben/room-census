@@ -67,7 +67,8 @@ function init(root: HTMLElement) {
     q("[data-head]").hidden = false;
     q("[data-body]").hidden = false;
     q("[data-short]").textContent = short;
-    q("[data-source]").textContent = official ? "signed by the referee" : "our recount of the signed trades";
+    q("[data-source]").textContent = official ? "signed by the referee"
+      : row[3] === "partial" ? "our recount · may miss its earliest trades" : "our recount of the signed trades";
     q("[data-rank]").textContent = `#${n(row[0])}`;
     const scoreEl = q("[data-score]");
     scoreEl.textContent = signed(score);
@@ -139,7 +140,7 @@ function init(root: HTMLElement) {
         options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
           scales: { x: { grid: { display: false }, ticks: { color: css("--color-text-muted"), maxTicksLimit: 4, maxRotation: 0,
             callback(this: { getLabelForValue(v: number): string }, v: string | number) { const s = this.getLabelForValue(Number(v)); return `${s.slice(8, 10)}/${s.slice(5, 7)} ${s.slice(11, 16)}`; } } },
-            y: { ...(robustRange(curve.map((p) => p.v)) ?? {}), position: "right", grid: { color: css("--color-border") }, ticks: { color: css("--color-text-muted"), maxTicksLimit: 5 } } },
+            y: { ...(robustRange(curve.map((p) => p.v)) ?? {}), position: "right", grid: { color: css("--color-border") }, ticks: { color: css("--color-text-muted"), maxTicksLimit: 5, callback: (v: string | number) => Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }) } } },
           plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c: { parsed: { y: number | null } }) => `Score: ${signed(c.parsed.y ?? 0)}` } } } },
       });
     } else {
@@ -203,9 +204,10 @@ function init(root: HTMLElement) {
     let ready: Blob | undefined;
     drawCard(cardData).then((b) => { ready = b; }).catch(() => undefined);
     q("[data-share]").addEventListener("click", () => {
-      const how = shareOnX(cardData, `${root.dataset.page}?k=${encodeURIComponent(did)}`, ready);
-      q("[data-share-status]").textContent = how === "copied" ? "Picture copied: paste it in your post (Ctrl+V)."
-        : how === "downloaded" ? "Picture downloaded: add it to your post." : "";
+      const paste = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘V" : "Ctrl+V";
+      shareOnX(cardData, `${root.dataset.page}?k=${encodeURIComponent(did)}`, ready, (how) => {
+        q("[data-share-status]").textContent = how === "copied" ? `Picture copied: paste it in your post (${paste}).` : "Picture downloaded: add it to your post.";
+      });
     });
   })();
 }

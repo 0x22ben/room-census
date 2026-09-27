@@ -194,19 +194,17 @@ function download(blob: Blob, name: string) {
  * score card on the clipboard so the reader pastes it into the post (X lets no site attach a picture
  * itself); when the clipboard refuses, the card is downloaded instead. Returns how the picture was
  * handed over. Must run inside the click, with the card already drawn, or the browser blocks X. */
-export function shareOnX(card: Card, pageUrl: string, blob: Blob | undefined): "copied" | "downloaded" | "none" {
+export function shareOnX(card: Card, pageUrl: string, blob: Blob | undefined, told: (how: "copied" | "downloaded") => void): void {
   const post = `${card.mine === false ? "Score" : "My score"} in ${card.contest.replace(" · ", " ")}: ${signed(card.score)} POLF, #${n(card.rank)} of ${n(card.traders)} traders${card.official ? ", signed by the referee" : " (Room Census recount)"}.`;
   const name = `room-census-${card.did.slice(-8)}.png`;
-  let handed: "copied" | "downloaded" | "none" = "none";
   if (blob) {
+    // the reader is told only once the clipboard said yes; otherwise the picture is downloaded instead
+    const fallback = () => { download(blob, name); told("downloaded"); };
     if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
-      navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]).catch(() => download(blob, name));
-      handed = "copied";
+      navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]).then(() => told("copied"), fallback);
     } else {
-      download(blob, name);
-      handed = "downloaded";
+      fallback();
     }
   }
   window.open(`https://x.com/intent/post?text=${encodeURIComponent(post)}&url=${encodeURIComponent(pageUrl)}`, "_blank", "noopener");
-  return handed;
 }
