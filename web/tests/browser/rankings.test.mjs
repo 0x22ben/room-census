@@ -63,4 +63,5 @@ test("a DID saved in the top bar shows everywhere and can be forgotten", { skip 
   await page(`document.querySelector("[data-save]").click()`);
   await until(`document.querySelector("[data-sw-nick]").textContent === "Save a DID"`, "the DID removed everywhere");
   assert.equal(await page(`localStorage.getItem("roomcensus.saved")`), "[]");
+  assert.ok(!(await page(`localStorage.getItem("roomcensus.saved.ranks") ?? ""`)).includes(did), "its cached rank is gone too");
 });

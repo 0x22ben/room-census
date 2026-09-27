@@ -35,6 +35,8 @@ export function licenses(): { project: Entry[]; shipped: Entry[] } {
       npm("chart.js", "LICENSE.md", "MIT", "Draws the line charts.", "https://www.chartjs.org/"),
       npm("@kurkle/color", "LICENSE.md", "MIT", "Color handling inside Chart.js.", "https://github.com/kurkle/color"),
       npm("pixelarticons", "LICENSE", "MIT", "Interface icons, in pixel style.", "https://pixelarticons.com/"),
+      { name: "FLOP Labs contest payouts", license: "Apache License 2.0", use: "The payout lists the Rankings page counts, copied byte for byte.",
+        url: "https://github.com/flop-labs/technocore-sonnet-challenge", text: read(resolve(WEB, "src", "data", "flop-labs", "LICENSE")) },
       npm("tailwindcss", "LICENSE", "MIT", "Generates the stylesheet.", "https://tailwindcss.com/"),
       npm("astro", "LICENSE", "MIT", "Builds the static pages.", "https://astro.build/"),
     ],

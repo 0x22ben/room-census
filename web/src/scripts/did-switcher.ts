@@ -2,10 +2,9 @@
 // menu to switch, open its trader page, save another, rename, remove or forget all. Ranks come from the
 // contest's published ranking files (same order as the Top 100) and are remembered for 15 minutes.
 import { avatarSvg } from "../lib/avatar.mjs";
-import { active, forgetAll, isDid, remove, rename, save, saved, setActive, type Saved } from "../lib/saved-store";
+import { RANKS as CACHE, active, forgetAll, isDid, remove, rename, save, saved, setActive, type Saved } from "../lib/saved-store";
 import { lookup, type Signed } from "./ranking-lookup";
 
-const CACHE = "roomcensus.saved.ranks";
 const TTL = 15 * 60_000;
 const short = (did: string) => `${did.slice(8, 14)}…${did.slice(-6)}`;
 

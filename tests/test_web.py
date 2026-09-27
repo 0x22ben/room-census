@@ -352,7 +352,7 @@ class Artifact(unittest.TestCase):
             with self.subTest(package=name):
                 official = (WEB / "node_modules" / name / file).read_text(encoding="utf-8").strip()
                 self.assertIn(official, text)
-        for own in (REPO / "LICENSE", REPO / "data" / "LICENSE"):
+        for own in (REPO / "LICENSE", REPO / "data" / "LICENSE", WEB / "src" / "data" / "flop-labs" / "LICENSE"):
             with self.subTest(file=own.name):
                 self.assertIn(own.read_text(encoding="utf-8").strip().replace("\r\n", "\n"), text)
         self.assertEqual(text.count("SIL OPEN FONT LICENSE"), 3, "the three self-hosted fonts ship their OFL text")
@@ -463,7 +463,7 @@ class Artifact(unittest.TestCase):
         self.assertIn("signature checked in this browser", chat)
         self.assertIn("the signature does not verify", chat)
         self.assertIn("public and permanent", visible)
-        fields = re.findall(r"<input(?![^>]*data-sw-field)[^>]*", text)
+        fields = re.findall(r"<input[^>]*", text)
         known = re.findall(r"<input[^>]*(?:data-chat-file|data-chat-password|data-chat-understand|data-chat-text)", text)
         self.assertEqual(len(fields), len(known), "the live room adds no field beyond the file, the passphrase, the box and the message")
         bundles = [f.read_text(encoding="utf-8") for f in DIST.glob("_astro/*.js")]
@@ -490,7 +490,7 @@ class Artifact(unittest.TestCase):
         # it asks for nothing but a public DID, and says so
         self.assertIn("No file, no key, nothing to install", visible)
         self.assertIn("Room Census keeps no record of this", visible)
-        self.assertEqual(len(re.findall(r"<input(?![^>]*data-sw-field)[^>]*", text)), len(re.findall(r'<input[^>]*id="did-input"', text)),
+        self.assertEqual(len(re.findall(r"<input[^>]*", text)), len(re.findall(r'<input[^>]*id="did-input"', text)),
                          "the only field on this page is the public DID")
         # the rooms read are exactly the latest census plus the room where Room Census signs
         form = re.search(r"<form data-did-form [^>]*>", text).group(0)
@@ -604,7 +604,7 @@ class Artifact(unittest.TestCase):
         self.assertIn("needs JavaScript", visible)
         self.assertIn("A public DID alone can never publish", visible)
         self.assertIn("You cannot type or paste a DID to publish", visible)
-        self.assertEqual(len(re.findall(r"<input(?![^>]*data-sw-field)[^>]*", text)), len(re.findall(r'<input[^>]*(?:data-unlock-file|data-unlock-password|data-room-search|data-understand|data-offer-pem)', text)),
+        self.assertEqual(len(re.findall(r"<input[^>]*", text)), len(re.findall(r'<input[^>]*(?:data-unlock-file|data-unlock-password|data-room-search|data-understand|data-offer-pem)', text)),
                          "every input belongs to the DID file, a passphrase, the room search or the confirmation")
         # both local backup formats open the same DID, and neither is presented as an older identity
         self.assertIn("A .json recovery file or an identity.pem", visible)
@@ -678,10 +678,15 @@ class Artifact(unittest.TestCase):
                 self.assertNotIn("passed every public check", text)
 
     def test_the_saved_dids_menu_is_one_popover_with_two_fields_on_every_page(self):
-        """The top bar's saved DIDs: a native popover, a filter and a DID to save; nothing else to fill in."""
+        """The top bar's saved DIDs: a native popover, a filter and a DID to save; nothing else to fill in.
+        The pages that run on the reader's device, or open a key to write in a room, have no such menu."""
         for page in self.html_pages():
             text = page.read_text(encoding="utf-8")
             with self.subTest(page=self.route(page)):
+                if self.route(page) in ("/did/", "/write/", "/look-up/") or re.search(r'http-equiv="Content-Security-Policy" content="[^"]*technocore\.chat', text):
+                    self.assertNotIn("data-did-switcher", text)
+                    self.assertNotIn("data-sw-field", text)
+                    continue
                 if "data-did-switcher" not in text:
                     continue
                 self.assertEqual(len(re.findall(r'<div id="did-menu" popover', text)), 1)

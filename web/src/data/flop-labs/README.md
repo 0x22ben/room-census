@@ -10,4 +10,4 @@ the one the referee signed.
 
 Close Call (close-1) shares 1,000,000 FLOP among its top three places after 4 October 2026; its
 payouts are added here once FLOP Labs publishes them. The files come from a repository under the
-Apache License 2.0.
+Apache License 2.0; its text is `LICENSE`, as published there.
