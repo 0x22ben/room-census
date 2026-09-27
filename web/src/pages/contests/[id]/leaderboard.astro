@@ -10,7 +10,7 @@ import Hourglass from "@lucide/astro/icons/hourglass";
 import Info from "@lucide/astro/icons/info";
 import Search from "@lucide/astro/icons/search";
 import TriangleAlert from "@lucide/astro/icons/triangle-alert";
-import { contests, phaseOf, shortDid, signed, type Contest } from "../../../lib/contests";
+import { contests, phaseOf, positionParts, shortDid, signed, type Contest } from "../../../lib/contests";
 
 export function getStaticPaths() {
   return contests().filter((c) => c.leaderboard).map((c) => ({ params: { id: c.id }, props: { contest: c } }));
@@ -20,6 +20,8 @@ const { contest: c } = Astro.props;
 const lb = c.leaderboard!;
 const pill = "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold";
 const allMatch = lb.rows.every((r) => r.check === "match");
+const withPosition = lb.rows.some((r) => r.position !== undefined);
+const POSITION_HELP = "Position rebuilt by us from the signed trades: side, net contracts and average entry price of the open lots. The referee does not publish entry prices. Flat means no open position.";
 ---
 <Base title={`${c.short} leaderboard`} description={`Official ranking of ${c.title}, signed by the referee and checked by Room Census, and a search for any DID.`}>
   <ContestHeader contest={c} current="Leaderboard" />
@@ -54,6 +56,7 @@ const allMatch = lb.rows.every((r) => r.check === "match");
           <th scope="col" class="w-12 px-4 py-2.5 text-xs font-semibold">#</th>
           <th scope="col" class="px-4 py-2.5 text-xs font-semibold">Player</th>
           <th scope="col" class="px-4 py-2.5 text-right text-xs font-semibold">Profit</th>
+          {withPosition && <th scope="col" class="hidden px-4 py-2.5 text-xs font-semibold sm:table-cell"><span class="inline-flex items-center gap-1">Position <Help term="Position" id="help-position" text={POSITION_HELP} /></span></th>}
           <th scope="col" class="px-4 py-2.5 text-right text-xs font-semibold">Our check</th>
         </tr>
       </thead>
@@ -61,8 +64,14 @@ const allMatch = lb.rows.every((r) => r.check === "match");
         {lb.rows.map((r) => (
           <tr class="border-t border-border">
             <td class:list={["px-4 py-2.5 font-mono", r.rank <= 3 ? "font-bold" : "text-text-secondary"]}>{r.rank}</td>
-            <td class="px-4 py-2.5 font-mono">{shortDid(r.did)}</td>
+            <td class="px-4 py-2.5 font-mono">{shortDid(r.did)}
+              {positionParts(r.position) && <span class="mt-0.5 block font-sans text-xs text-text-secondary sm:hidden" data-position-mobile><span class="font-semibold text-text">{positionParts(r.position)!.side}</span> <span class="font-mono">{positionParts(r.position)!.detail}</span></span>}</td>
             <td class="px-4 py-2.5 text-right font-mono whitespace-nowrap text-accent tabular-nums">{signed(r.pnl)} POLF</td>
+            {withPosition && (
+              <td class="hidden px-4 py-2.5 whitespace-nowrap sm:table-cell" data-position>
+                {positionParts(r.position) && <><span class:list={["font-semibold", r.position === null ? "text-text-muted" : "text-text"]}>{positionParts(r.position)!.side}</span> <span class="font-mono text-text-secondary tabular-nums">{positionParts(r.position)!.detail}</span></>}
+              </td>
+            )}
             <td class="px-4 py-2.5 text-right">
               {r.check === "match" && <span class={`${pill} border-accent-border bg-accent-soft text-accent`}><Check size={12} aria-hidden="true" />Checked</span>}
               {r.check === "pending" && <span class={`${pill} border-border bg-surface-raised text-text-secondary`}><Hourglass size={12} aria-hidden="true" />Not checked yet</span>}

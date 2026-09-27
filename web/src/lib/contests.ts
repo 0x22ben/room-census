@@ -14,7 +14,9 @@ const doc: Doc = LIVE ? json<Doc>("data/contests/index.json") : (sample as unkno
 
 export type CheckState = "ok" | "warn" | "wait";
 export type Check = { state: CheckState; title: string; text: string; help: string };
-export type LeaderRow = { rank: number; did: string; pnl: string; check: "match" | "pending" | "differs" };
+/** An open position rebuilt by our recount: [signed net contracts, average entry price]; null when none. */
+export type Position = [string, string] | null;
+export type LeaderRow = { rank: number; did: string; pnl: string; check: "match" | "pending" | "differs"; position?: Position };
 export type Contest = {
   id: string;
   title: string;
@@ -57,6 +59,14 @@ export function tabs(c: Contest): { label: string; href: string }[] {
 
 /** "did:key:z6MkgTDg…u7Hne": the start and the end, enough to recognise a key. */
 export const shortDid = (did: string): string => `${did.slice(8, 16)}…${did.slice(-5)}`;
+
+/** "Long" / "Short" / "Flat" and "44.66 @ 221.65"; undefined when the export carries no position. */
+export function positionParts(p: Position | undefined): { side: string; detail: string } | undefined {
+  if (p === undefined) return undefined;
+  if (p === null) return { side: "Flat", detail: "" };
+  const short = p[0].startsWith("-");
+  return { side: short ? "Short" : "Long", detail: `${short ? p[0].slice(1) : p[0]} @ ${p[1]}` };
+}
 
 /** Signed profit with its unit: "+71.87", "-3.20", "0.00". */
 export const signed = (v: string): string => (v.startsWith("-") || Number(v) === 0 ? v : `+${v}`);
