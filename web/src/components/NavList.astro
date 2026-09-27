@@ -8,15 +8,16 @@ interface Props { label: string }
 const pathname = Astro.url.pathname;
 const sections = readySections();
 const footer = NAV_FOOTER.filter((i) => i.ready);
-const item = "flex h-11 items-center gap-3 rounded-md px-3 text-base transition-colors duration-150";
+// compact on the desktop sidebar (Pencil hHTyx, 34 px rows); 44 px touch rows in the mobile menu
+const item = "flex h-11 items-center gap-3 rounded-md px-3 text-base transition-colors duration-150 lg:h-8.5 lg:gap-2.5 lg:px-2.5 lg:text-sm";
 // "Live" beside Contests only when the site shows the witness's real data and trading is open
 const live = !SAMPLE && contests().some((c) => phaseOf(c) === "live");
 ---
 <nav aria-label={Astro.props.label} class="flex flex-1 flex-col">
   {sections.map((section) => (
-    <div class="mt-4 first:mt-0">
-      <p class="px-3 pb-1.5 font-mono text-xs font-bold tracking-widest text-text-muted uppercase">{section.label}</p>
-      <ul class="flex flex-col gap-1.5">
+    <div class="mt-4 first:mt-0 lg:mt-3">
+      <p class="px-3 pb-1.5 font-mono text-xs font-bold tracking-widest text-text-muted uppercase lg:px-2.5 lg:pb-1 lg:text-[10px]">{section.label}</p>
+      <ul class="flex flex-col gap-1.5 lg:gap-0.5">
         {section.items.map((i) => {
           const on = isActive(i, pathname);
           return (
@@ -33,7 +34,7 @@ const live = !SAMPLE && contests().some((c) => phaseOf(c) === "live");
       </ul>
     </div>
   ))}
-  <ul class="mt-auto flex flex-col gap-1.5 border-t border-border pt-4">
+  <ul class="mt-auto flex flex-col gap-1.5 border-t border-border pt-4 lg:gap-0.5 lg:pt-2">
     {footer.map((i) => {
       const on = isActive(i, pathname);
       return (
