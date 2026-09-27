@@ -1,0 +1,10 @@
+---
+// A contest's pixel picture (src/lib/pixel-scenes.mjs), drawn at build time: 64 x 30 cells.
+import { H, W, scene } from "../lib/pixel-scenes.mjs";
+
+interface Props { id: string; class?: string }
+const { id, class: cls } = Astro.props;
+---
+<svg viewBox={`0 0 ${W} ${H}`} shape-rendering="crispEdges" aria-hidden="true" class:list={["block", cls]}>
+  {scene(id).map(([x, y, w, c]) => <rect x={x} y={y} width={w} height="1" fill={c} />)}
+</svg>

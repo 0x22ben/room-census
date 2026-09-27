@@ -39,13 +39,16 @@ after(stop);
 
 test("the list shows each contest with its status and opens it", { skip }, async () => {
   await navigate("/contests/");
-  assert.equal(await page(`document.querySelector("h1").textContent`), "Contests we follow");
+  assert.equal(await page(`document.querySelector("h1").textContent`), "Contests");
   const text = await page(`document.querySelector("main").textContent`);
   assert.match(text, /We hold every referee update since the opening\. Our copy of the trading room starts .* after the opening/);
   assert.doesNotMatch(text, /We hold nothing from before/);
   assert.doesNotMatch(text, /appear here on their own|from the first minute/);
   const cards = await page(`[...document.querySelectorAll("article h3")].map((h) => h.textContent)`);
-  assert.deepEqual(cards, ["Close Call · NVDA", "Sonnet Challenge"]);
+  assert.deepEqual(cards, ["Close Call · NVDA", "Sonnet Challenge", "Next contest"]);
+  // every contest card has its pixel picture, and the whole card opens the contest
+  assert.equal(await page(`document.querySelectorAll("[data-contest-card] svg[viewBox='0 0 64 30']").length`), 3);
+  assert.equal(await page(`[...document.querySelectorAll("[data-contest-card] h3 a")].map((a) => a.getAttribute("href")).join(" ")`), "/contests/close-1/ /contests/sonnet-2/");
   if (LIVE) assert.doesNotMatch(await page(`document.body.textContent`), /Sample data/);
   else assert.match(await page(`document.body.textContent`), /Sample data/);
   assert.equal(await page(`document.querySelector('a[aria-current="page"]').textContent.trim().startsWith("Contests")`), true);
