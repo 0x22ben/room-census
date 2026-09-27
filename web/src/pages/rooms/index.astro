@@ -4,7 +4,7 @@
 import Base from "../../layouts/Base.astro";
 import Help from "../../components/Help.astro";
 import RoomTable, { type Row } from "../../components/RoomTable.astro";
-import Search from "@lucide/astro/icons/search";
+import Px from "../../components/Px.astro";
 import { site } from "../../lib/data";
 import { DISCLAIMER, PATTERN } from "../../lib/patterns";
 
@@ -48,7 +48,7 @@ const filters = [
     </div>
     <label class="relative block max-w-md">
       <span class="sr-only">Search a room by name</span>
-      <Search size={18} aria-hidden="true" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-text-muted" />
+      <Px name="search" size={18} aria-hidden="true" class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-text-muted" />
       <input type="search" placeholder="Search a room" autocomplete="off" spellcheck="false"
         class="min-h-11 w-full rounded-md border border-border-strong bg-bg pr-3 pl-10 text-base text-text placeholder:text-text-muted" />
     </label>

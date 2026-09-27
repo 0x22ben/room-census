@@ -1,7 +1,7 @@
 ---
 // Licenses of the project and of everything the site ships, with their full official texts.
 import Base from "../layouts/Base.astro";
-import ArrowUpRight from "@lucide/astro/icons/arrow-up-right";
+import Px from "../components/Px.astro";
 import { licenses, type Entry } from "../lib/licenses";
 
 const { project, shipped } = licenses();
@@ -28,7 +28,7 @@ const sections: [string, string, Entry[]][] = [
             </div>
             <p class="mt-1 text-text-secondary">{e.use}</p>
             <div class="mt-2 flex flex-wrap gap-x-4">
-              <a href={e.url} class="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-link">Project page <ArrowUpRight size={14} aria-hidden="true" /></a>
+              <a href={e.url} class="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-link">Project page <Px name="external-link" size={14} aria-hidden="true" /></a>
               <details class="text-sm">
                 <summary class="inline-flex min-h-11 cursor-pointer items-center font-semibold text-link">Full license text</summary>
                 <pre class="mt-2 max-h-96 overflow-auto rounded-md border border-border bg-bg p-3 font-mono text-xs whitespace-pre-wrap text-text-secondary">{e.text}</pre>

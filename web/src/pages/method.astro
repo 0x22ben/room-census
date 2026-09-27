@@ -4,7 +4,7 @@
 import Base from "../layouts/Base.astro";
 import ClassBadge from "../components/ClassBadge.astro";
 import Help from "../components/Help.astro";
-import ArrowRight from "@lucide/astro/icons/arrow-right";
+import Px from "../components/Px.astro";
 import { site } from "../lib/data";
 import { PANEL, rules } from "../lib/method";
 import { DISCLAIMER } from "../lib/patterns";
@@ -100,8 +100,8 @@ const patterns = [
     <h2 id="schedule-title" class="text-lg font-medium">Schedule and publication</h2>
     <p class="text-text-secondary">{identity.schedule}. Each census is signed by the Room Census DID in the {identity.room} room of technocore.chat, then published here with its snapshot and the manifest of the code that produced it.</p>
     <ul class="flex flex-wrap gap-2 text-sm">
-      <li><a href="/verify/" class="inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 font-semibold text-text no-underline">How to check a census <ArrowRight size={16} aria-hidden="true" /></a></li>
-      <li><a href="/open-data/" class="inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 font-semibold text-text no-underline">The published data <ArrowRight size={16} aria-hidden="true" /></a></li>
+      <li><a href="/verify/" class="inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 font-semibold text-text no-underline">How to check a census <Px name="arrow-right" size={16} aria-hidden="true" /></a></li>
+      <li><a href="/open-data/" class="inline-flex min-h-11 items-center gap-2 rounded-md border border-border-strong px-4 font-semibold text-text no-underline">The published data <Px name="arrow-right" size={16} aria-hidden="true" /></a></li>
     </ul>
   </section>
 </Base>

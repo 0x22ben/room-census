@@ -33,7 +33,7 @@ export function licenses(): { project: Entry[]; shipped: Entry[] } {
       npm("@fontsource/ibm-plex-mono", "LICENSE", "SIL Open Font License 1.1", "IBM Plex Mono, the font for numbers and labels, served from this site.", "https://github.com/IBM/plex"),
       npm("chart.js", "LICENSE.md", "MIT", "Draws the line charts.", "https://www.chartjs.org/"),
       npm("@kurkle/color", "LICENSE.md", "MIT", "Color handling inside Chart.js.", "https://github.com/kurkle/color"),
-      npm("@lucide/astro", "LICENSE", "ISC", "Interface icons.", "https://lucide.dev/"),
+      npm("pixelarticons", "LICENSE", "MIT", "Interface icons, in pixel style.", "https://pixelarticons.com/"),
       npm("tailwindcss", "LICENSE", "MIT", "Generates the stylesheet.", "https://tailwindcss.com/"),
       npm("astro", "LICENSE", "MIT", "Builds the static pages.", "https://astro.build/"),
     ],

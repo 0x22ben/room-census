@@ -3,7 +3,7 @@
 // Space, closes on Escape or an outside click, with no script. `term` titles the popover, `ask` is
 // what a screen reader announces on the button. The popover id must be unique on the page: pass
 // `id` when the same term appears twice.
-import CircleQuestionMark from "@lucide/astro/icons/circle-question-mark";
+import Px from "./Px.astro";
 
 interface Props { term: string; text: string; ask?: string; id?: string; href?: string; linkLabel?: string }
 const { term, text, href, linkLabel = "How we measure it" } = Astro.props;
@@ -16,7 +16,7 @@ const id = Astro.props.id ?? `help-${term.toLowerCase().replace(/[^a-z0-9]+/g, "
   aria-label={ask}
   class="relative inline-grid size-5 shrink-0 cursor-pointer place-items-center rounded-full text-text-muted transition-colors duration-150 hover:text-text after:absolute after:-inset-3 after:content-['']"
 >
-  <CircleQuestionMark size={16} aria-hidden="true" />
+  <Px name="circle-question" size={12} aria-hidden="true" />
 </button>
 <span
   id={id}

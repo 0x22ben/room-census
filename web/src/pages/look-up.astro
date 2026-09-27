@@ -4,10 +4,7 @@
 // stays in this browser. Room Census keeps no record of a lookup: the site is static files.
 import Base from "../layouts/Base.astro";
 import Help from "../components/Help.astro";
-import Download from "@lucide/astro/icons/download";
-import Info from "@lucide/astro/icons/info";
-import Search from "@lucide/astro/icons/search";
-import ShieldCheck from "@lucide/astro/icons/shield-check";
+import Px from "../components/Px.astro";
 import { site } from "../lib/data";
 import { DID_DISCLAIMER } from "../lib/patterns";
 import { TECHNOCORE_CSP } from "../lib/site";
@@ -41,7 +38,7 @@ const lede = "text-text-secondary";
     </header>
 
       <section class={card} aria-labelledby="lookup-title">
-        <span class={tile}><Search size={22} aria-hidden="true" /></span>
+        <span class={tile}><Px name="search" size={22} aria-hidden="true" /></span>
         <h2 id="lookup-title" class="flex items-center gap-2 text-lg font-semibold">
           Look up a public DID
           <Help term="DID" ask="What is a DID?" text="A public identifier (did:key) that can sign Technocore messages. Only messages with a valid signature from this DID are counted." />
@@ -55,7 +52,7 @@ const lede = "text-text-secondary";
               placeholder="did:key:z6Mk…" aria-describedby="did-hint did-error"
               class="min-h-11 min-w-0 flex-1 basis-64 rounded-md border border-border-strong bg-bg px-3 font-mono text-sm text-text placeholder:text-text-muted aria-invalid:border-warning" />
             <button type="submit" data-did-submit class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-border-strong px-4 text-sm font-semibold text-text disabled:cursor-wait disabled:opacity-60">
-              <Search size={16} aria-hidden="true" /> Look up
+              <Px name="search" size={16} aria-hidden="true" /> Look up
             </button>
           </div>
           <p id="did-hint" class="text-sm text-text-muted">An Ed25519 did:key, starting with did:key:z6Mk.</p>
@@ -67,11 +64,11 @@ const lede = "text-text-secondary";
         </p>
       </section>
 
-    <p class={foot}><ShieldCheck size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-accent" />Room Census keeps no record of this: the DID you type stays on your computer, and the reading is done by your browser against the public rooms.</p>
+    <p class={foot}><Px name="shield" size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-accent" />Room Census keeps no record of this: the DID you type stays on your computer, and the reading is done by your browser against the public rooms.</p>
 
     <div data-lookup-area class="grid grid-cols-[minmax(0,1fr)] gap-4">
   <p class="flex items-start gap-2.5 rounded-md border border-border bg-surface px-4 py-2.5 text-sm text-text-secondary">
-    <Info size={18} aria-hidden="true" class="mt-0.5 shrink-0" />
+    <Px name="info-box" size={18} aria-hidden="true" class="mt-0.5 shrink-0" />
     <span>{DID_DISCLAIMER}</span>
   </p>
 
@@ -85,7 +82,7 @@ const lede = "text-text-secondary";
       <div class="flex flex-wrap gap-2">
         <button type="button" data-did-cancel class="inline-flex min-h-11 cursor-pointer items-center rounded-md border border-border-strong px-4 text-sm font-semibold text-text">Stop</button>
         <button type="button" data-did-proof hidden class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-accent-border bg-accent-soft px-4 text-sm font-semibold text-text">
-          <Download size={16} aria-hidden="true" class="text-accent" /> Download activity proof
+          <Px name="download" size={16} aria-hidden="true" class="text-accent" /> Download activity proof
         </button>
       </div>
     </div>

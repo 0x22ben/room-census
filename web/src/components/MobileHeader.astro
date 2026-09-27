@@ -1,8 +1,7 @@
 ---
 // Small screens: brand and a menu button that opens the same navigation. Native <details>, so
 // the menu works by keyboard and without script.
-import Menu from "@lucide/astro/icons/menu";
-import X from "@lucide/astro/icons/x";
+import Px from "./Px.astro";
 import Logo from "./Logo.astro";
 import NavList from "./NavList.astro";
 import { SITE_NAME } from "../lib/site";
@@ -15,8 +14,8 @@ import { SITE_NAME } from "../lib/site";
     </a>
     <details class="group">
       <summary aria-label="Menu" class="grid size-11 cursor-pointer list-none place-items-center rounded-md border border-border-strong text-text [&::-webkit-details-marker]:hidden">
-        <Menu size={20} aria-hidden="true" class="group-open:hidden" />
-        <X size={20} aria-hidden="true" class="hidden group-open:block" />
+        <Px name="menu" size={20} aria-hidden="true" class="group-open:hidden" />
+        <Px name="close" size={20} aria-hidden="true" class="hidden group-open:block" />
       </summary>
       <div class="absolute inset-x-0 top-full z-20 flex border-b border-border bg-bg px-3.5 py-4 shadow-2xl shadow-shadow/40">
         <NavList label="Menu" />

@@ -1,7 +1,6 @@
 ---
 // The top of every contest page: way back to the list, title, one-line summary, sample notice and tabs.
-import ArrowLeft from "@lucide/astro/icons/arrow-left";
-import Info from "@lucide/astro/icons/info";
+import Px from "./Px.astro";
 import { SAMPLE, CAPTURED_AT, coverageLine, tabs, type Contest } from "../lib/contests";
 import { dateTimeUtc } from "../lib/format";
 
@@ -10,7 +9,7 @@ const { contest: c, current } = Astro.props;
 ---
 <nav aria-label="Breadcrumb" class="text-sm">
   <ol class="flex items-center gap-1.5">
-    <li><a href="/contests/" class="inline-flex min-h-11 items-center gap-1.5 text-link no-underline hover:underline"><ArrowLeft size={14} aria-hidden="true" />Contests</a></li>
+    <li><a href="/contests/" class="inline-flex min-h-11 items-center gap-1.5 text-link no-underline hover:underline"><Px name="arrow-left" size={14} aria-hidden="true" />Contests</a></li>
     <li aria-hidden="true" class="text-text-muted">/</li>
     <li aria-current="page" class="text-text-secondary">{c.short}</li>
   </ol>
@@ -20,7 +19,7 @@ const { contest: c, current } = Astro.props;
   <p class="text-text-muted">{c.summary}</p>
 </section>
 <p class="mt-3 flex items-start gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-secondary">
-  <Info size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />
+  <Px name="info-box" size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />
   {SAMPLE
     ? <span>Sample data: a copy of our capture from {dateTimeUtc(CAPTURED_AT)}. This page does not update yet.</span>
     : <span>From our capture of {dateTimeUtc(CAPTURED_AT)}. This page is rebuilt about every 15 minutes. {coverageLine(c)}</span>}

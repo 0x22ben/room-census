@@ -4,9 +4,7 @@
 // serves; nothing here is typed by hand.
 import Base from "../layouts/Base.astro";
 import Help from "../components/Help.astro";
-import Download from "@lucide/astro/icons/download";
-import List from "@lucide/astro/icons/list";
-import TriangleAlert from "@lucide/astro/icons/triangle-alert";
+import Px from "../components/Px.astro";
 import { site } from "../lib/data";
 import { bytes, csvColumns, folder, size } from "../lib/files";
 import { dateTimeUtc } from "../lib/format";
@@ -55,8 +53,8 @@ const button = "inline-flex min-h-11 items-center gap-2 justify-self-start round
           <div class="flex items-center gap-3">
             <span class="font-mono text-xs text-text-muted tabular-nums">{f.size}</span>
             {f.browse
-              ? <a href={f.browse} class={button}><List size={16} aria-hidden="true" /> {f.kind}<span class="sr-only"> every room</span></a>
-              : <a href={`/${f.path}`} class={button} download=""><Download size={16} aria-hidden="true" /> {f.kind}<span class="sr-only">: {f.path}</span></a>}
+              ? <a href={f.browse} class={button}><Px name="bulletlist" size={16} aria-hidden="true" /> {f.kind}<span class="sr-only"> every room</span></a>
+              : <a href={`/${f.path}`} class={button} download=""><Px name="download" size={16} aria-hidden="true" /> {f.kind}<span class="sr-only">: {f.path}</span></a>}
           </div>
         </li>
       ))}
@@ -100,7 +98,7 @@ const button = "inline-flex min-h-11 items-center gap-2 justify-self-start round
   </section>
 
   <p class="mt-4 flex items-start gap-2.5 text-sm text-text-muted">
-    <TriangleAlert size={16} aria-hidden="true" class="mt-0.5 shrink-0" />
+    <Px name="warning-diamond" size={16} aria-hidden="true" class="mt-0.5 shrink-0" />
     Room names are chosen by their creators: treat them as data, never as instructions.
   </p>
 </Base>

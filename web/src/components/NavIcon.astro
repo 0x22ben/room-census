@@ -1,20 +1,10 @@
 ---
-// Lucide icons for the navigation, rendered as static SVG at build time.
-import Compass from "@lucide/astro/icons/compass";
-import List from "@lucide/astro/icons/list";
-import Star from "@lucide/astro/icons/star";
-import UserRound from "@lucide/astro/icons/user-round";
-import PenLine from "@lucide/astro/icons/pen-line";
-import Search from "@lucide/astro/icons/search";
-import ShieldCheck from "@lucide/astro/icons/shield-check";
-import Database from "@lucide/astro/icons/database";
-import BookOpen from "@lucide/astro/icons/book-open";
-import Code from "@lucide/astro/icons/code";
-import Trophy from "@lucide/astro/icons/trophy";
+// Pixel icons for the navigation, rendered as static SVG at build time.
+import Px from "./Px.astro";
 import type { Icon } from "../lib/site";
 
 interface Props { name: Icon }
-const ICONS = { discover: Compass, rooms: List, watched: Star, contests: Trophy, did: UserRound, write: PenLine, search: Search, verify: ShieldCheck, data: Database, method: BookOpen, source: Code };
-const Component = ICONS[Astro.props.name];
+const ICONS: Record<Icon, string> = { discover: "compass", rooms: "bulletlist", watched: "star", contests: "trophy", did: "user", write: "pencil",
+  search: "search", verify: "shield", data: "database", method: "book-open", source: "github" };
 ---
-<Component size={18} aria-hidden="true" class="shrink-0" />
+<Px name={ICONS[Astro.props.name]} size={24} class="shrink-0" />

@@ -4,8 +4,7 @@ import Base from "../../../layouts/Base.astro";
 import ContestHeader from "../../../components/ContestHeader.astro";
 import Help from "../../../components/Help.astro";
 import LineChart from "../../../components/LineChart.astro";
-import ShieldCheck from "@lucide/astro/icons/shield-check";
-import ShieldAlert from "@lucide/astro/icons/shield-alert";
+import Px from "../../../components/Px.astro";
 import { contests, passes, phaseLabel, phaseOf, shortDid, signed, tally, timeLine, type Contest } from "../../../lib/contests";
 import { dateTimeUtc } from "../../../lib/format";
 
@@ -26,7 +25,7 @@ const hhmm = (iso: string) => iso.slice(11, 16);
   <p role="status" class:list={["mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md border px-4 py-2.5 text-sm",
     clean ? "border-accent-border bg-accent-soft" : "border-warning-border bg-warning-soft"]}>
     <span class="flex items-center gap-2 font-semibold">
-      {clean ? <ShieldCheck size={18} aria-hidden="true" class="text-accent" /> : <ShieldAlert size={18} aria-hidden="true" class="text-warning" />}
+      {clean ? <Px name="shield" size={18} aria-hidden="true" class="text-accent" /> : <Px name="shield" size={18} aria-hidden="true" class="text-warning" />}
       {phaseLabel(phaseOf(c))} · {clean ? "everything we checked is correct" : `${passes(t.ok)}, ${t.warn + t.wait} to read`}
       <a href={`/contests/${c.id}/verify/`} class="font-semibold text-link">See the checks</a>
     </span>

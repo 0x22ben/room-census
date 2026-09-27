@@ -5,11 +5,7 @@
 // the reader with Git. The page never claims a check it did not run, and every manual way stays.
 import Base from "../layouts/Base.astro";
 import Help from "../components/Help.astro";
-import ArrowUpRight from "@lucide/astro/icons/arrow-up-right";
-import CircleDashed from "@lucide/astro/icons/circle-dashed";
-import Copy from "@lucide/astro/icons/copy";
-import Download from "@lucide/astro/icons/download";
-import ShieldCheck from "@lucide/astro/icons/shield-check";
+import Px from "../components/Px.astro";
 import { site } from "../lib/data";
 import { json } from "../lib/files";
 import { dateTimeUtc } from "../lib/format";
@@ -35,7 +31,7 @@ const pending = "flex items-center gap-2 text-sm font-semibold text-text-muted";
   </section>
 
   <p data-verify-summary role="status" class="mt-4 flex items-start gap-2.5 rounded-md border border-border bg-surface px-4 py-2.5 text-sm">
-    <ShieldCheck size={18} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />
+    <Px name="shield" size={18} aria-hidden="true" class="mt-0.5 shrink-0 text-text-muted" />
     <span data-verify-summary-text>Your browser can check the snapshot, the manifest and the signed message on this page; that needs JavaScript. Without it, and for the source code, use the steps below. Census #{latest.census}, {dateTimeUtc(latest.at_utc)}.</span>
   </p>
 
@@ -50,10 +46,10 @@ const pending = "flex items-center gap-2 text-sm font-semibold text-text-muted";
         <p class="font-mono text-xs break-all text-text-muted">sha256 {latest.sha256}</p>
       </div>
       <p data-check="snapshot" data-url={`/${latest.snapshot}`} data-expected={latest.sha256} class={pending}>
-        <CircleDashed size={18} aria-hidden="true" /><span data-check-text>Not checked in this browser</span>
+        <Px name="circle" size={18} aria-hidden="true" /><span data-check-text>Not checked in this browser</span>
       </p>
       <div class="flex flex-wrap gap-2">
-        <a href={`/${latest.snapshot}`} download="" class={button}><Download size={16} aria-hidden="true" /> Download snapshot</a>
+        <a href={`/${latest.snapshot}`} download="" class={button}><Px name="download" size={16} aria-hidden="true" /> Download snapshot</a>
       </div>
       <pre class={code}><code>curl -fsSLO {base}/{latest.snapshot}
 sha256sum {snapshotFile}    # on macOS: shasum -a 256 {snapshotFile}</code></pre>
@@ -70,10 +66,10 @@ sha256sum {snapshotFile}    # on macOS: shasum -a 256 {snapshotFile}</code></pre
           <p class="font-mono text-xs break-all text-text-muted">manifest {prov.manifest_sha256}</p>
         </div>
         <p data-check="manifest" data-url={`/${prov.manifest}`} data-expected={prov.manifest_sha256} class={pending}>
-          <CircleDashed size={18} aria-hidden="true" /><span data-check-text>Not checked in this browser</span>
+          <Px name="circle" size={18} aria-hidden="true" /><span data-check-text>Not checked in this browser</span>
         </p>
         <div class="flex flex-wrap gap-2">
-          <a href={`/${prov.manifest}`} download="" class={button}><Download size={16} aria-hidden="true" /> Download manifest</a>
+          <a href={`/${prov.manifest}`} download="" class={button}><Px name="download" size={16} aria-hidden="true" /> Download manifest</a>
         </div>
       </li>
     )}
@@ -90,7 +86,7 @@ sha256sum {snapshotFile}    # on macOS: shasum -a 256 {snapshotFile}</code></pre
         </div>
         <p data-check="signature" data-room={latest.signed_in.room} data-nonce={latest.signed_in.nonce} data-did={latest.publisher}
           data-sha256={latest.sha256} data-manifest={prov?.manifest_sha256 ?? ""} class={pending}>
-          <CircleDashed size={18} aria-hidden="true" /><span data-check-text>Not checked in this browser</span>
+          <Px name="circle" size={18} aria-hidden="true" /><span data-check-text>Not checked in this browser</span>
         </p>
         <p class="text-sm text-text-muted">This browser reads the public export of the {latest.signed_in.room} room from technocore.chat, finds the message with this nonce from the DID below, checks that it names the fingerprints of steps 1 and 2, and checks its signature. Nothing is sent but the read.</p>
         <div class="grid gap-1.5 text-sm text-text-secondary">
@@ -99,7 +95,7 @@ sha256sum {snapshotFile}    # on macOS: shasum -a 256 {snapshotFile}</code></pre
         </div>
         <div class="flex flex-wrap gap-2">
           <a href="/did/" class={button}>Open My DID</a>
-          <a href={`${identity.network}/r/${latest.signed_in.room}/export`} class={button}>Read the room export <ArrowUpRight size={16} aria-hidden="true" /></a>
+          <a href={`${identity.network}/r/${latest.signed_in.room}/export`} class={button}>Read the room export <Px name="external-link" size={16} aria-hidden="true" /></a>
         </div>
       </li>
     )}
@@ -113,7 +109,7 @@ sha256sum {snapshotFile}    # on macOS: shasum -a 256 {snapshotFile}</code></pre
           </h2>
           <p class="text-sm text-text-secondary">Every file digest in the manifest must match the same file in the repository at commit <span class="font-mono">{short}</span>.</p>
         </div>
-        <p class={pending}><CircleDashed size={18} aria-hidden="true" />Checked by you, with Git</p>
+        <p class={pending}><Px name="circle" size={18} aria-hidden="true" />Checked by you, with Git</p>
         <div class="overflow-x-auto">
           <table class="w-full text-left text-sm">
             <caption class="sr-only">Program files listed in the manifest, with their SHA-256</caption>
@@ -129,7 +125,7 @@ for f in {manifest.files.map((f) => f.path).join(" ")}; do
   printf '%s  %s\n' "$(git cat-file blob {commit}:$f | sha256sum | cut -d' ' -f1)" "$f"
 done</code></pre>
         <div class="flex flex-wrap gap-2">
-          <a href={`${manifest.source.repository}/tree/${commit}`} class={button}>View commit {short} <ArrowUpRight size={16} aria-hidden="true" /></a>
+          <a href={`${manifest.source.repository}/tree/${commit}`} class={button}>View commit {short} <Px name="external-link" size={16} aria-hidden="true" /></a>
         </div>
       </li>
     )}
@@ -142,7 +138,7 @@ done</code></pre>
     </h2>
     <div class="flex flex-wrap items-center gap-3">
       <code class="min-w-0 font-mono text-sm break-all">{latest.publisher}</code>
-      <button type="button" data-copy={latest.publisher} hidden class={`${button} cursor-pointer`}><Copy size={16} aria-hidden="true" /><span data-copy-label aria-live="polite">Copy</span><span class="sr-only"> the DID</span></button>
+      <button type="button" data-copy={latest.publisher} hidden class={`${button} cursor-pointer`}><Px name="copy" size={16} aria-hidden="true" /><span data-copy-label aria-live="polite">Copy</span><span class="sr-only"> the DID</span></button>
     </div>
   </section>
 
