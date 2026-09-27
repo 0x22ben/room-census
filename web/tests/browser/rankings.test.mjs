@@ -30,9 +30,20 @@ test("rankings say beta and unofficial, and show a podium and the first hundred"
   const head = await page(`document.querySelector("main").textContent`);
   assert.match(head, /BETA/);
   assert.match(head, /Unofficial\. Made by Room Census, not by FLOP Labs\./);
-  assert.equal(await page(`document.querySelectorAll("[data-podium] svg[viewBox='0 0 5 5']").length`), 3);
-  const rows = await page(`document.querySelectorAll("[data-rankings] tbody:not([data-pinned]) tr").length`);
-  assert.equal(rows, Math.min(100, doc.rows.length));
+  // a shared first place stands on one step, every DID of it (Sonnet: the 4 writers of the winning poem)
+  const first = doc.rows.filter((r) => r[0] === 1).length;
+  assert.equal(await page(`document.querySelectorAll("[data-podium] svg[viewBox='0 0 5 5']").length`), first > 1 ? first : Math.min(3, doc.rows.length));
+  if (first > 1) assert.match(await page(`document.querySelector("[data-podium]").textContent`), /MARAGUNG-FLOP|maragung-flop/i);
+  // every line says why FLOP Labs paid it; a long tie shows three lines and how many more share it
+  const lines = await page(`[...document.querySelectorAll("[data-rankings] tbody:not([data-pinned]) tr[data-did]")].map((tr) => [tr.dataset.did, tr.textContent])`);
+  assert.ok(lines.length > 0 && lines.length <= 100);
+  lines.forEach(([did, text], i) => {
+    assert.equal(did, doc.rows[i][1]);
+    assert.match(text, /Wrote the poem|Voted for the winner/);
+  });
+  const more = await page(`[...document.querySelectorAll("[data-rankings] tr[data-more]")].map((tr) => tr.textContent.trim())`);
+  const ties = Object.values(Object.groupBy(doc.rows, (r) => r[0])).filter((g) => g.length > 10);
+  if (ties.length) assert.ok(more[0].startsWith(`+ ${(ties[0].length - 3).toLocaleString("en-US")} more DIDs at #${ties[0][0][0]}`), more[0]);
   assert.ok(doc.rows.every((r, i) => i === 0 || r[2] <= doc.rows[i - 1][2]), "sorted by FLOP");
   await shot("rankings");
 });
