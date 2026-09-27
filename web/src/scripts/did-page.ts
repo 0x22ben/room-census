@@ -5,6 +5,7 @@
 import { CategoryScale, Chart, Filler, LinearScale, LineController, LineElement, PointElement, Tooltip } from "chart.js";
 import { Account, MINT } from "../lib/fold-lite.mjs";
 import { robustRange } from "../lib/robust-range.mjs";
+import { isSaved, remove, save } from "../lib/saved-store";
 import { drawCard, shareOnX, type Card } from "./pnl-card";
 import { lookup, tradesOf, type Signed } from "./ranking-lookup";
 
@@ -40,6 +41,16 @@ function init(root: HTMLElement) {
     return;
   }
   const short = `${did.slice(8, 16)}…${did.slice(-6)}`;
+  // Save / Saved: keeps this DID in the browser, for the top bar and every page
+  const saveBtn = q("[data-save]");
+  const drawSave = () => {
+    const on = isSaved(did);
+    saveBtn.setAttribute("aria-pressed", String(on));
+    q("[data-save-label]").textContent = on ? "Saved" : "Save";
+  };
+  saveBtn.addEventListener("click", () => { if (isSaved(did)) remove(did); else save(did); drawSave(); });
+  window.addEventListener("roomcensus:saved", drawSave);
+  drawSave();
   q("[data-crumb]").textContent = short;
   document.title = `${short} · ${document.title}`;
   const signedList: Signed[] = JSON.parse(root.dataset.signed ?? "[]");

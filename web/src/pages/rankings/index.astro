@@ -1,0 +1,125 @@
+---
+// Rankings (beta, unofficial, Pencil mockup wDNMc): every DID by the FLOP that FLOP Labs awarded it
+// across its contests, from the payout lists FLOP Labs published. A podium, the first hundred, and a
+// search that pins any DID; saved DIDs (the top bar's switcher) are pinned too.
+import Base from "../../layouts/Base.astro";
+import Help from "../../components/Help.astro";
+import PixelAvatar from "../../components/PixelAvatar.astro";
+import Px from "../../components/Px.astro";
+import { contest, ranksOf, shortDid } from "../../lib/contests";
+import { ordinal, rankings } from "../../lib/rankings";
+
+const { paid, pending, rows } = rankings();
+const top = rows.slice(0, 100);
+const close = contest("close-1");
+const live = close ? ranksOf(close, top.map((r) => r.did)) : new Map();
+const n = (v: number) => v.toLocaleString("en-US");
+const tied = (rank: number) => rows.filter((r) => r.rank === rank).length;
+const podium = [top[1], top[0], top[2]].filter(Boolean);
+const tone = ["#e3b341", "#c3cbd6", "#cd8a55"];
+const at = (r: { rank: number }) => Math.min(2, r.rank - 1);
+const height = (i: number) => (i === 1 ? "h-44" : i === 0 ? "h-32" : "h-24");
+const traderHref = (did: string) => (live.has(did) ? `/contests/close-1/did/?k=${did}` : undefined);
+---
+<Base title="Rankings: every DID by the FLOP it won (beta)" description="Unofficial rankings of every DID across FLOP Labs contests, by the FLOP FLOP Labs awarded. Beta, made by Room Census, not by FLOP Labs.">
+  <div class="flex flex-wrap items-end justify-between gap-3">
+    <div class="grid gap-1.5">
+      <h1 class="flex items-center gap-3 text-3xl font-medium tracking-tight sm:text-4xl">Rankings
+        <span class="rounded-md border border-warning-border bg-warning-soft px-2 py-0.5 font-mono text-xs font-bold tracking-widest text-warning">BETA</span></h1>
+      <p class="flex items-center gap-2 text-sm text-text-muted">Unofficial. Made by Room Census, not by FLOP Labs.
+        <Help term="Rankings" text="Counts only the FLOP that FLOP Labs awarded, from the payout lists it published and its referee signed. Close Call's 1,000,000 FLOP are added once FLOP Labs publishes who gets what." /></p>
+    </div>
+    <div class="flex flex-wrap gap-1" role="group" aria-label="Contests">
+      {[["all", "All contests"], ...paid.map((c) => [c.id, c.title]), ...pending.map((p) => [p.id, p.title])].map(([id, label], i) => (
+        <button type="button" data-filter={id} aria-pressed={i === 0 ? "true" : "false"}
+          class="inline-flex min-h-9 items-center rounded-lg border border-transparent px-3 text-sm text-text-secondary aria-pressed:border-border-strong aria-pressed:bg-surface-raised aria-pressed:font-semibold aria-pressed:text-text">{label}</button>
+      ))}
+    </div>
+  </div>
+
+  <p class="mt-4 hidden items-center gap-3 rounded-xl border border-border bg-surface px-5 py-4 text-sm" data-pending>
+    <Px name="hourglass" size={24} class="text-warning" />
+    <span><span class="font-semibold">Close Call: 1,000,000 FLOP for the top 3.</span> <span class="text-text-muted">Added here once FLOP Labs publishes who gets what, after 4 October.</span>
+      <a class="text-link" href="/contests/close-1/">Live ranking</a></span>
+  </p>
+
+  <section aria-label="Podium" class="relative mt-4 overflow-hidden rounded-2xl border border-border bg-linear-to-b from-[#0f1220] to-bg px-4 pt-6 sm:px-10" data-podium>
+    <p class="text-center font-['Silkscreen'] text-2xl font-bold tracking-[0.35em] text-text">HIGH SCORES</p>
+    <div class="mt-6 flex items-end justify-center gap-0">
+      {podium.map((r, i) => {
+        const c = tone[at(r)];
+        const t = tied(r.rank);
+        return (
+          <div class="grid w-36 justify-items-center gap-2 sm:w-64">
+            {r.rank === 1 ? <Px name="crown" size={24} class="text-[#e3b341]" label="First place" /> : <span class="h-6"></span>}
+            <PixelAvatar did={r.did} size={i === 1 ? 88 : 64} class="ring-2 ring-border" />
+            <span class="font-mono text-xs text-text-secondary">{shortDid(r.did)}</span>
+            <span class="flex items-baseline gap-1.5"><span class="font-mono text-2xl font-bold" data-tone={at(r)}>{n(r.flop)}</span><span class="font-['Silkscreen'] text-xs text-text-muted">FLOP</span></span>
+            <div class="w-full">
+              <div class="h-4" data-top={at(r)}></div>
+              <div class:list={["grid w-full place-items-center content-center gap-1 border-x-2", height(i)]} data-front={at(r)}>
+                <span class="font-['Silkscreen'] text-3xl font-bold tracking-widest sm:text-4xl" data-tone={at(r)}>{ordinal(r.rank).toUpperCase()}</span>
+                <span class="font-['Silkscreen'] text-[11px] tracking-[0.2em]" data-tone={at(r)}>{t > 1 ? `${t} TIED` : r.rank === 1 ? "CHAMPION" : "PODIUM"}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </section>
+
+  <section aria-labelledby="board-title" class="mt-4 overflow-hidden rounded-xl border border-border bg-surface" data-rankings data-url="/rankings/ranking.json">
+    <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
+      <h2 id="board-title" class="flex items-center gap-2 font-semibold"><Px name="fire" size={24} class="text-down" />Leaderboard
+        <span class="font-mono text-xs font-normal text-text-muted">{n(rows.length)} DIDs</span></h2>
+      <form class="flex min-h-11 w-full items-center gap-2 rounded-lg border border-border-strong bg-bg pr-1.5 pl-3 sm:w-96" data-rank-form>
+        <label for="rank-input" class="sr-only">A did:key</label>
+        <Px name="search" size={12} class="text-text-muted" />
+        <input id="rank-input" autocomplete="off" spellcheck="false" placeholder="Find my rank: did:key:z6Mk…" class="min-w-0 flex-1 bg-transparent font-mono text-sm outline-none placeholder:text-text-muted" />
+        <button type="submit" class="min-h-8 rounded-md bg-accent px-3 text-sm font-semibold text-on-accent">Find</button>
+      </form>
+    </div>
+    <p class="px-5 pb-3 text-sm" data-rank-result aria-live="polite"></p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-surface-raised text-xs text-text-muted">
+          <tr>
+            <th scope="col" class="w-14 px-4 py-2 sm:px-5">#</th>
+            <th scope="col" class="px-4 py-2" colspan="2">Trader</th>
+            <th scope="col" class="px-4 py-2 text-right">FLOP</th>
+            <th scope="col" class="hidden px-4 py-2 sm:table-cell">Contests</th>
+            <th scope="col" class="hidden px-4 py-2 md:table-cell">Trophies</th>
+            {paid.map((c) => <th scope="col" class="hidden px-4 py-2 lg:table-cell">{c.title}</th>)}
+            {pending.map((p) => <th scope="col" class="hidden px-4 py-2 lg:table-cell">{p.title}</th>)}
+            <th scope="col" class="w-8 pr-4 sm:pr-5"><span class="sr-only">Open</span></th>
+          </tr>
+        </thead>
+        <tbody data-pinned></tbody>
+        <tbody>
+          {top.map((r) => {
+            const href = traderHref(r.did);
+            const cc = live.get(r.did);
+            return (
+              <tr class:list={["relative border-t border-border", href && "transition-colors hover:bg-surface-raised"]} data-did={r.did}>
+                <td class="px-4 py-2.5 font-mono text-text-secondary sm:px-5">{r.rank}</td>
+                <td class="w-9 py-2.5 pl-4"><PixelAvatar did={r.did} size={26} /></td>
+                <td class="px-2 py-2.5">
+                  {href
+                    ? <a class="font-mono text-text no-underline outline-none after:absolute after:inset-0 after:content-[''] focus-visible:underline" href={href}>{shortDid(r.did)}</a>
+                    : <span class="font-mono">{shortDid(r.did)}</span>}
+                </td>
+                <td class="px-4 py-2.5 text-right font-mono font-bold whitespace-nowrap text-accent">{n(r.flop)}</td>
+                <td class="hidden px-4 py-2.5 font-mono text-text-secondary sm:table-cell">{Object.keys(r.by).length}</td>
+                <td class="hidden px-4 py-2.5 md:table-cell"><span class="flex gap-1">{Object.keys(r.by).map(() => <Px name="trophy" size={12} class="text-[#e3b341]" />)}</span></td>
+                {paid.map((c) => <td class="hidden px-4 py-2.5 lg:table-cell">{r.by[c.id] ? <span class="rounded-md bg-accent-soft px-2 py-0.5 font-mono text-xs font-semibold text-accent">{n(r.by[c.id])}</span> : <span class="text-text-muted">–</span>}</td>)}
+                {pending.map(() => <td class="hidden px-4 py-2.5 lg:table-cell">{cc ? <span class="rounded-md bg-surface-raised px-2 py-0.5 font-mono text-xs text-text-secondary">#{n(cc.rank)}</span> : <span class="text-text-muted">–</span>}</td>)}
+                <td class="pr-4 text-right text-text-muted sm:pr-5">{href && <Px name="chevron-right" size={12} class="inline" />}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <script>import "../../scripts/rankings.ts";</script>
+</Base>

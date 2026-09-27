@@ -245,7 +245,7 @@ class Artifact(unittest.TestCase):
             for label in ("Primary", "Menu"):
                 links = self.nav_links(text, label)
                 with self.subTest(page=route, nav=label):
-                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "Contests", "My DID", "Write", "Look up a DID",
+                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "Contests", "Rankings", "My DID", "Write", "Look up a DID",
                                                                 "Verify", "Data", "Method", "Source code"])
                     for href, _, _ in links:
                         if href.startswith("/"):
@@ -253,7 +253,8 @@ class Artifact(unittest.TestCase):
                     current = [h for h, _, on in links if on]
                     own = ("/watched/", "/did/", "/write/", "/look-up/", "/verify/", "/open-data/", "/method/")
                     expected = (["/"] if route == "/" else ["/rooms/"] if route.startswith("/rooms/")
-                                else ["/contests/"] if route.startswith("/contests/") else [route] if route in own else [])
+                                else ["/contests/"] if route.startswith("/contests/") else ["/rankings/"] if route.startswith("/rankings/")
+                                else [route] if route in own else [])
                     self.assertEqual(current, expected)
         for page in ("did", "write", "look-up", "verify", "open-data", "method"):
             self.assertTrue((DIST / page / "index.html").is_file())
@@ -287,7 +288,8 @@ class Artifact(unittest.TestCase):
                     self.assertRegex(attrs, r'type="module" src="/_astro/[\w.-]+\.js"')
                 needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched ", "data-did-form ",
                                                        "data-verify-summary ", "data-write ", "data-wizard ", "data-find-did ",
-                                                       "data-trading-chart=", "data-did-page "))
+                                                       "data-trading-chart=", "data-did-page ", "data-did-switcher ",
+                                                       "data-rankings "))
                 self.assertEqual(len(scripts), needed)
 
     def test_the_built_site_meets_the_legacy_route_contract(self):
@@ -461,7 +463,7 @@ class Artifact(unittest.TestCase):
         self.assertIn("signature checked in this browser", chat)
         self.assertIn("the signature does not verify", chat)
         self.assertIn("public and permanent", visible)
-        fields = re.findall(r"<input[^>]*", text)
+        fields = re.findall(r"<input(?![^>]*data-sw-field)[^>]*", text)
         known = re.findall(r"<input[^>]*(?:data-chat-file|data-chat-password|data-chat-understand|data-chat-text)", text)
         self.assertEqual(len(fields), len(known), "the live room adds no field beyond the file, the passphrase, the box and the message")
         bundles = [f.read_text(encoding="utf-8") for f in DIST.glob("_astro/*.js")]
@@ -488,7 +490,7 @@ class Artifact(unittest.TestCase):
         # it asks for nothing but a public DID, and says so
         self.assertIn("No file, no key, nothing to install", visible)
         self.assertIn("Room Census keeps no record of this", visible)
-        self.assertEqual(len(re.findall(r"<input[^>]*", text)), len(re.findall(r'<input[^>]*id="did-input"', text)),
+        self.assertEqual(len(re.findall(r"<input(?![^>]*data-sw-field)[^>]*", text)), len(re.findall(r'<input[^>]*id="did-input"', text)),
                          "the only field on this page is the public DID")
         # the rooms read are exactly the latest census plus the room where Room Census signs
         form = re.search(r"<form data-did-form [^>]*>", text).group(0)
@@ -602,7 +604,7 @@ class Artifact(unittest.TestCase):
         self.assertIn("needs JavaScript", visible)
         self.assertIn("A public DID alone can never publish", visible)
         self.assertIn("You cannot type or paste a DID to publish", visible)
-        self.assertEqual(len(re.findall(r"<input[^>]*", text)), len(re.findall(r'<input[^>]*(?:data-unlock-file|data-unlock-password|data-room-search|data-understand|data-offer-pem)', text)),
+        self.assertEqual(len(re.findall(r"<input(?![^>]*data-sw-field)[^>]*", text)), len(re.findall(r'<input[^>]*(?:data-unlock-file|data-unlock-password|data-room-search|data-understand|data-offer-pem)', text)),
                          "every input belongs to the DID file, a passphrase, the room search or the confirmation")
         # both local backup formats open the same DID, and neither is presented as an older identity
         self.assertIn("A .json recovery file or an identity.pem", visible)
@@ -675,17 +677,29 @@ class Artifact(unittest.TestCase):
                 self.assertNotRegex(text, r"(?i)census #\d+ verified")
                 self.assertNotIn("passed every public check", text)
 
+    def test_the_saved_dids_menu_is_one_popover_with_two_fields_on_every_page(self):
+        """The top bar's saved DIDs: a native popover, a filter and a DID to save; nothing else to fill in."""
+        for page in self.html_pages():
+            text = page.read_text(encoding="utf-8")
+            with self.subTest(page=self.route(page)):
+                if "data-did-switcher" not in text:
+                    continue
+                self.assertEqual(len(re.findall(r'<div id="did-menu" popover', text)), 1)
+                self.assertEqual(len(re.findall(r'popovertarget="did-menu"', text)), 1)
+                self.assertEqual(len(re.findall(r"<input[^>]*data-sw-field", text)), 2)
+
     def test_the_mobile_menu_and_the_help_work_without_script(self):
         for page in self.html_pages():
             text = page.read_text(encoding="utf-8")
             with self.subTest(page=self.route(page)):
                 self.assertRegex(text, r'<details[^>]*>\s*<summary aria-label="Menu"')
                 ids = re.findall(r'<span id="([^"]+)" popover', text)
-                targets = re.findall(r'popovertarget="([^"]+)"', text)
+                # the top bar's saved-DIDs menu is one popover of its own, checked in the test below
+                targets = [t for t in re.findall(r'popovertarget="([^"]+)"', text) if t != "did-menu"]
                 self.assertTrue(targets, "no help on the page")
                 self.assertEqual(len(ids), len(set(ids)), "duplicate popover id")
                 self.assertEqual(sorted(targets), sorted(ids), "every help button opens its own popover")
-                labels = re.findall(r'popovertarget="[^"]+"[^>]*aria-label="([^"]+)"', text)
+                labels = re.findall(r'popovertarget="(?!did-menu")[^"]+"[^>]*aria-label="([^"]+)"', text)
                 self.assertEqual(len(labels), len(targets), "every help button has a spoken question")
                 for label in labels:
                     self.assertTrue(label.endswith("?") and len(label) > 8, label)
@@ -710,7 +724,9 @@ class Artifact(unittest.TestCase):
                       # the full ranking of our recount of a contest, for "Find my DID" (PRODUCT_DIRECTION, Ben 2026-09-25)
                       or re.fullmatch(r"contests/[a-z0-9][a-z0-9_-]{0,47}/ranking\.json", rel)
                       # the one picture shown when a page is shared on social networks (Ben 2026-09-27)
-                      or re.fullmatch(r"_astro/social-card\.[\w-]+\.png", rel))
+                      or re.fullmatch(r"_astro/social-card\.[\w-]+\.png", rel)
+                      # the full Rankings list, built from the payout maps FLOP Labs published (Ben 2026-09-27)
+                      or rel == "rankings/ranking.json")
                 self.assertTrue(ok, "not a page, a built asset or public data")
         text = "".join(f.read_text(encoding="utf-8", errors="replace") for f in DIST.rglob("*") if f.suffix in (".html", ".css", ".js"))
         for leak in ("C:\\", "Users\\", "node_modules", "file://"):

@@ -2,3 +2,4 @@
 data/** -text
 identity.json -text
 llms.txt -text
+web/src/data/flop-labs/** -text

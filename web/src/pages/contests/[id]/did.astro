@@ -49,7 +49,10 @@ const stat = "grid gap-0.5";
         <p class={stat}><span class="font-mono text-lg font-semibold" data-count>–</span><span class="flex items-center gap-1 text-xs text-text-muted"><Px name="coins" size={12} />Trades</span></p>
         <p class={stat}><span class="font-mono text-lg font-semibold" data-fees>–</span><span class="flex items-center gap-1 text-xs text-text-muted"><Px name="minus" size={12} />Fees</span></p>
         <div class="grid justify-items-end gap-1">
+          <span class="flex gap-2">
+          <button type="button" data-save aria-pressed="false" class="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border-strong px-4 text-sm font-semibold aria-pressed:border-accent-border aria-pressed:bg-accent-soft aria-pressed:text-accent"><Px name="bookmark" size={24} /><span data-save-label>Save</span></button>
           <button type="button" data-share class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent"><Px name="share" size={24} />Share on X</button>
+          </span>
           <p class="text-xs text-text-muted" data-share-status aria-live="polite"></p>
         </div>
       </div>

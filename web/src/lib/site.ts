@@ -20,7 +20,7 @@ export const CSP = policy("'self'");
 // no other page may connect out
 export const TECHNOCORE_CSP = policy("'self' https://technocore.chat");
 
-export type Icon = "discover" | "rooms" | "watched" | "contests" | "did" | "write" | "search" | "verify" | "data" | "method" | "source";
+export type Icon = "discover" | "rooms" | "watched" | "contests" | "rankings" | "did" | "write" | "search" | "verify" | "data" | "method" | "source";
 export type NavItem = { label: string; href: string; icon: Icon; ready: boolean; external?: boolean };
 export type NavSection = { label: string; items: NavItem[] };
 
@@ -34,6 +34,7 @@ export const NAV: NavSection[] = [
       { label: "All rooms", href: "/rooms/", icon: "rooms", ready: true },
       { label: "Watched rooms", href: "/watched/", icon: "watched", ready: true },
       { label: "Contests", href: "/contests/", icon: "contests", ready: true },
+      { label: "Rankings", href: "/rankings/", icon: "rankings", ready: true },
     ],
   },
   {

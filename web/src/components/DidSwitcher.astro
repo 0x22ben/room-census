@@ -1,0 +1,38 @@
+---
+// The visitor's saved DIDs, top right of every page (Pencil mockup N74Tq): the active one with its
+// avatar, nickname and rank in the live contest, and a menu to switch, open, save, rename or forget.
+// Everything stays in this browser (src/lib/saved-store.ts); the menu is a native popover.
+import Px from "./Px.astro";
+import { contests, phaseOf } from "../lib/contests";
+
+const c = contests().find((x) => x.ranking && phaseOf(x) === "live") ?? contests().find((x) => x.ranking);
+const signed = (c?.leaderboard?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check }));
+const btn = "inline-flex min-h-9 items-center gap-2 rounded-md px-2.5 text-sm";
+---
+<div data-did-switcher data-url={c?.ranking?.file} data-contest={c?.id} data-contest-title={c?.short} data-signed={JSON.stringify(signed)}>
+  <button type="button" popovertarget="did-menu" class="inline-flex min-h-9 items-center gap-2 rounded-md border border-border-strong bg-surface px-2.5 text-sm font-semibold text-text hover:bg-surface-raised" aria-label="Saved DIDs">
+    <span data-sw-avatar class="inline-flex"><Px name="bookmark" size={12} class="text-accent" /></span>
+    <span data-sw-nick>Save a DID</span>
+    <span data-sw-rank class="font-mono text-xs font-normal text-text-muted"></span>
+    <Px name="chevron-down" size={12} class="text-text-muted" />
+  </button>
+  <div id="did-menu" popover class="did-menu w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border-strong bg-surface-raised p-2.5 text-sm text-text shadow-2xl shadow-shadow/40">
+    <input data-sw-filter data-sw-field hidden autocomplete="off" spellcheck="false" placeholder="Filter saved DIDs" aria-label="Filter saved DIDs"
+      class="mb-2 min-h-9 w-full rounded-md border border-border bg-bg px-3 text-sm outline-none placeholder:text-text-muted" />
+    <p class="flex justify-between px-2 pb-1 font-mono text-[10px] font-bold tracking-widest text-text-muted uppercase"><span data-sw-count>Saved</span><span>{c?.short}</span></p>
+    <ul data-sw-list class="grid max-h-80 gap-0.5 overflow-y-auto"></ul>
+    <p data-sw-empty class="px-2 py-3 text-text-muted">Save your DIDs once: you will see them on every page.</p>
+    <form data-sw-add class="mt-2 flex gap-1.5 border-t border-border pt-2.5">
+      <label for="sw-add-input" class="sr-only">A did:key to save</label>
+      <input id="sw-add-input" data-sw-field autocomplete="off" spellcheck="false" placeholder="Paste a did:key" class="min-h-9 min-w-0 flex-1 rounded-md border border-border bg-bg px-2.5 font-mono text-xs outline-none placeholder:text-text-muted" />
+      <button type="submit" class="min-h-9 rounded-md bg-accent px-3 text-sm font-semibold text-on-accent">Save</button>
+    </form>
+    <p data-sw-error class="px-2 pt-1.5 text-xs text-warning" aria-live="polite"></p>
+    <div class="mt-1.5 flex items-center justify-between">
+      <button type="button" data-sw-manage class={`${btn} text-text-secondary hover:text-text`}><Px name="pencil" size={12} />Manage</button>
+      <button type="button" data-sw-forget hidden class={`${btn} text-down`}>Forget all</button>
+    </div>
+    <p class="px-2 pt-1 text-[11px] text-text-muted">Kept in this browser only. Saving a DID does not prove you own it.</p>
+  </div>
+</div>
+<script>import "../scripts/did-switcher.ts";</script>

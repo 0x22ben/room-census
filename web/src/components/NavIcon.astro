@@ -4,7 +4,7 @@ import Px from "./Px.astro";
 import type { Icon } from "../lib/site";
 
 interface Props { name: Icon }
-const ICONS: Record<Icon, string> = { discover: "compass", rooms: "bulletlist", watched: "star", contests: "trophy", did: "user", write: "pencil",
+const ICONS: Record<Icon, string> = { discover: "compass", rooms: "bulletlist", watched: "star", contests: "trophy", rankings: "crown", did: "user", write: "pencil",
   search: "search", verify: "shield", data: "database", method: "book-open", source: "github" };
 ---
 <Px name={ICONS[Astro.props.name]} size={24} class="shrink-0" />

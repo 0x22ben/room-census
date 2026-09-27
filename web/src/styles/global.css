@@ -58,3 +58,21 @@
     }
   }
 }
+
+/* Rankings podium: gold, silver, bronze (data-tone, data-top, data-front = 0, 1, 2) */
+@layer components {
+  [data-tone="0"] { color: #e3b341; }
+  [data-tone="1"] { color: #c3cbd6; }
+  [data-tone="2"] { color: #cd8a55; }
+  [data-top="0"] { background: #e3b341; }
+  [data-top="1"] { background: #c3cbd6; }
+  [data-top="2"] { background: #cd8a55; }
+  [data-front="0"] { background: #e3b34124; border-color: #e3b341; }
+  [data-front="1"] { background: #c3cbd61f; border-color: #c3cbd6; }
+  [data-front="2"] { background: #cd8a5524; border-color: #cd8a55; }
+}
+
+/* the saved-DIDs menu of the top bar: a native popover, pinned under the top right corner */
+@layer components {
+  .did-menu { position: fixed; inset: auto; top: 3.75rem; right: 1rem; margin: 0; }
+}

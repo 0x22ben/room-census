@@ -129,6 +129,27 @@ export function sparklines(c: Contest, dids: string[]): Map<string, { d: string;
   return out;
 }
 
+/** The rank and score of some keys in a contest's published ranking, read at build time from their
+ * shard files (ranking v2) or from the one file (v1). Keys that did not trade are left out. */
+export function ranksOf(c: Contest, dids: string[]): Map<string, { rank: number; pnl: string }> {
+  const out = new Map<string, { rank: number; pnl: string }>();
+  if (!c.ranking || !LIVE) return out;
+  const main = json<RankingDoc>(c.ranking.file.replace(/^\//, ""));
+  if (!("top" in main)) {
+    const want = new Set(dids);
+    for (const [rank, did, pnl] of main.rows) if (want.has(did)) out.set(did, { rank, pnl });
+    return out;
+  }
+  const byShard = new Map<string, string[]>();
+  for (const d of dids) byShard.set(shard(d), [...(byShard.get(shard(d)) ?? []), d]);
+  for (const [s, list] of byShard) {
+    const rows = json<{ rows: RankRow[] }>(shardFile(c.ranking.file, "ranking", s).replace(/^\//, "")).rows;
+    const want = new Set(list);
+    for (const [rank, did, pnl] of rows) if (want.has(did)) out.set(did, { rank, pnl });
+  }
+  return out;
+}
+
 /** "−0.53%" between two prices, or undefined when one is missing. */
 export function change(from: string | null | undefined, to: string | null | undefined): string | undefined {
   if (!from || !to) return undefined;

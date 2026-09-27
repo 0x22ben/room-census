@@ -25,6 +25,7 @@ const live = !SAMPLE && contests().some((c) => phaseOf(c) === "live");
                 class:list={[item, on ? "bg-surface-raised font-semibold text-text" : "font-medium text-text-secondary hover:bg-surface hover:text-text"]}>
                 <NavIcon name={i.icon} /><span>{i.label}</span>
                 {live && i.href === "/contests/" && <span data-nav-badge aria-hidden="true" class="ml-auto rounded border border-accent-border bg-accent-soft px-1.5 font-mono text-[10px] font-bold tracking-widest text-accent uppercase">Live</span>}
+                {i.href === "/rankings/" && <span data-nav-badge aria-hidden="true" class="ml-auto rounded border border-warning-border bg-warning-soft px-1.5 font-mono text-[10px] font-bold tracking-widest text-warning uppercase">Beta</span>}
               </a>
             </li>
           );
