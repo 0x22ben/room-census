@@ -3,9 +3,9 @@
 import Px from "./Px.astro";
 import type { Icon } from "../lib/site";
 
+// 16 px on the compact desktop sidebar (Ben, 2026-09-28): a little softer than 12 or 24, but 12 was too small
 interface Props { name: Icon }
 const ICONS: Record<Icon, string> = { discover: "compass", rooms: "bulletlist", watched: "star", contests: "trophy", rankings: "crown", did: "user", write: "pencil",
   search: "search", verify: "shield", data: "database", method: "book-open", source: "github" };
 ---
-<!-- 16 px on the compact desktop sidebar (Ben, 2026-09-28): a little softer than 12 or 24, but 12 was too small -->
 <Px name={ICONS[Astro.props.name]} size={24} class="shrink-0 lg:size-4" />

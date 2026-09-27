@@ -39,8 +39,12 @@ function init(root: HTMLElement) {
     try {
       const { row } = await lookup(url, did, signedList);
       const r: Rank = row ? { rank: row[0], pnl: row[2] } : null;
-      all[did] = { at: Date.now(), r };
-      try { window.localStorage.setItem(CACHE, JSON.stringify(all)); } catch { /* no memory */ }
+      // read again after the wait: the DID may have been removed or forgotten meanwhile
+      if (saved().some((s) => s.did === did)) {
+        const now = cached();
+        now[did] = { at: Date.now(), r };
+        try { window.localStorage.setItem(CACHE, JSON.stringify(now)); } catch { /* no memory */ }
+      }
       return r;
     } catch {
       return null;
