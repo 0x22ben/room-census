@@ -1,11 +1,9 @@
 ---
-// My DID, laid out as the approved Pencil mockups (My DID, Create DID and its steps): create,
-// protect and restore a Technocore identity, prepare a first signed message, and look up public
-// activity. Everything runs in this browser. The secret key lives in the page's memory and leaves it
-// only inside the encrypted recovery file the reader downloads; no key, password or recovery file is
-// ever sent anywhere. The lookup reads the newest messages of each measured room from Technocore,
-// keeps the ones this DID signed, and checks every signature locally; a message that names the DID
-// without a valid signature is never counted.
+// Create a DID, laid out as the approved Pencil mockups (Create DID and its steps): create, protect
+// and restore a Technocore identity, publish a first signed message, then sign in with the public DID
+// (only the DID is kept, in this browser). Everything runs in this browser. The secret key lives in the
+// page's memory and leaves it only inside the encrypted recovery file the reader downloads; no key,
+// password or recovery file is ever sent anywhere.
 import Base from "../layouts/Base.astro";
 import Help from "../components/Help.astro";
 import Px from "../components/Px.astro";
@@ -52,7 +50,7 @@ const rowKey = "text-text-secondary";
 const rowValue = "font-mono break-all text-right";
 const steps = ["Create", "Protect", "Write", "Publish"];
 ---
-<Base title="Create a Technocore DID" csp={TECHNOCORE_CSP} local description="Create, protect and restore a Technocore identity in your browser, prepare a first signed message, and look up public activity.">
+<Base title="Create a Technocore DID" csp={TECHNOCORE_CSP} local description="Create, protect and restore a Technocore identity in your browser, and publish a first signed message.">
   <div class="mx-auto grid w-full max-w-3xl grid-cols-[minmax(0,1fr)] gap-6">
     <header class="grid justify-items-center gap-2 pt-4 text-center">
       <p class="flex items-center gap-2 font-mono text-xs font-semibold tracking-widest text-accent uppercase">
@@ -99,10 +97,6 @@ const steps = ["Create", "Protect", "Write", "Publish"];
         <span>{DID_DISCLAIMER}</span>
       </p>
 
-      <p class="text-center text-sm text-text-secondary">
-        Only want to read the public activity of a DID? <a href="/look-up/" class="font-semibold text-link">Look up a public DID</a>, no file needed.
-      </p>
-
       <!-- what Room Census can see: shown on the landing, before anything is created -->
       <section data-sees aria-labelledby="sees-title" class={card}>
         <h2 id="sees-title" class="text-lg font-semibold">What becomes public, and what never leaves your device</h2>
@@ -114,9 +108,9 @@ const steps = ["Create", "Protect", "Write", "Publish"];
           <div class={row}><span class={rowKey}>Your private key</span><span class={rowValue}>stays on your computer</span></div>
           <div class={row}><span class={rowKey}>Your passphrase</span><span class={rowValue}>stays on your computer</span></div>
           <div class={row}><span class={rowKey}>Your recovery files</span><span class={rowValue}>stay on your computer</span></div>
-          <div class={row}><span class={rowKey}>The DIDs you look up</span><span class={rowValue}>stay on your computer</span></div>
+          <div class={row}><span class={rowKey}>The DIDs you sign in with</span><span class={rowValue}>stay on your computer</span></div>
         </div>
-        <p class={good}><Px name="shield" size={18} aria-hidden="true" class="shrink-0 text-accent" />Room Census stores nothing about you. No account, no email, no database, no log of what you do here.</p>
+        <p class={good}><Px name="shield" size={18} aria-hidden="true" class="shrink-0 text-accent" />Room Census stores nothing about you. No server account, no email, no database, no log of what you do here.</p>
         <p class={foot}><Px name="shield" size={16} aria-hidden="true" class="mt-0.5 shrink-0 text-accent" />Your private key exists decrypted only in this tab's memory, on your computer, while the DID is unlocked. Closing the tab forgets it.</p>
         <p class={foot}><Px name="info-box" size={16} aria-hidden="true" class="mt-0.5 shrink-0" />This site is a set of static files. There is no server behind it that could receive, or keep, a key, a passphrase, a file or a DID.</p>
       </section>
@@ -245,7 +239,7 @@ const steps = ["Create", "Protect", "Write", "Publish"];
         </form>
         <div data-skipped hidden class="grid gap-3 rounded-lg border border-border bg-bg p-4">
           <p class="text-sm">Nothing was published. Your DID is ready, and your recovery file is what brings it back.</p>
-          <a data-skipped-link href="/look-up/" class="text-sm font-semibold text-link">See the public activity of this DID</a>
+          <button type="button" data-action="sign-in" class="justify-self-start text-sm font-semibold text-link">Sign in with this DID</button>
         </div>
         <section data-preview hidden aria-labelledby="preview-title" class="grid gap-3 rounded-lg border border-border-strong bg-bg p-4">
           <h3 id="preview-title" tabindex="-1" class="font-semibold outline-none">Exactly what will be published</h3>
@@ -270,7 +264,7 @@ const steps = ["Create", "Protect", "Write", "Publish"];
           <div class={row}><span class={rowKey}>Public DID</span><code data-did-value class={rowValue}></code></div>
           <div class={row}><span class={rowKey}>Room</span><span data-out-room class={rowValue}></span></div>
         </div>
-        <button type="button" data-action="view" hidden class={primary}>View in My DID <Px name="search" size={18} aria-hidden="true" /></button>
+        <button type="button" data-action="view" hidden class={primary}>Sign in with this DID <Px name="user" size={18} aria-hidden="true" /></button>
         <button type="button" data-action="another" hidden class={secondary}>Write another message</button>
         <button type="button" data-action="look" hidden class={primary}>Check Technocore again <Px name="reload" size={18} aria-hidden="true" /></button>
         <button type="button" data-action="edit" hidden class={primary}>Edit and review again <Px name="arrow-right" size={18} aria-hidden="true" /></button>

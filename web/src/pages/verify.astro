@@ -90,11 +90,9 @@ sha256sum {snapshotFile}    # on macOS: shasum -a 256 {snapshotFile}</code></pre
         </p>
         <p class="text-sm text-text-muted">This browser reads the public export of the {latest.signed_in.room} room from technocore.chat, finds the message with this nonce from the DID below, checks that it names the fingerprints of steps 1 and 2, and checks its signature. Nothing is sent but the read.</p>
         <div class="grid gap-1.5 text-sm text-text-secondary">
-          <p><span class="font-semibold text-text">Another way, in this browser:</span> copy the DID below, open My DID and look it up. The message with nonce {latest.signed_in.nonce} appears with “Signature checked”; compare the fingerprints at the end of its text with steps 1 and 2. The activity proof you can download there holds the full text too.</p>
           <p><span class="font-semibold text-text">By hand:</span> read the room export, take the message with this nonce, and check its <code class="font-mono">sig</code> over <code class="font-mono">{latest.signed_in.room}|{latest.signed_in.nonce}|text</code> with the DID below, for example with <code class="font-mono">verify()</code> in <code class="font-mono">flop_did.py</code> from the repository.</p>
         </div>
         <div class="flex flex-wrap gap-2">
-          <a href="/did/" class={button}>Open My DID</a>
           <a href={`${identity.network}/r/${latest.signed_in.room}/export`} class={button}>Read the room export <Px name="external-link" size={16} aria-hidden="true" /></a>
         </div>
       </li>

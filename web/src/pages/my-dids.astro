@@ -1,0 +1,66 @@
+---
+// My DIDs: every DID the visitor signed in with, kept only in this browser (Pencil mockup AUQcK). Add one
+// or many at once (one per line), search them, rename, switch, open their trades or remove them. Ranks
+// and scores come from the live contest's published ranking, as in the account menu.
+import Base from "../layouts/Base.astro";
+import Px from "../components/Px.astro";
+import { contests, phaseOf } from "../lib/contests";
+import { MAX } from "../lib/saved-store";
+
+const c = contests().find((x) => x.ranking && phaseOf(x) === "live") ?? contests().find((x) => x.ranking);
+const signed = (c?.leaderboard?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check }));
+---
+<Base title="My DIDs" description="The DIDs you signed in with on Room Census, with their rank and score. Saved only in your browser.">
+  <div data-my-dids data-url={c?.ranking?.file} data-contest={c?.id} data-signed={JSON.stringify(signed)} data-max={MAX} class="grid grid-cols-1 gap-5">
+    <section aria-labelledby="my-dids-title" class="grid gap-1">
+      <h1 id="my-dids-title" class="flex items-center gap-2.5 text-3xl font-bold tracking-tight">
+        My DIDs <span data-md-count class="rounded-md bg-surface-raised px-2 py-0.5 font-mono text-xs font-bold text-text-secondary">0</span>
+      </h1>
+      <p class="text-sm text-text-muted">Saved in this browser only.</p>
+    </section>
+
+    <form data-md-add class="grid gap-2.5 rounded-xl border border-accent-border bg-surface p-4">
+      <label for="md-input" class="text-sm font-bold">Add DIDs</label>
+      <textarea id="md-input" data-md-input rows="3" autocomplete="off" spellcheck="false" placeholder="did:key:z6Mk…"
+        class="w-full resize-y rounded-lg border border-border-strong bg-bg px-3 py-2.5 font-mono text-xs leading-relaxed outline-none placeholder:text-text-muted"></textarea>
+      <div class="flex flex-wrap items-center gap-3">
+        <p data-md-hint class="flex-1 text-xs text-text-muted" aria-live="polite">One DID per line.</p>
+        <button type="submit" data-md-submit disabled class="min-h-9 rounded-lg bg-accent px-3.5 text-sm font-semibold text-on-accent disabled:opacity-40">Add DIDs</button>
+      </div>
+    </form>
+
+    <p data-md-noscript class="text-text-muted">Your DIDs need JavaScript. They stay in this browser.</p>
+
+    <section data-md-body hidden class="grid grid-cols-1 gap-3">
+      <label class="flex min-h-9 w-full max-w-sm items-center gap-2 rounded-lg border border-border-strong bg-bg px-3">
+        <Px name="search" size={12} class="text-text-muted" />
+        <span class="sr-only">Search your DIDs</span>
+        <input data-md-search autocomplete="off" spellcheck="false" placeholder="Search nickname or DID" class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-text-muted" />
+      </label>
+      <div class="relative overflow-x-auto rounded-xl border border-border bg-surface">
+        <table class="w-full min-w-[40rem] text-sm">
+          <thead class="bg-surface-raised font-mono text-[10px] font-bold tracking-widest text-text-muted uppercase">
+            <tr>
+              <th scope="col" class="px-4 py-3 text-left">DID</th>
+              <th scope="col" class="px-4 py-3 text-right">{c?.short} rank</th>
+              <th scope="col" class="px-4 py-3 text-right">Score</th>
+              <th scope="col" class="px-4 py-3"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody data-md-list></tbody>
+        </table>
+        <p data-md-empty hidden class="px-4 py-6 text-text-muted">No DID yet. Paste one above.</p>
+        <p data-md-none hidden class="px-4 py-6 text-text-muted">No DID matches.</p>
+      </div>
+    </section>
+  </div>
+  <template data-md-icons>
+    <span data-i="pencil"><Px name="pencil" size={12} /></span>
+    <span data-i="copy"><Px name="copy" size={12} /></span>
+    <span data-i="trash"><Px name="trash" size={12} /></span>
+  </template>
+</Base>
+
+<script>
+  import "../scripts/my-dids.ts";
+</script>

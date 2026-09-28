@@ -5,6 +5,8 @@
 export type Card = {
   did: string; score: number; rank: number; traders: number; contest: string; sweep: number;
   position?: string; line?: number; prices: number[]; official?: boolean;
+  /** how many trades the key made, and what its best one realized (the tiles of mockup CZ6BX) */
+  trades?: number; best?: number;
   /** what the curve shows: the NVDA price by default, or the key's own score */
   curveLabel?: string;
   /** false when the card is shared from someone's trader page: then it says SCORE, not MY SCORE */
@@ -20,6 +22,8 @@ const ICON = {
   trophy: "M16 17H13V19H15V21H9V19H11V17H8V15H16V17ZM18 5H22V11H20V7H18V11H20V13H18V15H16V5H8V15H6V13H4V11H6V7H4V11H2V5H6V3H18V5Z",
   crown: "M3 3h2v12H3zm16 0h2v12h-2zm-8 0h2v2h-2zM9 5h2v2H9zM5 5h2v2H5z M3 3h2v2H3zm4 4h2v2H7zm6-2h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2zM5 15h14v2H5zm-2 4h18v2H3z",
   check: "M10 18H8v-2h2v2Zm-2-2H6v-2h2v2Zm4-2v2h-2v-2h2Zm-6 0H4v-2h2v2Zm8 0h-2v-2h2v2Zm2-2h-2v-2h2v2Zm2-2h-2V8h2v2Zm2-2h-2V6h2v2Z",
+  coins: "M6 2h6v2H6zM4 4h2v2H4zm8 0h2v2h-2zm-8 8h2v2H4zm8 0h2v2h-2zm-6 2h6v2H6zM2 6h2v6H2zm12 0h2v6h-2zM14 8h4v2h-4zm-4 10h2v2h-2zm8-8h2v2h-2zm-6 10h2v2h-2zm6-2h2v2h-2zM12 20h6v2h-6zm-4-6h2v4H8zm12-2h2v6h-2zM7 6h4v2H7z",
+  fire: "M9 2h2v4H9zM7 6h2v2H7zM5 8h2v2H5zm8 2h2v2h-2zm2-2h2v2h-2zm2 2h2v2h-2zm2 2h2v6h-2zM3 10h2v8H3zm8-4h2v4h-2zm6 12h2v2h-2zM7 20h10v2H7zm-2-2h2v2H5zm4-2h6v4H9zM11 14h2v3h-2z",
   chart: "M22 22H4v-2h18v2ZM4 20H2V2h2v18Zm4-6H6v-2h2v2Zm8 0h-2v-2h2v2Zm-6-2H8v-2h2v2Zm4 0h-2v-2h2v2Zm4 0h-2v-2h2v2Zm-6-2h-2V8h2v2Zm8 0h-2V8h2v2Zm2-2h-2V6h2v2Z",
 };
 // the Room Census logo, as in the favicon: four bars crossed by the census line
@@ -147,20 +151,20 @@ export async function drawCard(card: Card): Promise<Blob> {
     ctx.stroke(line);
     ctx.restore();
   }
-  icon(ctx, "chart", cx + 16, cy + 14, 24, C.muted);
-  text(ctx, card.curveLabel ?? "NVDA", cx + 48, cy + 32, `400 16px ${PIXEL}`, C.muted);
 
-  // three facts under the chart
-  const facts: [string, string, string][] = [
-    ["Position", card.position ?? "-", card.position?.startsWith("Short") ? C.down : card.position?.startsWith("Long") ? C.up : C.text],
-    ["Vs 3rd", card.line !== undefined && card.rank > 3 ? signed(card.score - card.line) : card.rank <= 3 ? "Top 3" : "-", card.rank <= 3 ? C.gold : C.text],
-    ["Update", String(card.sweep), C.text],
+  // three facts under the chart, as in mockup CZ6BX: trades, best trade, open position
+  const [side, qty] = (card.position ?? "").split(" ");
+  const facts: [keyof typeof ICON, string, string, string, string][] = [
+    ["coins", "Trades", card.trades !== undefined ? n(card.trades) : "-", C.text, C.up],
+    ["fire", "Best", card.best !== undefined ? signed(card.best) : "-", C.text, C.gold],
+    ["chart", side && qty ? side : "Position", qty ?? side ?? "-", C.text, side === "Short" ? C.down : C.up],
   ];
   const fw = (cwid - 24) / 3;
-  facts.forEach(([label, value, color], i) => {
+  facts.forEach(([ic, label, value, color, tint], i) => {
     const fx = cx + i * (fw + 12);
     box(ctx, fx, 421, fw, 90, 10, C.surface, C.border);
-    text(ctx, label, fx + 14, 450, `400 16px ${PIXEL}`, C.muted);
+    icon(ctx, ic, fx + 14, 433, 24, tint);
+    text(ctx, label, fx + 46, 450, `400 16px ${PIXEL}`, C.muted);
     ctx.font = mono(27, true);
     let v = value;
     while (ctx.measureText(v).width > fw - 28 && v.length > 4) v = `${v.slice(0, -2)}…`;
@@ -190,21 +194,31 @@ function download(blob: Blob, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-/** "Share on X", straight away: opens a post on X with the text and the link filled in, and puts the
- * score card on the clipboard so the reader pastes it into the post (X lets no site attach a picture
- * itself); when the clipboard refuses, the card is downloaded instead. Returns how the picture was
- * handed over. Must run inside the click, with the card already drawn, or the browser blocks X. */
-export function shareOnX(card: Card, pageUrl: string, blob: Blob | undefined, told: (how: "copied" | "downloaded") => void): void {
+/** "Share on X": puts the score card on the clipboard so the reader pastes it into the post (X lets no
+ * site attach a picture itself), then opens a post on X with the text and the link filled in. The
+ * card is copied first, while this page is still in front: a browser stops drawing in a tab that X
+ * has pushed to the back. When the clipboard refuses, the card is downloaded instead. X opens right
+ * after, still within the click's grace time; if the browser blocks it anyway, the reader gets a link.
+ * Must be called inside the click. Returns the address of the post on X. */
+export function shareOnX(card: Card, pageUrl: string, blob: Promise<Blob>, told: (how: "copied" | "downloaded" | "failed", opened: boolean) => void): string {
   const post = `${card.mine === false ? "Score" : "My score"} in ${card.contest.replace(" · ", " ")}: ${signed(card.score)} POLF, #${n(card.rank)} of ${n(card.traders)} traders${card.official ? ", signed by the referee" : " (Room Census recount)"}.`;
+  const intent = `https://x.com/intent/post?text=${encodeURIComponent(post)}&url=${encodeURIComponent(pageUrl)}`;
   const name = `room-census-${card.did.slice(-8)}.png`;
-  if (blob) {
-    // the reader is told only once the clipboard said yes; otherwise the picture is downloaded instead
-    const fallback = () => { download(blob, name); told("downloaded"); };
-    if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
-      navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]).then(() => told("copied"), fallback);
-    } else {
-      fallback();
-    }
+  let done = false;
+  const finish = (how: "copied" | "downloaded" | "failed") => {
+    if (done) return;
+    done = true;
+    const w = window.open(intent, "_blank");
+    if (w) w.opener = null;
+    told(how, !!w);
+  };
+  const fallback = () => blob.then((b) => { download(b, name); finish("downloaded"); }, () => finish("failed"));
+  if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
+    navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]).then(() => finish("copied"), fallback);
+  } else {
+    fallback();
   }
-  window.open(`https://x.com/intent/post?text=${encodeURIComponent(post)}&url=${encodeURIComponent(pageUrl)}`, "_blank", "noopener");
+  // never keep the reader waiting on a slow clipboard: X opens anyway after a moment
+  setTimeout(() => finish("failed"), 3000);
+  return intent;
 }

@@ -211,13 +211,27 @@ function init(root: HTMLElement) {
     const cardData: Card = { did, score, rank: row[0], traders: found.traders, contest: root.dataset.contest ?? "", official,
       sweep: found.sweep, position: pos === undefined ? undefined : pos === null ? "Flat" : `${Number(pos[0]) > 0 ? "Long" : "Short"} ${Math.abs(Number(pos[0])).toFixed(1)}`,
       line: signedList.length >= 3 ? Number(signedList[2].pnl) : undefined,
-      prices: curve.length > 1 ? curve.map((p) => p.v) : marks.map((m) => m[1]), curveLabel: curve.length > 1 ? "SCORE" : "NVDA", mine: false };
-    let ready: Blob | undefined;
-    drawCard(cardData).then((b) => { ready = b; }).catch(() => undefined);
+      prices: curve.length > 1 ? curve.map((p) => p.v) : marks.map((m) => m[1]), curveLabel: curve.length > 1 ? "SCORE" : "NVDA", mine: isSaved(did),
+      trades: trades?.length, best: top.length ? top[0].gain : undefined };
+    // drawn once, as soon as the page has its numbers; a click before it is ready waits for it
+    const ready = drawCard(cardData);
+    ready.catch(() => undefined);
     q("[data-share]").addEventListener("click", () => {
       const paste = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘V" : "Ctrl+V";
-      shareOnX(cardData, `${root.dataset.page}?k=${encodeURIComponent(did)}`, ready, (how) => {
-        q("[data-share-status]").textContent = how === "copied" ? `Picture copied: paste it in your post (${paste}).` : "Picture downloaded: add it to your post.";
+      const status = q("[data-share-status]");
+      status.textContent = "Making the picture…";
+      const intent = shareOnX(cardData, `${root.dataset.page}?k=${encodeURIComponent(did)}`, ready, (how, opened) => {
+        status.textContent = how === "copied" ? `Picture copied: paste it in your post (${paste}).`
+          : how === "downloaded" ? "Picture downloaded: add it to your post." : "The picture could not be copied.";
+        if (!opened) {
+          const a = document.createElement("a");
+          a.href = intent;
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.className = "ml-1 font-semibold text-link";
+          a.textContent = "Open the post on X";
+          status.append(" ", a);
+        }
       });
     });
   })();

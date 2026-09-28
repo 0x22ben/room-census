@@ -23,7 +23,7 @@ PAGE_CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self'; script-
             "base-uri 'none'; form-action 'none'; object-src 'none'")
 # My DID and Verify are the only pages that may connect out, and only to Technocore's public read API
 DID_CSP = PAGE_CSP.replace("connect-src 'self'", "connect-src 'self' https://technocore.chat")
-CONNECTS = ("/did/", "/verify/", "/write/", "/look-up/")
+CONNECTS = ("/did/", "/verify/")
 # plus every room page: each one shows its room live, read by the reader's browser
 connects = lambda route: route in CONNECTS or (route.startswith("/rooms/") and route != "/rooms/")
 DID_DISCLAIMER = ("This page summarizes public Technocore activity. It does not determine ownership, reputation or "
@@ -115,7 +115,7 @@ class Project(unittest.TestCase):
         wf = (REPO / ".github" / "workflows" / "web.yml").read_text(encoding="utf-8")
         self.assertIn("npm run test:browser", wf)
         self.assertRegex(wf, r'REQUIRE_BROWSER:\s*"1"')
-        self.assertTrue((WEB / "tests" / "browser" / "did-page.test.mjs").is_file())
+        self.assertTrue((WEB / "tests" / "browser" / "did-wizard.test.mjs").is_file())
 
     def test_the_deployment_guard_catches_each_form(self):
         for example in ("uses: actions/deploy-pages@v4", "pages: 'write'", "permissions: write-all",
@@ -223,7 +223,7 @@ class Artifact(unittest.TestCase):
         for page in self.html_pages():
             route = self.route(page)
             with self.subTest(page=route):
-                if route == "/404.html":
+                if route == "/404.html" or '<meta name="robots" content="noindex">' in page.read_text(encoding="utf-8"):
                     self.assertIsNone(contract.parse(page).canonical)
                 else:
                     self.assertEqual(contract.parse(page).canonical, DOMAIN + route)
@@ -245,19 +245,27 @@ class Artifact(unittest.TestCase):
             for label in ("Primary", "Menu"):
                 links = self.nav_links(text, label)
                 with self.subTest(page=route, nav=label):
-                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "Contests", "Rankings", "My DID", "Write", "Look up a DID",
+                    self.assertEqual([t for _, t, _ in links], ["Discover rooms", "All rooms", "Watched rooms", "Contests", "Rankings", "Create a DID",
                                                                 "Verify", "Data", "Method", "Source code"])
                     for href, _, _ in links:
                         if href.startswith("/"):
                             self.assertTrue(contract.resolve(DIST, route, href).is_file(), href)
                     current = [h for h, _, on in links if on]
-                    own = ("/watched/", "/did/", "/write/", "/look-up/", "/verify/", "/open-data/", "/method/")
+                    own = ("/watched/", "/did/", "/verify/", "/open-data/", "/method/")
                     expected = (["/"] if route == "/" else ["/rooms/"] if route.startswith("/rooms/")
                                 else ["/contests/"] if route.startswith("/contests/") else ["/rankings/"] if route.startswith("/rankings/")
                                 else [route] if route in own else [])
                     self.assertEqual(current, expected)
-        for page in ("did", "write", "look-up", "verify", "open-data", "method"):
+        for page in ("did", "verify", "open-data", "method"):
             self.assertTrue((DIST / page / "index.html").is_file())
+        # the pages removed on 28 Sep 2026 only send old links on, and nothing links to them any more
+        for gone, to in (("write", "/did/"), ("look-up", "/my-dids/")):
+            text = (DIST / gone / "index.html").read_text(encoding="utf-8")
+            self.assertIn(f'http-equiv="refresh" content="0;url={to}"', text)
+            self.assertIn('<meta name="robots" content="noindex">', text)
+            for page in self.html_pages():
+                with self.subTest(page=self.route(page), gone=gone):
+                    self.assertNotIn(f'href="/{gone}/', page.read_text(encoding="utf-8"))
 
     def test_the_overview_keeps_the_anchors_signed_messages_link_to(self):
         ids = contract.parse(DIST / "index.html").ids
@@ -286,8 +294,8 @@ class Artifact(unittest.TestCase):
             with self.subTest(page=self.route(page)):
                 for attrs in scripts:
                     self.assertRegex(attrs, r'type="module" src="/_astro/[\w.-]+\.js"')
-                needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched ", "data-did-form ",
-                                                       "data-verify-summary ", "data-write ", "data-wizard ", "data-find-did ",
+                needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched ", "data-my-dids ",
+                                                       "data-verify-summary ", "data-wizard ", "data-find-did ",
                                                        "data-trading-chart=", "data-did-page ", "data-did-switcher ",
                                                        "data-rankings "))
                 self.assertEqual(len(scripts), needed)
@@ -315,9 +323,10 @@ class Artifact(unittest.TestCase):
                 # a reader is sent to the human window of the room, an agent to the plain text endpoint
                 self.assertIn(f'href="https://technocore.chat/humans#r/{doc["room"]}/"', text)
                 self.assertIn(f'href="{doc["technocore"]}"', text)
-                # writing is offered only where the Write page would accept it
-                writable = entry["room"] in measured and entry["room"] not in ("room-census", "events")
-                self.assertEqual(f'href="/write/?room={doc["room"]}"' in text, writable and doc["current"])
+                # writing happens in the room itself, and only in a measured, current room a census does not own
+                self.assertNotIn('href="/write/', text)
+                writable = entry["room"] in measured and entry["room"] not in ("room-census", "events") and doc["current"]
+                self.assertIn(f'data-chat-writable="{"yes" if writable else "no"}"', text)
 
     def test_the_method_text_matches_the_code_that_classifies(self):
         import room_census as rc
@@ -425,17 +434,17 @@ class Artifact(unittest.TestCase):
     def test_my_did_runs_in_the_browser_and_keeps_the_identity_on_the_device(self):
         text = (DIST / "did" / "index.html").read_text(encoding="utf-8")
         visible = self.visible_text(DIST / "did" / "index.html")
-        # the identity page no longer carries the lookup: that is a page of its own
+        # the identity page carries no lookup, and no link to the removed lookup page
         self.assertNotIn("data-did-form", text)
-        self.assertIn("/look-up/", text)
+        self.assertNotIn("/look-up/", text)
         self.assertIn(DID_DISCLAIMER, html.unescape(text))
         # what is public and what never leaves the device are two separate lists
         self.assertIn("What becomes public, and what never leaves your device", visible)
         kept = visible.split("Never sent anywhere, and never stored by Room Census")[1]
-        for secret in ("Your private key", "Your passphrase", "Your recovery files", "The DIDs you look up"):
+        for secret in ("Your private key", "Your passphrase", "Your recovery files", "The DIDs you sign in with"):
             self.assertIn(secret, kept)
         self.assertNotIn("Your private key", visible.split("Public on Technocore")[1].split("Never sent")[0])
-        self.assertIn("Room Census stores nothing about you. No account, no email, no database, no log of what you do here.", visible)
+        self.assertIn("Room Census stores nothing about you. No server account, no email, no database, no log of what you do here.", visible)
         self.assertIn("stays on your computer", visible)
         self.assertIn("There is no server behind it that could receive, or keep, a key, a passphrase, a file or a DID.", visible)
         # one way in for an identity that already exists, whichever local backup holds it
@@ -477,39 +486,7 @@ class Artifact(unittest.TestCase):
         self.assertIn("It never publishes the messages themselves", visible)
         self.assertIn("They are never stored here, never part of a census", visible)
 
-    def test_the_lookup_page_says_what_it_inspects_and_keeps_nothing(self):
-        text = (DIST / "look-up" / "index.html").read_text(encoding="utf-8")
-        visible = self.visible_text(DIST / "look-up" / "index.html")
-        latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
-        identity = json.loads((DIST / "identity.json").read_text(encoding="utf-8"))
-        # the lookup needs script: without it the form stays hidden, and the policy blocks any submit
-        self.assertRegex(text, r"<form data-did-form [^>]*hidden")
-        self.assertIn("form-action 'none'", DID_CSP)
-        self.assertIn("The lookup needs JavaScript", text)
-        self.assertIn(DID_DISCLAIMER, html.unescape(text))
-        # it asks for nothing but a public DID, and says so
-        self.assertIn("No file, no key, nothing to install", visible)
-        self.assertIn("Room Census keeps no record of this", visible)
-        self.assertEqual(len(re.findall(r"<input[^>]*", text)), len(re.findall(r'<input[^>]*id="did-input"', text)),
-                         "the only field on this page is the public DID")
-        # the rooms read are exactly the latest census plus the room where Room Census signs
-        form = re.search(r"<form data-did-form [^>]*>", text).group(0)
-        rooms = json.loads(html.unescape(re.search(r'data-rooms="([^"]+)"', form).group(1)))
-        self.assertEqual(rooms, [r["room"] for r in latest["rooms"]] + [identity["room"]])
-        self.assertIn(f'the newest 200 messages of each of the {len(latest["rooms"])} rooms in census #{latest["census"]}', visible)
-        self.assertIn("Older messages, other rooms and private rooms are not inspected", visible)
-        # it never claims a full history, and it keeps "not found" apart from "no activity"
-        script = next(DIST.glob("_astro/look-up.astro*.js")).read_text(encoding="utf-8")
-        # the navigation names the Contests section on every page; the lookup itself claims nothing about contests
-        own = re.sub(r"<nav\b.*?</nav>", " ", text, flags=re.S)
-        for claim in ("Total messages", "First seen", "Rooms visited", "Contest"):
-            self.assertNotIn(claim, script + own)
-        for phrase in ("Recent activity found in measured rooms", "Not found in the inspected data",
-                       "This does not mean the DID has no activity"):
-            self.assertIn(phrase, script)
-        # it reads Technocore and nothing else, and keeps nothing
-        self.assertIn("https://technocore.chat", script + "".join(p.read_text(encoding="utf-8") for p in DIST.glob("_astro/did-core*.js")))
-        self.assertNotRegex(script, r"localStorage|sessionStorage|indexedDB|sendBeacon|XMLHttpRequest|document\.cookie")
+    def test_only_pages_that_read_technocore_may_connect_out(self):
         for page in self.html_pages():
             if not connects(self.route(page)):
                 with self.subTest(page=self.route(page)):
@@ -545,9 +522,10 @@ class Artifact(unittest.TestCase):
         self.assertIn("that needs JavaScript", visible)
         for claim in ("All checks pass", "checks pass for", "Verified"):
             self.assertNotIn(claim, visible)
-        # the manual ways stay: My DID and by hand for the signature, Git for the code
+        # the manual ways stay: by hand for the signature, Git for the code
         self.assertEqual(visible.count("Checked by you"), 1)
-        for way in ("Another way, in this browser:", "By hand:", "Read the room export"):
+        self.assertNotIn("Another way, in this browser:", visible)
+        for way in ("By hand:", "Read the room export"):
             self.assertIn(way, visible)
 
     def test_data_lists_every_published_file_with_its_real_size(self):
@@ -595,39 +573,6 @@ class Artifact(unittest.TestCase):
         identity = json.loads((DIST / "identity.json").read_text(encoding="utf-8"))
         self.assertIn(identity["schedule"].lower(), visible)
 
-    def test_write_publishes_only_with_an_unlocked_key_and_a_room_that_exists(self):
-        text = (DIST / "write" / "index.html").read_text(encoding="utf-8")
-        visible = self.visible_text(DIST / "write" / "index.html")
-        latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
-        # publishing needs the recovery file: the page offers no way to type a DID
-        self.assertRegex(text, r"<div data-write [^>]*hidden")
-        self.assertIn("needs JavaScript", visible)
-        self.assertIn("A public DID alone can never publish", visible)
-        self.assertIn("You cannot type or paste a DID to publish", visible)
-        self.assertEqual(len(re.findall(r"<input[^>]*", text)), len(re.findall(r'<input[^>]*(?:data-unlock-file|data-unlock-password|data-room-search|data-understand|data-offer-pem)', text)),
-                         "every input belongs to the DID file, a passphrase, the room search or the confirmation")
-        # both local backup formats open the same DID, and neither is presented as an older identity
-        self.assertIn("A .json recovery file or an identity.pem", visible)
-        self.assertIn("two local backups of the same DID", visible)
-        self.assertIn("never a different identity", visible)
-        for wording in ("old did", "previous did", "replacement did", "another did of yours"):
-            self.assertNotIn(wording, visible.lower())
-        self.assertNotRegex(text, r'contenteditable')
-        # the rooms offered are the measured ones of the latest census, never a reserved room
-        carried = json.loads(html.unescape(re.search(r'data-rooms="([^"]+)"', text).group(1)))
-        measured = {r["room"] for r in latest["rooms"]}
-        self.assertTrue(carried)
-        for entry in carried:
-            with self.subTest(room=entry["room"]):
-                self.assertIn(entry["room"], measured)
-                self.assertNotIn(entry["room"], ("room-census", "events"))
-        self.assertIn("Publishing never creates a room", visible)
-        # the community room is never offered here, and is not created
-        self.assertNotIn("room-census-community", [e["room"] for e in carried])
-        self.assertIn(DID_DISCLAIMER, html.unescape(text))
-        script = next(DIST.glob("_astro/write.astro*.js")).read_text(encoding="utf-8")
-        self.assertNotRegex(script, r"localStorage|sessionStorage|indexedDB|document\.cookie")
-
     def test_the_first_message_offers_the_community_room_that_exists(self):
         text = (DIST / "did" / "index.html").read_text(encoding="utf-8")
         visible = self.visible_text(DIST / "did" / "index.html")
@@ -650,9 +595,6 @@ class Artifact(unittest.TestCase):
         community = next(e for e in carried if e["room"] == "room-census-community")
         self.assertEqual([community["rate"], community["senders"], community["pattern"]], [None, None, None])
         self.assertNotIn("room-census-community", [r["room"] for r in latest["rooms"]])
-        # the Write page still offers measured rooms only
-        write = json.loads(html.unescape(re.search(r'data-rooms="([^"]+)"', (DIST / "write" / "index.html").read_text(encoding="utf-8")).group(1)))
-        self.assertNotIn("room-census-community", [e["room"] for e in write])
         self.assertIn("I am interested in [topic]", visible)
         self.assertIn("I plan to contribute by [contribution]", visible)
         self.assertIn("Skip for now", visible)
@@ -664,26 +606,23 @@ class Artifact(unittest.TestCase):
         self.assertEqual(sorted(listed), sorted(r["room"] for r in index))
         self.assertRegex(text, r"<div data-room-filters hidden")
 
-    def test_the_census_status_never_claims_more_than_the_data(self):
-        latest = json.loads((DIST / "data" / "latest.json").read_text(encoding="utf-8"))
-        complete = not latest["partial"] and latest["signed_in"] is not None and latest["provenance"] is not None
-        expected = f"Census #{latest['census']} " + ("signed" if complete else "incomplete")
+    def test_no_page_claims_more_than_the_data(self):
+        """The census status left the top bar on 28 Sep 2026; no page may claim a verification it did not run."""
         for page in self.html_pages():
             text = page.read_text(encoding="utf-8")
             with self.subTest(page=self.route(page)):
-                # My DID and Write run on the reader's device and say so in the top bar instead
-                local = self.route(page) in ("/did/", "/write/", "/look-up/")
-                self.assertIn("Runs locally on this device" if local else expected, text)
+                if self.route(page) == "/did/":
+                    self.assertIn("Runs locally on this device", text)
                 self.assertNotRegex(text, r"(?i)census #\d+ verified")
                 self.assertNotIn("passed every public check", text)
 
-    def test_the_saved_dids_menu_is_one_popover_with_two_fields_on_every_page(self):
-        """The top bar's saved DIDs: a native popover, a filter and a DID to save; nothing else to fill in.
-        The pages that run on the reader's device, or open a key to write in a room, have no such menu."""
+    def test_the_account_menu_is_one_popover_with_three_fields_on_every_page(self):
+        """The top bar's account: a native popover with a DID, a nickname and a rename field; nothing else.
+        The page that runs on the reader's device, and those that open a key to write in a room, have none."""
         for page in self.html_pages():
             text = page.read_text(encoding="utf-8")
             with self.subTest(page=self.route(page)):
-                if self.route(page) in ("/did/", "/write/", "/look-up/") or re.search(r'http-equiv="Content-Security-Policy" content="[^"]*technocore\.chat', text):
+                if self.route(page) == "/did/" or re.search(r'http-equiv="Content-Security-Policy" content="[^"]*technocore\.chat', text):
                     self.assertNotIn("data-did-switcher", text)
                     self.assertNotIn("data-sw-field", text)
                     continue
@@ -691,7 +630,8 @@ class Artifact(unittest.TestCase):
                     continue
                 self.assertEqual(len(re.findall(r'<div id="did-menu" popover', text)), 1)
                 self.assertEqual(len(re.findall(r'popovertarget="did-menu"', text)), 1)
-                self.assertEqual(len(re.findall(r"<input[^>]*data-sw-field", text)), 2)
+                self.assertEqual(len(re.findall(r"<input[^>]*data-sw-field", text)), 3)
+                self.assertIn("no proof that you own the DID", text)
 
     def test_the_mobile_menu_and_the_help_work_without_script(self):
         for page in self.html_pages():
@@ -701,7 +641,6 @@ class Artifact(unittest.TestCase):
                 ids = re.findall(r'<span id="([^"]+)" popover', text)
                 # the top bar's saved-DIDs menu is one popover of its own, checked in the test below
                 targets = [t for t in re.findall(r'popovertarget="([^"]+)"', text) if t != "did-menu"]
-                self.assertTrue(targets, "no help on the page")
                 self.assertEqual(len(ids), len(set(ids)), "duplicate popover id")
                 self.assertEqual(sorted(targets), sorted(ids), "every help button opens its own popover")
                 labels = re.findall(r'popovertarget="(?!did-menu")[^"]+"[^>]*aria-label="([^"]+)"', text)

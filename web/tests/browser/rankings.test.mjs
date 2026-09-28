@@ -58,21 +58,61 @@ test("a searched DID is pinned with its rank, and a DID with no FLOP is told so"
   await until(`/0 FLOP/.test(document.querySelector("[data-rank-result]").textContent)`, "the no-FLOP answer");
 });
 
-test("a DID saved in the top bar shows everywhere and can be forgotten", { skip }, async () => {
+test("a DID signed in from the top bar shows everywhere and can be forgotten", { skip }, async () => {
   const [, did] = doc.rows[0];
   await navigate("/rankings/");
   await page(`localStorage.clear()`);
   await navigate("/rankings/");
-  assert.equal(await page(`document.querySelector("[data-sw-nick]").textContent`), "Save a DID");
-  await page(`(() => { document.querySelector("[popovertarget=did-menu]").click(); document.querySelector("#sw-add-input").value = ${JSON.stringify(did)};
-    document.querySelector("[data-sw-add]").requestSubmit(); return true; })()`);
+  assert.equal(await page(`document.querySelector("[data-sw-nick]").textContent`), "Sign in");
+  await page(`(() => { document.querySelector("[popovertarget=did-menu]").click(); document.querySelector("[data-sw-did]").value = ${JSON.stringify(did)};
+    document.querySelector("[data-sw-form]").requestSubmit(); return true; })()`);
   await until(`document.querySelector("[data-sw-nick]").textContent === "main"`, "the saved DID in the top bar");
   await until(`[...document.querySelectorAll("[data-pinned] tr")].some((tr) => tr.dataset.pinned === ${JSON.stringify(did)})`, "the pinned saved DID");
   await shot("rankings-saved");
   await navigate(`/contests/close-1/did/?k=${did}`);
   await until(`document.querySelector("[data-save]").getAttribute("aria-pressed") === "true"`, "Saved on the trader page");
   await page(`document.querySelector("[data-save]").click()`);
-  await until(`document.querySelector("[data-sw-nick]").textContent === "Save a DID"`, "the DID removed everywhere");
+  await until(`document.querySelector("[data-sw-nick]").textContent === "Sign in"`, "the DID removed everywhere");
   assert.equal(await page(`localStorage.getItem("roomcensus.saved")`), "[]");
   assert.ok(!(await page(`localStorage.getItem("roomcensus.saved.ranks") ?? ""`)).includes(did), "its cached rank is gone too");
+});
+
+test("My DIDs adds many at once, renames, switches and removes", { skip }, async () => {
+  const [a, b] = [doc.rows[0][1], doc.rows[1][1]];
+  await navigate("/my-dids/");
+  await page(`localStorage.clear()`);
+  await navigate("/my-dids/");
+  await page(`(() => { const t = document.querySelector("[data-md-input]"); t.value = ${JSON.stringify(`${a}\nnot-a-did\n${b}\n${a}`)};
+    t.dispatchEvent(new Event("input")); return true; })()`);
+  assert.equal(await page(`document.querySelector("[data-md-submit]").textContent`), "Add 2 DIDs");
+  await page(`(() => { document.querySelector("[data-md-add]").requestSubmit(); return true; })()`);
+  await until(`document.querySelectorAll("[data-md-list] tr").length === 2`, "the two rows");
+  assert.match(await page(`document.querySelector("[data-md-hint]").textContent`), /2 DIDs added\. 1 not a did:key\./);
+  assert.equal(await page(`document.querySelector("[data-md-input]").value`), "not-a-did");
+  assert.equal(await page(`document.querySelector("[data-md-count]").textContent`), "2");
+  assert.equal(await page(`document.querySelector("[data-sw-nick]").textContent`), "main");
+  // switch to the second one: it moves first, marked signed in, and the top bar follows
+  await page(`document.querySelector("[data-md-list] tr:nth-child(2) button:not([aria-label])").click()`);
+  await until(`document.querySelector("[data-md-list] tr").dataset.did === ${JSON.stringify(b)}`, "the switched DID first");
+  assert.match(await page(`document.querySelector("[data-md-list] tr").textContent`), /SIGNED IN/);
+  assert.equal(await page(`document.querySelector("[data-sw-nick]").textContent`), "DID 2");
+  await page(`(() => { document.querySelector("[data-md-list] tr [aria-label^=Rename]").click(); const f = document.querySelector("[data-md-list] tr input");
+    f.value = "long-bot"; f.blur(); return true; })()`);
+  await until(`document.querySelector("[data-sw-nick]").textContent === "long-bot"`, "the new nickname in the top bar");
+  await shot("my-dids");
+  await page(`document.querySelector("[data-md-list] tr [aria-label^=Remove]").click()`);
+  await until(`document.querySelectorAll("[data-md-list] tr").length === 1`, "one row left");
+  assert.equal(await page(`document.querySelector("[data-sw-nick]").textContent`), "main");
+});
+
+test("switching DID on a trades page opens the new DID's trades", { skip }, async () => {
+  const c = JSON.parse(readFileSync(join(DIST, "data", "contests", "close-1.ranking.json"), "utf8"));
+  const [a, b] = (c.top ?? c.rows).slice(0, 2).map((r) => r[1]);
+  await navigate("/rankings/");
+  await page(`(() => { localStorage.clear(); localStorage.setItem("roomcensus.saved", JSON.stringify([{ did: ${JSON.stringify(a)}, nick: "main" }, { did: ${JSON.stringify(b)}, nick: "other" }])); return true; })()`);
+  await navigate(`/contests/close-1/did/?k=${a}`);
+  await until(`document.querySelector("[data-sw-list] button") !== null`, "the other DID in the menu");
+  await page(`document.querySelector("[data-sw-list] button").click()`);
+  await until(`new URLSearchParams(location.search).get("k") === ${JSON.stringify(b)}`, "the new DID's trades");
+  await until(`document.querySelector("[data-sw-nick]").textContent === "other"`, "the switched DID in the top bar");
 });

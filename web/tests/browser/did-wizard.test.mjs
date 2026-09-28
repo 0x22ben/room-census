@@ -319,14 +319,13 @@ test("the happy path: create, save the recovery file once, write, publish, and s
   assert.equal(log.posts.length, 2);
   assert.notEqual(JSON.parse(log.posts[1].postData).nonce, body.nonce);
 
-  // View: the public DID is handed to the page that reads it, and the address is cleaned there
+  // Sign in with this DID: only the public DID is kept in this browser, and My DIDs opens with it
   const haystack = await exposure(log);
   await click("[data-action=view]");
-  await until('location.pathname === "/look-up/"', "the lookup page");
-  await until("document.getElementById('did-input').value !== ''", "the filled field");
-  assert.equal(await page("document.getElementById('did-input').value"), did);
-  assert.equal(await page("location.hash"), "", "the address is cleaned once read");
-  assert.equal(await hidden("[data-did-result]"), true, "a handed-over DID never starts a lookup by itself");
+  await until('location.pathname === "/my-dids/"', "My DIDs");
+  assert.deepEqual(await page(`JSON.parse(localStorage.getItem("roomcensus.saved")).map((s) => s.did)`), [did]);
+  assert.equal(await page(`localStorage.getItem("roomcensus.saved.active")`), JSON.stringify(did));
+  await until(`document.querySelector("[data-sw-nick]").textContent === "main"`, "the account in the top bar");
   for (const r of log.requests.filter((x) => x.method === "GET")) {
     assert.ok(!r.url.includes("z6Mk") && !/did(:|%3A)key/i.test(r.url), `the DID left the browser: ${r.url}`);
   }
@@ -551,14 +550,46 @@ test("My DID opens an identity.pem too, and says plainly what never leaves the d
   }
 });
 
-test("My DID is about the identity only, and points at the page that reads one", { skip }, async () => {
+test("Create a DID is about the identity only, and reads nothing by itself", { skip }, async () => {
   const log = await open();
   // no lookup happens here, and there is nothing to type a DID into
   assert.equal(await page("document.querySelector('#did-input')"), null);
-  assert.equal(await page(`[...document.querySelectorAll('a')].some(a => a.getAttribute("href") === "/look-up/")`), true);
+  assert.equal(await page(`[...document.querySelectorAll('a')].some(a => a.getAttribute("href") === "/look-up/")`), false);
   await sleep(1200);
   assert.equal(log.requests.filter((r) => r.url.startsWith("https://technocore.chat/")).length, 0, "the page read Technocore on its own");
   // the DID a reader already has is one click away
   await click("[data-action=begin-restore]");
   await until("!document.querySelector('[data-panel=restore]').hidden", "the open panel");
+});
+
+// moved from the Write page tests (28 Sep 2026): the restore step opens files with the same code
+test("a did.txt that names another DID also stops a .json recovery file", { skip }, async () => {
+  await open();
+  const identity = await createIdentity(subtle);
+  const backup = saveAs("room-census-did-recovery.json", JSON.stringify(await sealBackup(subtle, (n) => new Uint8Array(randomBytes(n)), identity, PASSWORD)));
+  await click("[data-action=begin-restore]");
+  await setFile("[data-restore-file]", backup, saveAs("did.txt", `${PEM_DID}
+`));
+  await fill("[data-restore-password]", PASSWORD);
+  await submit("[data-restore]");
+  await waitError("restore");
+  assert.match(await errorOf("restore"), /did\.txt names a different DID than the recovery file/);
+  assert.equal(await hidden("[data-panel=message]"), true);
+  // the same file, with the DID it really holds, opens
+  await setFile("[data-restore-file]", backup, saveAs("did.txt", `${identity.did}
+`));
+  await fill("[data-restore-password]", PASSWORD);
+  await submit("[data-restore]");
+  await until("!document.querySelector('[data-panel=message]').hidden", "the composer");
+});
+
+// moved from the Write page tests (28 Sep 2026): the publish timeout is shared with the rooms (publish.mjs)
+test("no answer at all: the page waits, says so, and never sends again", { skip }, async () => {
+  const { log } = await restored((r) => (r.method === "POST" ? "hold" : { body: "{}" }));
+  await compose();
+  await publishNow();
+  await until(`document.querySelector('[data-panel=outcome]').dataset.outcome === 'unconfirmed' && !document.querySelector('[data-panel=outcome]').hidden`, "the unconfirmed outcome", 40000);
+  assert.match(await text("[data-outcome-lede]"), /did not answer in time/);
+  await sleep(200);
+  assert.equal(log.posts.length, 1, "never sent again");
 });

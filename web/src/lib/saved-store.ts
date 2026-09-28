@@ -7,7 +7,7 @@ const ACTIVE = "roomcensus.saved.active";
 export const RANKS = "roomcensus.saved.ranks";
 const DID = /^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]{44}$/;
 const NICK = /^[\p{L}\p{N} ._-]{1,20}$/u;
-export const MAX = 20;
+export const MAX = 100;
 
 export type Saved = { did: string; nick: string };
 

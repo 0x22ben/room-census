@@ -15,8 +15,8 @@ const policy = (connect: string) => [
   "object-src 'none'",
 ].join("; ");
 export const CSP = policy("'self'");
-// My DID, Write, Verify, the lookup and every room page read or write public room messages on
-// Technocore from the browser;
+// Create a DID, Verify and every room page read or write public room messages on Technocore from
+// the browser;
 // no other page may connect out
 export const TECHNOCORE_CSP = policy("'self' https://technocore.chat");
 
@@ -24,8 +24,8 @@ export type Icon = "discover" | "rooms" | "watched" | "contests" | "rankings" | 
 export type NavItem = { label: string; href: string; icon: Icon; ready: boolean; external?: boolean };
 export type NavSection = { label: string; items: NavItem[] };
 
-// the sidebar of the approved mockup; a destination stays out of the navigation until its page
-// exists (My DID ships with the public lookup; Create and Restore wait for their security review)
+// the sidebar of the approved mockup (Pencil hHTyx, 28 Sep 2026): the account lives in the top bar,
+// so YOU keeps only the creation of a DID; Verify and Data sit in the footer group
 export const NAV: NavSection[] = [
   {
     label: "Explore",
@@ -40,21 +40,14 @@ export const NAV: NavSection[] = [
   {
     label: "You",
     items: [
-      { label: "My DID", href: "/did/", icon: "did", ready: true },
-      { label: "Write", href: "/write/", icon: "write", ready: true },
-      { label: "Look up a DID", href: "/look-up/", icon: "search", ready: true },
-    ],
-  },
-  {
-    label: "Evidence",
-    items: [
-      { label: "Verify", href: "/verify/", icon: "verify", ready: true },
-      { label: "Data", href: "/open-data/", icon: "data", ready: true },
+      { label: "Create a DID", href: "/did/", icon: "did", ready: true },
     ],
   },
 ];
 
 export const NAV_FOOTER: NavItem[] = [
+  { label: "Verify", href: "/verify/", icon: "verify", ready: true },
+  { label: "Data", href: "/open-data/", icon: "data", ready: true },
   { label: "Method", href: "/method/", icon: "method", ready: true },
   { label: "Source code", href: REPOSITORY, icon: "source", ready: true, external: true },
 ];

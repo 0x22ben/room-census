@@ -14,6 +14,7 @@ import {
 } from "../lib/did-wallet.mjs";
 import { dateTimeUtc } from "../lib/format";
 import { known } from "../lib/rooms.mjs";
+import { save, setActive } from "../lib/saved-store";
 import { roomPicker, type Room } from "./room-picker.ts";
 
 type Identity = { did: string; privateKey: CryptoKey };
@@ -386,13 +387,12 @@ if (root) {
     compose();
     text.value = kept;
   });
-  // skipping publishes nothing: the message step closes, and the DID is offered to the lookup page
+  // skipping publishes nothing: the message step closes, and the DID can be signed in with
   q<HTMLButtonElement>("[data-action=skip]").addEventListener("click", () => {
     if (attempted || !identity) return;
     signed = null;
     q<HTMLElement>("[data-panel=message]").hidden = true;
     const after = q<HTMLElement>("[data-skipped]");
-    q<HTMLAnchorElement>("[data-skipped-link]").href = `/look-up/#did=${encodeURIComponent(identity.did)}`;
     after.hidden = false;
     after.scrollIntoView({ block: "center" });
   });
@@ -401,10 +401,15 @@ if (root) {
     if (result?.kind === "published") compose();
   });
 
-  // the activity of a DID is read on its own page, from the public DID alone
-  q<HTMLElement>("[data-action=view]").addEventListener("click", () => {
-    if (identity) location.href = `/look-up/#did=${encodeURIComponent(identity.did)}`;
-  });
+  // signing in keeps only the public DID in this browser (My DIDs), never the key or the file
+  const signIn = () => {
+    if (!identity) return;
+    save(identity.did);
+    setActive(identity.did);
+    location.href = "/my-dids/";
+  };
+  q<HTMLElement>("[data-action=view]").addEventListener("click", signIn);
+  q<HTMLElement>("[data-action=sign-in]").addEventListener("click", signIn);
 
   // optional, inside Advanced: the complete server reply and what was signed
   q<HTMLButtonElement>("[data-action=download-proof]").addEventListener("click", () => {

@@ -3,18 +3,17 @@ import "../styles/global.css";
 import Sidebar from "../components/Sidebar.astro";
 import MobileHeader from "../components/MobileHeader.astro";
 import Footer from "../components/Footer.astro";
-import Help from "../components/Help.astro";
 import Px from "../components/Px.astro";
 import DidSwitcher from "../components/DidSwitcher.astro";
 import { CSP, TECHNOCORE_CSP, SITE_NAME } from "../lib/site";
-import { censusStatus, latest } from "../lib/data";
+import { latest } from "../lib/data";
 import socialCard from "../assets/social-card.png";
 
 // indexable: false for pages served at any missing address (404), which have no canonical URL
-// csp: My DID, Write and Verify pass their own policy (they may connect to Technocore)
-// local: a page that runs on the reader's device (My DID) shows that in the top bar, as its mockup,
-// and has no saved-DIDs menu: those pages store nothing and take no other DID field. Neither do the
-// pages that talk to Technocore (a room opens a key to write in it): the menu is for the other pages.
+// csp: Create a DID, Verify and the rooms pass their own policy (they may connect to Technocore)
+// local: a page that runs on the reader's device (Create a DID) shows that in the top bar, as its
+// mockup, and has no account menu: it keeps its key apart from any saved DID. Neither do the pages
+// that talk to Technocore (a room opens a key to write in it): the account is for the other pages.
 // refresh: a page that moved sends the reader to its new address (no script, the policy stays strict)
 interface Props { title: string; description: string; indexable?: boolean; csp?: string; local?: boolean; refresh?: string }
 const { title, description, indexable = true, csp = CSP, local = false, refresh } = Astro.props;
@@ -25,7 +24,6 @@ const favicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' vi
 // the picture shown when a page is shared (1200 x 630, drawn in the Pencil mockup, node O2it1)
 const shareImage = new URL(socialCard.src, Astro.site).href;
 const census = latest();
-const status = censusStatus(census);
 ---
 <!doctype html>
 <html lang="en">
@@ -64,16 +62,7 @@ const status = censusStatus(census);
           <MobileHeader />
           <div class:list={["flex min-h-14 items-center gap-3 border-b border-border px-4 sm:px-7", local ? "justify-between" : "justify-end"]}>
             {local && <p class="flex items-center gap-2 text-sm"><Px name="key" size={16} aria-hidden="true" class="text-accent" />{title}</p>}
-            {local
-              ? <p class="inline-flex min-h-9 items-center gap-2 rounded-md border border-accent-border bg-accent-soft px-3 text-sm font-semibold"><Px name="lock" size={16} aria-hidden="true" class="text-accent" />Runs locally on this device</p>
-              : <div class:list={["inline-flex min-h-9 items-center gap-2 rounded-md border px-3 text-sm font-semibold text-text",
-              status.complete ? "border-accent-border bg-accent-soft" : "border-warning-border bg-warning-soft"]}>
-              {status.complete
-                ? <Px name="checkbox-on" size={16} aria-hidden="true" class="text-accent" />
-                : <Px name="warning-diamond" size={16} aria-hidden="true" class="text-warning" />}
-              {status.label}
-              <Help term={status.label} ask="What does this status mean?" id="help-census-status" text={status.help} />
-            </div>}
+            {local && <p class="inline-flex min-h-9 items-center gap-2 rounded-md border border-accent-border bg-accent-soft px-3 text-sm font-semibold"><Px name="lock" size={16} aria-hidden="true" class="text-accent" />Runs locally on this device</p>}
             {switcher && <DidSwitcher />}
           </div>
         </header>

@@ -1,4 +1,4 @@
-// Acceptance check, run by hand: open a DID on the shipped Write page from the three files
+// Acceptance check, run by hand: open a DID on the shipped Create a DID page (its restore step) from the three files
 // flop_did.py writes, in a real browser, and report only what was observed.
 //
 //   node tests/browser/acceptance.mjs <folder holding identity.pem, passphrase.txt, did.txt>
@@ -35,26 +35,26 @@ try {
   });
   await send("Network.enable");
   await send("Fetch.enable", { patterns: [{ urlPattern: "https://technocore.chat/*", requestStage: "Request" }] });
-  await navigate("/write/");
-  await until("!document.querySelector('[data-write]').hidden", "the page script");
+  await navigate("/did/");
+  await until("!document.querySelector('[data-wizard]').hidden", "the page script");
+  await page(`document.querySelector("[data-action=begin-restore]").click()`);
   const loaded = requests.length;
 
   const { root } = await send("DOM.getDocument", { depth: 1 });
-  const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector: "[data-unlock-file]" });
+  const { nodeId } = await send("DOM.querySelector", { nodeId: root.nodeId, selector: "[data-restore-file]" });
   await send("DOM.setFileInputFiles", { nodeId, files: ["identity.pem", "passphrase.txt", "did.txt"].map((n) => join(folder, n)) });
-  await page(`document.querySelector("[data-unlock]").requestSubmit()`);
-  await until("!document.querySelector('[data-panel=room]').hidden || document.querySelector('[data-error=unlock]').textContent !== ''", "the page to answer");
+  await page(`document.querySelector("[data-restore]").requestSubmit()`);
+  await until("!document.querySelector('[data-panel=message]').hidden || document.querySelector('[data-error=restore]').textContent !== ''", "the page to answer");
 
-  const shown = await text("[data-signing] code[data-did-value]");
+  const shown = (await page(`[...document.querySelectorAll("[data-did-value]")].map((e) => e.textContent.trim()).find(Boolean) ?? null`));
   const expected = readFileSync(join(folder, "did.txt"), "utf8").trim();
   const asked = requests.slice(loaded).filter((url) => !url.startsWith(site.origin));
   console.log(`DID shown matches did.txt   : ${shown === expected ? "yes" : "no"}`);
   console.log(`DID                         : ${shown ?? "(none)"}`);
   console.log(`requests while opening      : ${asked.length}${asked.length ? ` (${asked.join(", ")})` : ""}`);
-  console.log(`signing bar visible         : ${await visible("[data-signing]")}`);
-  console.log(`room picker visible         : ${await visible("[data-panel=room]")}`);
-  console.log(`unlock error                : ${(await text("[data-error=unlock]")) || "(none)"}`);
-  console.log(`review or outcome shown     : ${(await visible("[data-panel=review]")) || (await visible("[data-panel=outcome]"))}`);
+  console.log(`composer visible            : ${await visible("[data-panel=message]")}`);
+  console.log(`restore error               : ${(await text("[data-error=restore]")) || "(none)"}`);
+  console.log(`preview or outcome shown    : ${(await visible("[data-preview]")) || (await visible("[data-panel=outcome]"))}`);
   assert.equal(shown, expected);
   assert.equal(asked.length, 0);
 } finally {

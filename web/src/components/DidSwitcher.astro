@@ -1,38 +1,69 @@
 ---
-// The visitor's saved DIDs, top right of every page (Pencil mockup N74Tq): the active one with its
-// avatar, nickname and rank in the live contest, and a menu to switch, open, save, rename or forget.
-// Everything stays in this browser (src/lib/saved-store.ts); the menu is a native popover.
+// The visitor's account, top right of every page (Pencil mockup TwddI): "Sign in" with a DID, then the
+// active DID with its avatar, nickname and rank in the live contest, and an account menu to open its
+// trades, rename it, switch to another DID, add one, manage them all or sign out. There is no password
+// and nothing is signed: the DIDs stay in this browser (src/lib/saved-store.ts). The menu is a native popover.
 import Px from "./Px.astro";
 import { contests, phaseOf } from "../lib/contests";
 
 const c = contests().find((x) => x.ranking && phaseOf(x) === "live") ?? contests().find((x) => x.ranking);
 const signed = (c?.leaderboard?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check }));
-const btn = "inline-flex min-h-9 items-center gap-2 rounded-md px-2.5 text-sm";
+const item = "flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm hover:bg-surface";
+const field = "min-h-10 w-full rounded-lg border border-border bg-bg px-3 text-sm outline-none placeholder:text-text-muted";
 ---
 <div data-did-switcher data-url={c?.ranking?.file} data-contest={c?.id} data-contest-title={c?.short} data-signed={JSON.stringify(signed)}>
-  <button type="button" popovertarget="did-menu" class="inline-flex min-h-9 items-center gap-2 rounded-md border border-border-strong bg-surface px-2.5 text-sm font-semibold text-text hover:bg-surface-raised" aria-label="Saved DIDs">
-    <span data-sw-avatar class="inline-flex"><Px name="bookmark" size={12} class="text-accent" /></span>
-    <span data-sw-nick>Save a DID</span>
+  <button type="button" popovertarget="did-menu" data-sw-pill class="inline-flex min-h-9 items-center gap-2 rounded-md border border-accent bg-surface-raised px-3 text-sm font-semibold text-text hover:bg-accent-soft">
+    <span data-sw-avatar class="inline-flex"><Px name="user" size={12} class="text-accent" /></span>
+    <span data-sw-nick>Sign in</span>
     <span data-sw-rank class="font-mono text-xs font-normal text-text-muted"></span>
-    <Px name="chevron-down" size={12} class="text-text-muted" />
+    <span data-sw-chevron hidden class="inline-flex"><Px name="chevron-down" size={12} class="text-text-muted" /></span>
   </button>
-  <div id="did-menu" popover class="did-menu w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border-strong bg-surface-raised p-2.5 text-sm text-text shadow-2xl shadow-shadow/40">
-    <input data-sw-filter data-sw-field hidden autocomplete="off" spellcheck="false" placeholder="Filter saved DIDs" aria-label="Filter saved DIDs"
-      class="mb-2 min-h-9 w-full rounded-md border border-border bg-bg px-3 text-sm outline-none placeholder:text-text-muted" />
-    <p class="flex justify-between px-2 pb-1 font-mono text-[10px] font-bold tracking-widest text-text-muted uppercase"><span data-sw-count>Saved</span><span>{c?.short}</span></p>
-    <ul data-sw-list class="grid max-h-80 gap-0.5 overflow-y-auto"></ul>
-    <p data-sw-empty class="px-2 py-3 text-text-muted">Save your DIDs once: you will see them on every page.</p>
-    <form data-sw-add class="mt-2 flex gap-1.5 border-t border-border pt-2.5">
-      <label for="sw-add-input" class="sr-only">A did:key to save</label>
-      <input id="sw-add-input" data-sw-field autocomplete="off" spellcheck="false" placeholder="Paste a did:key" class="min-h-9 min-w-0 flex-1 rounded-md border border-border bg-bg px-2.5 font-mono text-xs outline-none placeholder:text-text-muted" />
-      <button type="submit" class="min-h-9 rounded-md bg-accent px-3 text-sm font-semibold text-on-accent">Save</button>
+  <div id="did-menu" popover class="did-menu w-[min(22.5rem,calc(100vw-2rem))] rounded-xl border border-border-strong bg-surface-raised p-2.5 text-sm text-text shadow-2xl shadow-shadow/40">
+    <form data-sw-form hidden class="grid gap-3 p-1.5">
+      <p data-sw-form-title class="text-base font-bold">Sign in with your DID</p>
+      <label class="grid gap-1.5">
+        <span class="text-xs font-semibold text-text-secondary">Your DID</span>
+        <input data-sw-did data-sw-field autocomplete="off" spellcheck="false" placeholder="did:key:z6Mk…" class={`${field} font-mono text-xs`} />
+      </label>
+      <label class="grid gap-1.5">
+        <span class="text-xs font-semibold text-text-secondary">Nickname (optional)</span>
+        <input data-sw-name data-sw-field autocomplete="off" maxlength="20" placeholder="main" class={field} />
+      </label>
+      <p data-sw-error class="-mt-1 text-xs text-warning empty:hidden" aria-live="polite"></p>
+      <button type="submit" data-sw-submit class="min-h-10 rounded-lg bg-accent text-sm font-bold text-on-accent">Sign in</button>
+      <p class="text-xs text-text-muted">No password, and no proof that you own the DID. Stays in this browser only.</p>
+      <p data-sw-create class="text-xs text-text-muted">No DID yet? <a href="/did/" class="font-semibold text-link">Create one</a></p>
+      <button type="button" data-sw-back hidden class="justify-self-start text-xs font-semibold text-link">Back</button>
     </form>
-    <p data-sw-error class="px-2 pt-1.5 text-xs text-warning" aria-live="polite"></p>
-    <div class="mt-1.5 flex items-center justify-between">
-      <button type="button" data-sw-manage class={`${btn} text-text-secondary hover:text-text`}><Px name="pencil" size={12} />Manage</button>
-      <button type="button" data-sw-forget hidden class={`${btn} text-down`}>Forget all</button>
+    <div data-sw-menu hidden class="grid gap-1">
+      <div class="flex items-center gap-3 px-2 pt-1.5 pb-2.5">
+        <span data-sw-me-avatar class="inline-flex shrink-0"></span>
+        <span class="grid min-w-0 flex-1 gap-0.5">
+          <span data-sw-me-nick class="truncate text-[15px] font-bold"></span>
+          <input data-sw-rename data-sw-field hidden maxlength="20" aria-label="New nickname" class="min-h-8 w-full rounded border border-border bg-bg px-2 text-sm outline-none" />
+          <span data-sw-me-did class="font-mono text-[11px] text-text-muted"></span>
+        </span>
+        <span class="grid justify-items-end">
+          <span class="font-mono text-[9px] font-bold tracking-widest text-text-muted uppercase">{c?.short}</span>
+          <span data-sw-me-rank class="font-mono text-sm font-bold"></span>
+          <span data-sw-me-pnl class="font-mono text-[11px] text-text-muted"></span>
+        </span>
+      </div>
+      <hr class="border-border" />
+      <a data-sw-trades class={`${item} text-text`}><Px name="chart" size={12} class="text-text-secondary" />My trades</a>
+      <a href="/rankings/" class={`${item} text-text`}><Px name="crown" size={12} class="text-text-secondary" />My ranking</a>
+      <button type="button" data-sw-edit class={`${item} text-text`}><Px name="pencil" size={12} class="text-text-secondary" />Edit nickname</button>
+      <div data-sw-others-box class="grid gap-0.5">
+        <hr class="my-1 border-border" />
+        <p data-sw-others-head class="px-2.5 pt-1 pb-0.5 font-mono text-[10px] font-bold tracking-widest text-text-muted uppercase">Switch DID</p>
+        <ul data-sw-list class="grid max-h-64 gap-0.5 overflow-y-auto"></ul>
+      </div>
+      <button type="button" data-sw-add class={`${item} text-link`}><Px name="plus" size={12} />Add another DID</button>
+      <a href="/my-dids/" class={`${item} text-text`}><Px name="users" size={12} class="text-text-secondary" /><span class="flex-1">Manage all DIDs</span><span data-sw-count class="font-mono text-xs text-text-muted"></span></a>
+      <hr class="my-1 border-border" />
+      <button type="button" data-sw-out class={`${item} text-down`}>Sign out</button>
     </div>
-    <p class="px-2 pt-1 text-[11px] text-text-muted">Kept in this browser only. Saving a DID does not prove you own it.</p>
   </div>
 </div>
+<template data-sw-user-icon><Px name="user" size={12} class="text-accent" /></template>
 <script>import "../scripts/did-switcher.ts";</script>

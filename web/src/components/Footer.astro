@@ -8,18 +8,16 @@ const links = [
   ["Licenses", "/licenses/"],
 ];
 ---
-<footer class="mt-16 border-t border-border px-4 py-8 sm:px-7">
-  <div class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+<footer class="mt-12 border-t border-border px-4 py-4 text-xs sm:px-7">
+  <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
     <div>
-      <p class="font-semibold">Room Census</p>
-      <p class="text-text-muted">A signed daily census of public Technocore rooms.</p>
-      <p class="text-text-muted">{schedule}.</p>
+      <p class="text-text-muted"><span class="font-semibold text-text-secondary">Room Census</span> · A signed daily census of public Technocore rooms. {schedule}.</p>
     </div>
     <ul class="flex flex-wrap gap-x-2">
       {links.map(([label, href]) => (
-        <li><a href={href} class="inline-flex min-h-11 items-center px-2 text-link underline first:pl-0 md:first:pl-2">{label}</a></li>
+        <li><a href={href} class="inline-flex min-h-6 items-center px-1.5 text-link first:pl-0 md:first:pl-1.5">{label}</a></li>
       ))}
     </ul>
   </div>
-  <p class="mt-5 text-sm text-text-muted">Data under CC BY 4.0, code under MIT. Community project, not affiliated with Flop Labs.</p>
+  <p class="mt-1 text-[11px] text-text-muted">Data under CC BY 4.0, code under MIT. Community project, not affiliated with Flop Labs.</p>
 </footer>
