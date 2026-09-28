@@ -2,7 +2,9 @@
 // The navigation of the sidebar, also used by the mobile menu. Only pages that exist are listed.
 import NavIcon from "./NavIcon.astro";
 import { NAV_FOOTER, isActive, readySections } from "../lib/site";
-import { SAMPLE, contests, phaseOf } from "../lib/contests";
+import { CAPTURED_AT, SAMPLE, contests, phaseOf } from "../lib/contests";
+import { latest } from "../lib/data";
+import { dayTimeUtc, newest } from "../lib/freshness.mjs";
 
 interface Props { label: string }
 const pathname = Astro.url.pathname;
@@ -12,6 +14,8 @@ const footer = NAV_FOOTER.filter((i) => i.ready);
 const item = "flex h-11 items-center gap-3 rounded-md px-3 text-base transition-colors duration-150 lg:h-8.5 lg:gap-2.5 lg:px-2.5 lg:text-sm";
 // "Live" beside Contests only when the site shows the witness's real data and trading is open
 const live = !SAMPLE && contests().some((c) => phaseOf(c) === "live");
+// the newest data this build carries: the daily census, or the contest capture (never the sample's)
+const dataAt = newest(latest().at_utc, SAMPLE ? null : CAPTURED_AT);
 ---
 <nav aria-label={Astro.props.label} class="flex flex-1 flex-col">
   {sections.map((section) => (
@@ -47,4 +51,10 @@ const live = !SAMPLE && contests().some((c) => phaseOf(c) === "live");
       );
     })}
   </ul>
+  {dataAt && (
+    <p class="px-3 pt-2 font-mono text-text-muted lg:px-2.5 lg:pt-1.5">
+      <span class="block text-[10px] font-bold tracking-widest uppercase">Data</span>
+      <time datetime={dataAt} class="block text-[11px]">{dayTimeUtc(dataAt)}</time>
+    </p>
+  )}
 </nav>
