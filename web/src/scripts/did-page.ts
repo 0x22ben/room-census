@@ -207,11 +207,11 @@ function init(root: HTMLElement) {
       draw(b.dataset.filter!);
     }));
 
-    // share: the score card with this key's own curve
+    // share: the score card with this key's own curve; it always says Score, since a saved DID proves no ownership
     const cardData: Card = { did, score, rank: row[0], traders: found.traders, contest: root.dataset.contest ?? "", official,
       sweep: found.sweep, position: pos === undefined ? undefined : pos === null ? "Flat" : `${Number(pos[0]) > 0 ? "Long" : "Short"} ${Math.abs(Number(pos[0])).toFixed(1)}`,
       line: signedList.length >= 3 ? Number(signedList[2].pnl) : undefined,
-      prices: curve.length > 1 ? curve.map((p) => p.v) : marks.map((m) => m[1]), curveLabel: curve.length > 1 ? "SCORE" : "NVDA", mine: isSaved(did),
+      prices: curve.length > 1 ? curve.map((p) => p.v) : marks.map((m) => m[1]), curveLabel: curve.length > 1 ? "SCORE" : "NVDA", mine: false,
       trades: trades?.length, best: top.length ? top[0].gain : undefined };
     // drawn once, as soon as the page has its numbers; a click before it is ready waits for it
     const ready = drawCard(cardData);
