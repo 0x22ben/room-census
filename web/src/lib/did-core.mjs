@@ -1,4 +1,4 @@
-// The My DID lookup, without the page: parse a did:key, read Technocore room replies, check each
+// DID helpers, without a page: parse a did:key, read Technocore room replies, check each
 // Ed25519 signature and summarize what was found and what was inspected. Plain JavaScript so the
 // Node tests run it as is. Nothing here stores or sends anything; the caller does the fetching.
 

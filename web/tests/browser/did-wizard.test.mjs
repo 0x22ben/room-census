@@ -1,4 +1,4 @@
-// The My DID identity wizard, as shipped, in a real headless browser. Every Technocore request is
+// The Create a DID wizard, as shipped, in a real headless browser. Every Technocore request is
 // answered by the test (no network, never a real publication). Downloads are caught in the page.
 // The primary flow under test (Ben, 2026-09-23): Create DID -> save the encrypted recovery file, with
 // a download the reader asks for -> Write a message -> Publish -> Message published, with "View in My
@@ -363,7 +363,7 @@ test("a later visit opens the recovery file once, safely, and goes straight to t
   await submit("[data-restore]");
   await until("!document.querySelector('[data-panel=message]').hidden", "the composer");
   assert.equal(await page("document.querySelector('[data-restore-password]').value"), "");
-  assert.equal(await text("[data-page-title]"), "My DID", "a restored DID keeps the My DID title");
+  assert.equal(await text("[data-page-title]"), "Your DID", "a restored DID is called Your DID");
   assert.equal(await hidden("[data-saved-note]"), true);
   assert.equal(log.requests.length, log.loaded, "restoring made no request");
   await compose();
@@ -507,7 +507,7 @@ test("inside another site's frame the wizard stays closed", { skip }, async () =
   assert.deepEqual(state, { wizard: true, framed: false });
 });
 
-test("My DID opens an identity.pem too, and says plainly what never leaves the device", { skip }, async () => {
+test("Create a DID opens an identity.pem too, and says plainly what never leaves the device", { skip }, async () => {
   const log = await open();
   // the two lists are separate, and the private key is only ever in the second one
   const seen = await page("document.querySelector('[data-sees]').innerText");
@@ -532,7 +532,7 @@ test("My DID opens an identity.pem too, and says plainly what never leaves the d
   const haystack = await exposure(log);
   assert.ok(!haystack.includes(PEM_PASSPHRASE), "the passphrase leaked");
 
-  // and it refuses the same selections the Write page refuses
+  // and it refuses the selections the removed Write page refused
   await click("[data-action=start-over]");
   await click("[data-action=over-yes]");
   await until("!document.querySelector('[data-panel=start]').hidden", "the landing");

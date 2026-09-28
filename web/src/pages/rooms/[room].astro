@@ -22,7 +22,7 @@ export function getStaticPaths() {
 const { room } = Astro.params;
 const { rooms, latest } = site();
 const doc = rooms.get(room!)!;
-// a message can only go to a room the Write page offers: measured in the latest census, never reserved
+// a message can only go to a room this page opens for writing: measured in the latest census, never reserved
 const writable = doc.current && !RESERVED.includes(doc.room) && latest.rooms.some((r) => r.room === doc.room);
 const m = doc.last_measured;
 const rated = doc.history.filter((p) => p.rate_interval !== null);

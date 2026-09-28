@@ -3,7 +3,7 @@
 //
 // Nothing here is stored. The messages are fetched by this page from the public room and written into
 // the DOM as text, never as markup, so a message can never run anything or become a link. The key is
-// opened by the same shared code as the Write page, it never leaves this page, and closing or leaving
+// opened by the same shared code as Create a DID, it never leaves this page, and closing or leaving
 // the page forgets it. Sending goes through the one publication path the whole site uses.
 import { check, importKey, publicKey } from "../lib/did-core.mjs";
 import { openChosen } from "../lib/did-open.mjs";
@@ -188,7 +188,7 @@ if (root && "crypto" in window && crypto.subtle) {
           error.textContent = "Tick the box: what you send here is public and permanent.";
           return;
         }
-        // the same opening as the Write page and My DID
+        // the same opening as Create a DID
         const opened = await openChosen(crypto.subtle, [...(file.files ?? [])], password.value);
         if (opened.problem) {
           error.textContent = opened.problem;

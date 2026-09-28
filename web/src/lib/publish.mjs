@@ -1,5 +1,5 @@
-// Publishing one signed message to Technocore, and checking what came back. Shared by the My DID
-// wizard and the Write page so both make the same promises: one send, never a silent retry, and
+// Publishing one signed message to Technocore, and checking what came back. Shared by the Create a DID
+// wizard and the room pages so both make the same promises: one send, never a silent retry, and
 // "published" only when the room really holds this exact signed message.
 import { check, importKey, publicKey, readReply, TECHNOCORE } from "./did-core.mjs";
 

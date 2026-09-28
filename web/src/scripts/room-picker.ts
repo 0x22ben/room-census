@@ -1,4 +1,4 @@
-// The room picker of the Write page and of the My DID first message: a search over the rooms this
+// The room picker of the first message on Create a DID: a search over the rooms this
 // page carries, and one selected room. A room that is not in the list can never be picked, so a
 // message never creates a room by writing to a name Technocore does not know yet.
 import { searchRooms } from "../lib/rooms.mjs";

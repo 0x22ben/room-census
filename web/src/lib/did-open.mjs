@@ -1,6 +1,6 @@
 // Opening a DID from the files a reader picked, for every page that does it.
 //
-// Both entry points, My DID and Write, go through this one function, so a file is sorted, checked and
+// Both entry points, Create a DID and a room page, go through this one function, so a file is sorted, checked and
 // opened the same way everywhere: one key container in either local backup format, an optional
 // passphrase.txt that only fills in for an empty field, and an optional did.txt that must hold one
 // did:key value and must name the DID the key derives, or nothing is opened.

@@ -1,4 +1,4 @@
-// My DID identity wizard, in the style of the approved mockups. Primary flow (Ben, 2026-09-23):
+// The Create a DID wizard, in the style of the approved mockups. Primary flow (Ben, 2026-09-23):
 // Create DID -> Download the encrypted recovery file once -> Write a message -> Publish -> Message published.
 // Plus Restore, for a later visit, when the reader wants to publish again.
 // The unlocked identity lives only in this module's memory, for this tab: closing or reloading the page,
@@ -75,7 +75,8 @@ if (root) {
       else delete li.dataset.done;
     });
     const h1 = document.querySelector<HTMLElement>("[data-page-title]");
-    if (h1) h1.textContent = panel === "create" || (created && panel !== "start" && panel !== "restore") ? "Create your Technocore DID" : "My DID";
+    if (h1) h1.textContent = panel === "create" || (created && panel !== "start" && panel !== "restore") ? "Create your Technocore DID"
+      : panel === "start" ? "Create a DID" : "Your DID";
     q<HTMLElement>("[data-action=start-over]").hidden = identity === null;
     q<HTMLElement>("[data-confirm-over]").hidden = true;
     // a passphrase shown in clear never stays shown on the next screen
@@ -232,7 +233,7 @@ if (root) {
       if (identity) return;
       const chosen = [...(q<HTMLInputElement>("[data-restore-file]").files ?? [])];
       const pw = q<HTMLInputElement>("[data-restore-password]");
-      // the same opening as the Write page: lib/did-open.mjs
+      // the same opening as the room pages: lib/did-open.mjs
       const opened = await openChosen(crypto.subtle, chosen, pw.value);
       if (opened.problem) return error("restore", opened.problem);
       identity = opened.identity!;

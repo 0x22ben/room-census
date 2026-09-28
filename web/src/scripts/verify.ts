@@ -113,7 +113,7 @@ async function run() {
       + `. See the steps below. ${code}`;
 }
 
-// copy the DID for My DID; the button only exists for readers with script
+// copy the DID; the button only exists for readers with script
 for (const button of document.querySelectorAll<HTMLButtonElement>("button[data-copy]")) {
   const label = button.querySelector<HTMLElement>("[data-copy-label]");
   button.addEventListener("click", async () => {

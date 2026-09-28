@@ -1,4 +1,4 @@
-// My DID identity, without the page: create an Ed25519 did:key, seal it in an encrypted backup,
+// A DID identity, without the page: create an Ed25519 did:key, seal it in an encrypted backup,
 // open that backup again, prepare and sign a first message, and check what Technocore stored.
 // Plain JavaScript over Web Crypto, so the Node tests run it as is. Nothing here touches the network
 // or any storage: the caller keeps the identity in memory and decides what, if anything, is sent.
