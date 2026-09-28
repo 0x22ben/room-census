@@ -74,9 +74,11 @@ function init(root: HTMLElement) {
       field.value = s.nick;
       field.maxLength = 20;
       field.setAttribute("aria-label", `New nickname for ${short(s.did)}`);
-      const done = () => { const v = field.value.trim(); if (!v || v === s.nick || !rename(s.did, v)) draw(); };
-      field.addEventListener("keydown", (e) => { if (e.key === "Enter") field.blur(); if (e.key === "Escape") { field.value = s.nick; field.blur(); } });
-      field.addEventListener("blur", done, { once: true });
+      // Enter keeps the name at once: it never depends on the field having had focus
+      let over = false;
+      const done = () => { if (over) return; over = true; const v = field.value.trim(); if (!v || v === s.nick || !rename(s.did, v)) draw(); };
+      field.addEventListener("keydown", (e) => { if (e.key === "Enter") done(); if (e.key === "Escape") { field.value = s.nick; done(); } });
+      field.addEventListener("blur", done);
       nick.replaceWith(field);
       edit.hidden = true;
       field.focus();

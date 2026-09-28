@@ -123,16 +123,19 @@ function init(root: HTMLElement) {
     input.focus();
     input.select();
   });
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
-    if (e.key === "Escape") { e.stopPropagation(); input.value = active()?.nick ?? ""; input.blur(); }
-  });
-  input.addEventListener("blur", () => {
+  // Enter keeps the name at once: it never depends on the field having had focus
+  const keepName = () => {
+    if (input.hidden) return;
     const a = active();
     const v = input.value.trim();
-    if (a && v && v !== a.nick) rename(a.did, v);
     closeRename();
+    if (a && v && v !== a.nick) rename(a.did, v);
+  };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); keepName(); }
+    if (e.key === "Escape") { e.stopPropagation(); input.value = active()?.nick ?? ""; keepName(); }
   });
+  input.addEventListener("blur", keepName);
 
   q("[data-sw-out]").addEventListener("click", () => {
     const n = saved().length;

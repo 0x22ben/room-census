@@ -97,7 +97,7 @@ test("My DIDs adds many at once, renames, switches and removes", { skip }, async
   assert.match(await page(`document.querySelector("[data-md-list] tr").textContent`), /SIGNED IN/);
   assert.equal(await page(`document.querySelector("[data-sw-nick]").textContent`), "DID 2");
   await page(`(() => { document.querySelector("[data-md-list] tr [aria-label^=Rename]").click(); const f = document.querySelector("[data-md-list] tr input");
-    f.value = "long-bot"; f.blur(); return true; })()`);
+    f.value = "long-bot"; f.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" })); return true; })()`);
   await until(`document.querySelector("[data-sw-nick]").textContent === "long-bot"`, "the new nickname in the top bar");
   await shot("my-dids");
   await page(`document.querySelector("[data-md-list] tr [aria-label^=Remove]").click()`);
