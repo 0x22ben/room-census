@@ -2,7 +2,7 @@
 // Everything goes through saved-store (this browser only); every change redraws the page and the top bar.
 import { avatarSvg } from "../lib/avatar.mjs";
 import { active, isDid, remove, rename, save, saved, setActive, type Saved } from "../lib/saved-store";
-import type { Signed } from "./ranking-lookup";
+import { filesOf, type Signed } from "./ranking-lookup";
 import { pnlText, pnlTone, rankText, ranker, short } from "./saved-ranks";
 
 function el(tag: string, cls: string, text?: string): HTMLElement {
@@ -16,7 +16,7 @@ const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
 function init(root: HTMLElement) {
   const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
-  const rankOf = ranker(root.dataset.url, JSON.parse(root.dataset.signed ?? "[]") as Signed[]);
+  const rankOf = ranker(filesOf(root), JSON.parse(root.dataset.signed ?? "[]") as Signed[]);
   const contestId = root.dataset.contest;
   const max = Number(root.dataset.max);
   const icons = document.querySelector<HTMLTemplateElement>("[data-md-icons]")!.content;

@@ -26,6 +26,18 @@ DID_CSP = PAGE_CSP.replace("connect-src 'self'", "connect-src 'self' https://tec
 CONNECTS = ("/did/", "/verify/")
 # plus every room page: each one shows its room live, read by the reader's browser
 connects = lambda route: route in CONNECTS or (route.startswith("/rooms/") and route != "/rooms/")
+# The contest shards are not in the site: a page that looks a DID up reads them from this one path
+# (src/lib/contest-files.mjs), at the contest-data commit the build used, or from the site without one.
+CONTEST_FILES = contract.CONTEST_FILES
+CONTEST_CSP = PAGE_CSP.replace("connect-src 'self'", f"connect-src 'self' {CONTEST_FILES}")
+CONTEST_DATA_REF = os.environ.get("CONTEST_DATA_REF") or None
+SHARDS_BASE = f"{CONTEST_FILES}{CONTEST_DATA_REF}/data/contests/" if CONTEST_DATA_REF else "/data/contests/"
+# the elements whose script reads them: the account menu, Find my DID, a trader's page, My DIDs
+LOOKS_A_DID_UP = re.compile(r"<[a-z]+\s[^>]*\bdata-(did-switcher|find-did|did-page|my-dids)[\s>=]")
+looks_a_did_up = lambda text: LOOKS_A_DID_UP.search(text) is not None
+# the lookup pages named when the shards left the site (SPEC_SITE_HEAVY_OFF_PAGES, Ben 2026-09-28)
+LOOKUP_ROUTES = ("/contests/close-1/", "/contests/close-1/did/", "/my-dids/", "/rankings/")
+SHARD_FILE = re.compile(r"\.(ranking|trades)\.[0-9a-f]{2}\.json$")
 DID_DISCLAIMER = ("This page summarizes public Technocore activity. It does not determine ownership, reputation or "
                   "eligibility for any reward.")
 # the wizard's own result for a signature it checked itself (ROOM_CENSUS_UX_SPEC.md, exceptions): only in the My DID script
@@ -109,6 +121,13 @@ class Project(unittest.TestCase):
         upload = text.index("upload-pages-artifact")
         for gate in ("tests.test_web", "site_contract.py"):
             self.assertLess(text.index(gate), upload, f"{gate} must run before the upload")
+
+    def test_the_published_build_names_the_contest_data_commit_it_used(self):
+        """The pages read the contest shards at the commit pages.yml checked out: the build must see it."""
+        text = (REPO / ".github" / "workflows" / self.PUBLISHER).read_text(encoding="utf-8")
+        export = text.index('echo "CONTEST_DATA_REF=$(git rev-parse FETCH_HEAD)" >> "$GITHUB_ENV"')
+        self.assertLess(text.index("git checkout FETCH_HEAD -- data/contests"), export)
+        self.assertLess(export, text.index("run: npm run build"))
 
     def test_ci_runs_the_did_page_in_a_real_browser(self):
         """The /did/ script is tested as shipped; in CI a missing browser fails instead of skipping."""
@@ -196,8 +215,10 @@ class Artifact(unittest.TestCase):
             p = contract.parse(page)
             route = self.route(page)
             with self.subTest(page=route):
-                self.assertEqual(p.csp, DID_CSP if connects(route) else PAGE_CSP)
-                self.assertIsNone(contract.csp_problem(p.csp.replace(" https://technocore.chat", "") if connects(route) else p.csp))
+                reads = not connects(route) and looks_a_did_up(text)
+                self.assertEqual(p.csp, DID_CSP if connects(route) else CONTEST_CSP if reads else PAGE_CSP)
+                self.assertIsNone(contract.csp_problem(p.csp.replace(" https://technocore.chat", "").replace(f" {CONTEST_FILES}", "")))
+                self.assertIsNone(contract.csp_problem(p.csp, reads_technocore=connects(route), reads_contest_files=reads))
                 self.assertEqual(p.inline_scripts, 0)
                 self.assertNotRegex(text, r"<style[\s>]")
                 self.assertNotRegex(text, r"\sstyle=")
@@ -490,8 +511,40 @@ class Artifact(unittest.TestCase):
         for page in self.html_pages():
             if not connects(self.route(page)):
                 with self.subTest(page=self.route(page)):
-                    self.assertNotIn("technocore.chat https", contract.parse(page).csp or "")
-                    self.assertNotIn("connect-src 'self' https", contract.parse(page).csp or "")
+                    csp = contract.parse(page).csp or ""
+                    self.assertNotIn("technocore.chat", csp)
+                    self.assertIn(contract.csp_directives(csp).get("connect-src"), (["'self'"], ["'self'", CONTEST_FILES]))
+
+    def test_only_pages_that_look_a_did_up_may_read_the_contest_files(self):
+        """Exactly the pages whose script reads the shards name their one path, and each such element says
+        where it reads them: the contest-data commit of this build, or the site itself without one."""
+        reading = set()
+        for page in self.html_pages():
+            text = page.read_text(encoding="utf-8")
+            route = self.route(page)
+            csp = contract.parse(page).csp or ""
+            with self.subTest(page=route):
+                if connects(route):
+                    self.assertNotIn("raw.githubusercontent.com", csp)
+                    self.assertFalse(looks_a_did_up(text), "a page that talks to Technocore has no DID lookup")
+                    continue
+                self.assertEqual(CONTEST_FILES in csp, looks_a_did_up(text))
+                if looks_a_did_up(text):
+                    reading.add(route)
+                for tag in re.findall(r"<[a-z]+\s[^>]*\bdata-(?:did-switcher|find-did|did-page|my-dids)[\s>=][^>]*>", text):
+                    if " data-url=" in tag:
+                        self.assertEqual(re.findall(r'\sdata-shards="([^"]*)"', tag), [SHARDS_BASE], tag[:200])
+        for route in LOOKUP_ROUTES:
+            self.assertIn(route, reading)
+        self.assertNotIn("/did/", reading)
+
+    def test_the_contest_shards_stay_out_of_the_artifact(self):
+        """GitHub Pages publishes at most 1 GB: only the contest index and each ranking summary are in the site."""
+        self.assertEqual([f.relative_to(DIST).as_posix() for f in DIST.rglob("*") if SHARD_FILE.search(f.name)], [])
+        contests = DIST / "data" / "contests"
+        for f in sorted(contests.iterdir()) if contests.is_dir() else ():
+            with self.subTest(file=f.name):
+                self.assertRegex(f.name, r"^(index|[a-z0-9][a-z0-9_-]{0,47}\.ranking)\.json$")
 
     def test_verify_runs_only_the_checks_it_can_and_names_the_published_fingerprints(self):
         text = (DIST / "verify" / "index.html").read_text(encoding="utf-8")

@@ -50,6 +50,9 @@ jobs:
       - name: Contest data from the contest-data branch
         # One commit, replaced at every publication, so the contest files never pile up in main's history
         # (27 Sep 2026: about 100 MB per publication). Without that branch, main's own copy is used.
+        # Only the index and the ranking summaries are uploaded: the pages read the shards from
+        # raw.githubusercontent.com at CONTEST_DATA_REF (web/src/lib/contest-files.mjs). Without that
+        # ref they ask the site itself, which does not hold them: DID lookups then fail.
         run: |
           if git fetch --depth=1 --no-tags origin contest-data; then
             rm -rf data/contests

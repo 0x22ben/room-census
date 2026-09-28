@@ -44,6 +44,9 @@ CSP_REQUIRED = {"default-src": ["'self'"], "script-src": ["'self'"], "object-src
 CSP_ALLOWED = {"style-src": {"'self'", "'unsafe-inline'"}, "img-src": {"'self'", "data:"}}
 # the one origin a page may reach, and only a page that shows or writes to a room
 TECHNOCORE = "https://technocore.chat"
+# the one path a page that looks a DID up in a contest may read: the contest shards of this repository,
+# served at a contest-data commit by raw.githubusercontent.com (never the whole host)
+CONTEST_FILES = "https://raw.githubusercontent.com/0x22ben/room-census/"
 # GitHub Pages serves the extensionless data/LICENSE as application/octet-stream (recorded 2026-09-23)
 CONTENT_TYPES = {".html": ("text/html",), ".json": ("application/json",), ".csv": ("text/csv",), ".png": ("image/png",),
                  ".txt": ("text/plain",), "": ("text/plain", "application/octet-stream")}
@@ -110,20 +113,23 @@ def csp_directives(policy):
     return out
 
 
-def csp_problem(policy, reads_technocore=False):
+def csp_problem(policy, reads_technocore=False, reads_contest_files=False):
     """Why a page's Content-Security-Policy is weaker than the contract, None when it holds.
 
     A page that shows a room live, or that writes to one, reads technocore.chat from the browser, so
-    its connect-src names that one origin. Everywhere else connect-src stays 'self', and no directive
+    its connect-src names that one origin. A page that looks a DID up in a contest (the account menu of
+    the top bar, Find my DID, a trader's page, My DIDs) reads the contest shards, so its connect-src
+    names the one path CONTEST_FILES. Everywhere else connect-src stays 'self', and no other directive
     may name a host on any page.
     """
     d = csp_directives(policy)
     allowed = dict(CSP_ALLOWED)
     required = dict(CSP_REQUIRED)
-    if reads_technocore:
-        # that one origin becomes possible, it never becomes required: a page that reads no room keeps 'self'
+    reachable = ({TECHNOCORE} if reads_technocore else set()) | ({CONTEST_FILES} if reads_contest_files else set())
+    if reachable:
+        # those sources become possible, never required: a page that reads neither keeps 'self'
         required.pop("connect-src")
-        allowed["connect-src"] = {"'self'", TECHNOCORE}
+        allowed["connect-src"] = {"'self'"} | reachable
         if "'self'" not in d.get("connect-src", []):
             return f"connect-src is {d.get('connect-src')}"
     for name, sources in required.items():
@@ -258,7 +264,8 @@ def check(root, base_url):
         p = parse(f)
         if p.canonical != base_url.rstrip("/") + route:
             bad(f"{route}: canonical is {p.canonical!r}")
-        weak = csp_problem(p.csp, reads_technocore=kind == "/rooms/<slug>/")
+        # the home page and the room index carry the account menu; a room page talks to Technocore instead
+        weak = csp_problem(p.csp, reads_technocore=kind == "/rooms/<slug>/", reads_contest_files=kind in ("/", "/rooms/"))
         if weak:
             bad(f"{route}: missing or weakened Content-Security-Policy ({weak})")
         if p.inline_scripts:

@@ -3,7 +3,7 @@
 // switch to another saved DID, add one, manage them all or sign out (forgets every DID in this browser).
 import { avatarSvg } from "../lib/avatar.mjs";
 import { active, forgetAll, isDid, rename, save, saved, setActive, type Saved } from "../lib/saved-store";
-import type { Signed } from "./ranking-lookup";
+import { filesOf, type Signed } from "./ranking-lookup";
 import { pnlText, pnlTone, rankText, ranker, short } from "./saved-ranks";
 
 function el(tag: string, cls: string, text?: string): HTMLElement {
@@ -23,7 +23,7 @@ function follow(did: string) {
 function init(root: HTMLElement) {
   const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
   const signedList: Signed[] = JSON.parse(root.dataset.signed ?? "[]");
-  const rankOf = ranker(root.dataset.url, signedList);
+  const rankOf = ranker(filesOf(root), signedList);
   const contestId = root.dataset.contest;
   const menu = q("#did-menu");
   let adding = false;

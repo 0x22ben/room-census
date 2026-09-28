@@ -11,6 +11,11 @@ import { fileURLToPath } from "node:url";
 
 export const WEB = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const DIST = join(WEB, "dist");
+// The contest shards are not part of the site (src/lib/contest-files.mjs). A build without
+// CONTEST_DATA_REF asks them from the site itself, and this server answers from the checkout's
+// data/contests/, the very files the build checked. (A build with the ref reads them from
+// raw.githubusercontent.com: build without it to keep these tests off the network.)
+const SHARD = /^\/data\/contests\/[a-z0-9][a-z0-9_-]{0,47}\.(ranking|trades)\.[0-9a-f]{2}\.json$/;
 
 const CANDIDATES = [
   process.env.BROWSER_BIN,
@@ -83,6 +88,7 @@ export async function start() {
     let file = normalize(join(DIST, path));
     if (!file.startsWith(DIST + sep) && file !== DIST) { res.writeHead(403).end(); return; }
     if (path.endsWith("/")) file = join(file, "index.html");
+    if (!existsSync(file) && SHARD.test(path)) file = join(WEB, "..", ...path.slice(1).split("/"));
     if (!existsSync(file)) { res.writeHead(404).end(); return; }
     res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream" }).end(readFileSync(file));
   });

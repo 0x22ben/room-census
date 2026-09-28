@@ -1,4 +1,5 @@
 // Site-wide constants: identity, navigation and the Content-Security-Policy every page carries.
+import { RAW_REPOSITORY } from "./contest-files.mjs";
 
 export const SITE_NAME = "Room Census";
 export const REPOSITORY = "https://github.com/0x22ben/room-census";
@@ -19,6 +20,10 @@ export const CSP = policy("'self'");
 // the browser;
 // no other page may connect out
 export const TECHNOCORE_CSP = policy("'self' https://technocore.chat");
+// the pages that look a DID up in a contest (the account menu of the top bar, Find my DID, a trader's
+// page, My DIDs) read the ranking and trades shards from this repository on raw.githubusercontent.com
+// (src/lib/contest-files.mjs): that path only, never the whole host
+export const CONTEST_CSP = policy(`'self' ${RAW_REPOSITORY}`);
 
 export type Icon = "discover" | "rooms" | "watched" | "contests" | "rankings" | "did" | "write" | "search" | "verify" | "data" | "method" | "source";
 export type NavItem = { label: string; href: string; icon: Icon; ready: boolean; external?: boolean };

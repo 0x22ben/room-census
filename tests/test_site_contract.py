@@ -119,6 +119,36 @@ class Regressions(unittest.TestCase):
                 self.assertReported("/: missing or weakened Content-Security-Policy")
                 self.edit("index.html", new, old)
 
+    def test_the_contest_files_are_one_path_on_pages_with_the_account_menu_only(self):
+        """The home page may read the contest shards of this repository, and nothing else on that host;
+        a room page may not read them at all."""
+        self.edit("index.html", "connect-src 'self'", f"connect-src 'self' {contract.CONTEST_FILES}")
+        self.assertEqual(contract.check(self.root, contract.LEGACY_BASE), [])
+        for wider in ("https://raw.githubusercontent.com", "https://raw.githubusercontent.com/",
+                      "https://raw.githubusercontent.com/0x22ben/", "https://raw.githubusercontent.com/someone/room-census/"):
+            with self.subTest(source=wider):
+                self.edit("index.html", contract.CONTEST_FILES, wider)
+                self.assertReported("/: missing or weakened Content-Security-Policy")
+                self.edit("index.html", wider, contract.CONTEST_FILES)
+        page = next(p for p in (self.root / "rooms").glob("*/index.html"))
+        route = f"/rooms/{page.parent.name}/"
+        text = page.read_text(encoding="utf-8")
+        self.assertIn("connect-src 'self'", text)
+        page.write_text(text.replace("connect-src 'self'", f"connect-src 'self' {contract.CONTEST_FILES}", 1), encoding="utf-8", newline="\n")
+        self.assertReported(f"{route}: missing or weakened Content-Security-Policy")
+
+    def test_the_contest_files_policy_never_drops_self_or_opens_other_directives(self):
+        strict = ("default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; "
+                  "base-uri 'none'; form-action 'none'; object-src 'none'")
+        wide = strict.replace("connect-src 'self'", f"connect-src 'self' {contract.CONTEST_FILES}")
+        self.assertIsNone(contract.csp_problem(strict, reads_contest_files=True))
+        self.assertIsNone(contract.csp_problem(wide, reads_contest_files=True))
+        self.assertIsNotNone(contract.csp_problem(wide))
+        self.assertIsNotNone(contract.csp_problem(wide, reads_technocore=True))
+        self.assertIsNotNone(contract.csp_problem(wide.replace("connect-src 'self' ", "connect-src "), reads_contest_files=True))
+        self.assertIsNotNone(contract.csp_problem(wide.replace("script-src 'self'", f"script-src 'self' {contract.CONTEST_FILES}"),
+                                                  reads_contest_files=True))
+
     def test_preconnect_to_another_origin(self):
         self.edit("index.html", "</head>", '<link rel="preconnect" href="https://fonts.example"></head>')
         self.assertReported("/: external resource https://fonts.example")

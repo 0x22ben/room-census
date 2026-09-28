@@ -1,14 +1,15 @@
 // The staging step copies exactly the public allowlist, byte for byte, and fails closed on anything else.
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { StagingError, stage } from "../scripts/stage-public-data.mjs";
-import { validIndex, validRanking } from "./fixtures/contests-valid.mjs";
+import { StagingError, offSite, stage } from "../scripts/stage-public-data.mjs";
+import { shard } from "../src/lib/did-shard.mjs";
+import { DIDS, validIndex, validRanking, validRankingV2Files } from "./fixtures/contests-valid.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -194,4 +195,45 @@ test("an unexpected file in data/contests/ is refused", () => {
   contests(validIndex(), { "close-1": validRanking() });
   writeFileSync(join(repo, "data", "contests", "notes.txt"), "x");
   refused(/unexpected entry in data\/contests\/: notes\.txt/);
+});
+
+// Ranking v2: every shard is checked, but only the index and the ranking summary reach the site; the
+// pages read the shards from the contest-data commit on raw.githubusercontent.com (contest-files.mjs).
+const contestFiles = (docs) => {
+  mkdirSync(join(repo, "data", "contests"));
+  for (const [rel, doc] of Object.entries(docs)) writeFileSync(join(repo, ...rel.split("/")), JSON.stringify(doc));
+};
+
+test("contest shards are checked but never staged", () => {
+  contestFiles(validRankingV2Files(true));
+  const result = stage({ repo, out });
+  const contestPaths = result.files.map((f) => f.path).filter((p) => p.startsWith("data/contests/"));
+  assert.deepEqual(contestPaths, ["data/contests/close-1.ranking.json", "data/contests/index.json"]);
+  assert.equal(result.offSite, 512);
+  assert.deepEqual(readdirSync(join(out, "data", "contests")).sort(), ["close-1.ranking.json", "index.json"]);
+  for (const rel of contestPaths) {
+    assert.equal(sha(readFileSync(join(out, ...rel.split("/")))), sha(readFileSync(join(repo, ...rel.split("/")))), rel);
+  }
+  assert.ok(offSite("data/contests/close-1.ranking.bf.json") && offSite("data/contests/close-1.trades.00.json"));
+  for (const rel of ["data/contests/index.json", "data/contests/close-1.ranking.json", "data/latest.json", "data/rooms/lobby.json"]) {
+    assert.ok(!offSite(rel), rel);
+  }
+});
+
+test("a ranking shard the contract refuses still stops the build", () => {
+  const docs = validRankingV2Files(true);
+  docs[`data/contests/close-1.ranking.${shard(DIDS[0])}.json`].sweep = 1;
+  contestFiles(docs);
+  refused(/is not shard/);
+  assert.ok(!existsSync(out));
+});
+
+test("a trades shard the contract refuses still stops the build", () => {
+  const docs = validRankingV2Files(true);
+  const own = `data/contests/close-1.trades.${shard(DIDS[0])}.json`;
+  const other = `data/contests/close-1.trades.${shard(DIDS[0]) === "00" ? "01" : "00"}.json`;
+  docs[other].keys[DIDS[0]] = docs[own].keys[DIDS[0]];
+  delete docs[own].keys[DIDS[0]];
+  contestFiles(docs);
+  refused(/bad key/);
 });

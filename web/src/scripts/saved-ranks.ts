@@ -2,7 +2,7 @@
 // They come from the contest's published ranking files (same order as the Top 100) and are remembered
 // in this browser for 15 minutes; a DID removed while its lookup runs is not written back.
 import { RANKS as CACHE, saved } from "../lib/saved-store";
-import { lookup, type Signed } from "./ranking-lookup";
+import { lookup, type Files, type Signed } from "./ranking-lookup";
 
 const TTL = 15 * 60_000;
 export type Rank = { rank: number; pnl: string } | null;
@@ -20,13 +20,13 @@ function cached(): Record<string, { at: number; r: Rank }> {
   }
 }
 
-export function ranker(url: string | undefined, signed: Signed[]) {
+export function ranker(files: Files | undefined, signed: Signed[]) {
   return async function rankOf(did: string): Promise<Rank> {
-    if (!url) return null;
+    if (!files) return null;
     const hit = cached()[did];
     if (hit && Date.now() - hit.at < TTL) return hit.r;
     try {
-      const { row } = await lookup(url, did, signed);
+      const { row } = await lookup(files, did, signed);
       const r: Rank = row ? { rank: row[0], pnl: row[2] } : null;
       // read again after the wait: the DID may have been removed or forgotten meanwhile
       if (saved().some((s) => s.did === did)) {

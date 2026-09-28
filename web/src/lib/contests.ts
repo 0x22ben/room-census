@@ -1,11 +1,12 @@
 // Contests followed by the Room Census witness. The witness on the server publishes data/contests/
 // (index.json and one ranking per contest); without it, as on a fresh checkout, the pages read a sample
 // built from the real capture of 25 Sep 2026 (scripts/contests-sample.py) and say so on every page.
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import sample from "../fixtures/contests.sample.json";
 import { json } from "./files";
 import sampleRanking from "../fixtures/close-1.ranking.sample.json";
+import { contestFilesBase } from "./contest-files.mjs";
 import { shard, shardFile } from "./did-shard.mjs";
 import { scoreCurve } from "./fold-lite.mjs";
 import { robustRange } from "./robust-range.mjs";
@@ -17,6 +18,17 @@ import { dateTimeUtc } from "./format";
 type Doc = { sample?: boolean; captured_at: string; contests: Contest[] };
 const LIVE = existsSync(resolve(process.cwd(), ".public", "data", "contests", "index.json"));
 const doc: Doc = LIVE ? json<Doc>("data/contests/index.json") : (sample as unknown as Doc);
+
+/** Where the browser reads the ranking and trades shards (data-shards of the pages that look a DID up):
+ * the contest-data commit this build used, on raw.githubusercontent.com, or the site itself when the
+ * build names none. A malformed CONTEST_DATA_REF stops the build (src/lib/contest-files.mjs). */
+export const SHARDS_BASE: string = contestFilesBase(process.env.CONTEST_DATA_REF);
+
+// The shards are not in the site, so the build reads them from the checkout (data/contests/, filled by
+// pages.yml from that same commit), after the staging step has checked every one of them.
+const REPOSITORY = resolve(process.cwd(), "..");
+const hasShard = (rel: string): boolean => existsSync(resolve(REPOSITORY, rel));
+const shardJson = <T>(rel: string): T => JSON.parse(readFileSync(resolve(REPOSITORY, rel), "utf8")) as T;
 
 export type CheckState = "ok" | "warn" | "wait";
 export type Check = { state: CheckState; title: string; text: string; help: string };
@@ -114,7 +126,7 @@ export function sparklines(c: Contest, dids: string[]): Map<string, { d: string;
     const s = shard(did);
     if (!files.has(s)) {
       const rel = shardFile(c.ranking.file, "trades", s).replace(/^\//, "");
-      files.set(s, existsSync(resolve(process.cwd(), ".public", rel)) ? json<{ keys: Record<string, Trade[]> }>(rel).keys : null);
+      files.set(s, hasShard(rel) ? shardJson<{ keys: Record<string, Trade[]> }>(rel).keys : null);
     }
     const trades = files.get(s)?.[did];
     if (!trades?.length) continue;
@@ -143,7 +155,7 @@ export function ranksOf(c: Contest, dids: string[]): Map<string, { rank: number;
   const byShard = new Map<string, string[]>();
   for (const d of dids) byShard.set(shard(d), [...(byShard.get(shard(d)) ?? []), d]);
   for (const [s, list] of byShard) {
-    const rows = json<{ rows: RankRow[] }>(shardFile(c.ranking.file, "ranking", s).replace(/^\//, "")).rows;
+    const rows = shardJson<{ rows: RankRow[] }>(shardFile(c.ranking.file, "ranking", s).replace(/^\//, "")).rows;
     const want = new Set(list);
     for (const [rank, did, pnl] of rows) if (want.has(did)) out.set(did, { rank, pnl });
   }

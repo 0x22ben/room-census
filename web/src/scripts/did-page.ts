@@ -7,7 +7,7 @@ import { Account, MINT } from "../lib/fold-lite.mjs";
 import { robustRange } from "../lib/robust-range.mjs";
 import { isSaved, remove, save } from "../lib/saved-store";
 import { drawCard, shareOnX, type Card } from "./pnl-card";
-import { lookup, tradesOf, type Signed } from "./ranking-lookup";
+import { filesOf, lookup, tradesOf, type Signed } from "./ranking-lookup";
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler);
 
@@ -56,12 +56,12 @@ function init(root: HTMLElement) {
   const signedList: Signed[] = JSON.parse(root.dataset.signed ?? "[]");
   const marks: Mark[] = JSON.parse(root.dataset.marks ?? "[]");
   const opening = Date.parse(root.dataset.opening ?? "");
-  const url = root.dataset.url!;
+  const files = filesOf(root)!;
 
   (async () => {
     let found;
     try {
-      found = await lookup(url, did, signedList);
+      found = await lookup(files, did, signedList);
     } catch {
       problem("The ranking could not be read. Try again in a moment.");
       return;
@@ -71,7 +71,7 @@ function init(root: HTMLElement) {
       problem("No trade yet: this key has no settled trade in our capture.");
       return;
     }
-    const trades = await tradesOf(url, did);
+    const trades = await tradesOf(files, did);
     const score = Number(row[2]);
     const official = row[3] === "official" || row[3] === "signed";
 

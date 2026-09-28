@@ -7,7 +7,7 @@ import ContestHeader from "../../../components/ContestHeader.astro";
 import Help from "../../../components/Help.astro";
 import Px from "../../../components/Px.astro";
 import TradingChart, { type View } from "../../../components/TradingChart.astro";
-import { change, contests, countdown, phaseOf, positionParts, shortDid, signed, sparklines, tabs, topTraders, type Contest } from "../../../lib/contests";
+import { SHARDS_BASE, change, contests, countdown, phaseOf, positionParts, shortDid, signed, sparklines, tabs, topTraders, type Contest } from "../../../lib/contests";
 
 export function getStaticPaths() {
   return contests().map((c) => ({ params: { id: c.id }, props: { contest: c } }));
@@ -96,7 +96,7 @@ const current = tabs(c)[0].label;
 
       {c.ranking && (
         <section aria-labelledby="find-title" class="grid content-start gap-3 rounded-xl border border-border bg-surface p-4 sm:p-5"
-          data-find-did data-url={c.ranking.file}
+          data-find-did data-url={c.ranking.file} data-shards={SHARDS_BASE}
           data-signed={JSON.stringify((lb?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check })))}
           data-lock={phase === "live" ? countdown(c.trading_lock_at) : undefined}>
           <h2 id="find-title" class="flex items-center gap-2 font-semibold"><Px name="search" size={24} class="text-accent" />Find my DID</h2>

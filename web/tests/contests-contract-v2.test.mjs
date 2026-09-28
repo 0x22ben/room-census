@@ -4,28 +4,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { ContestContractError, checkContests } from "../scripts/contests-contract.mjs";
-import { SHARDS, shard } from "../src/lib/did-shard.mjs";
-import { DIDS, validIndex } from "./fixtures/contests-valid.mjs";
-
-const hex = (k) => k.toString(16).padStart(2, "0");
-
-function build(withTrades = false) {
-  const index = validIndex();
-  const lines = [[1, DIDS[0], "76.35", "official", ["44.66", "221.65"]], [2, DIDS[1], "68.41", "signed", null], [3, DIDS[2], "-3.10", "complete", ["-12.40", "229.40"]]];
-  const main = { schema: "room-census/contest-ranking/2", contest: "close-1", sweep: 2, at: "2026-09-25T17:31:00Z", traders: 3, owners: 600784,
-    capture_start: "13:32 UTC", shards: SHARDS, notes: { official: "o", signed: "s", complete: "c", partial: "p" }, top: lines.map((l) => [...l]) };
-  const docs = { "data/contests/index.json": index, "data/contests/close-1.ranking.json": main };
-  for (let k = 0; k < SHARDS; k++) {
-    docs[`data/contests/close-1.ranking.${hex(k)}.json`] = { schema: "room-census/contest-ranking-shard/1", contest: "close-1", sweep: 2, shard: hex(k), rows: [] };
-    if (withTrades) docs[`data/contests/close-1.trades.${hex(k)}.json`] = { schema: "room-census/contest-trades/1", contest: "close-1", sweep: 2, shard: hex(k), keys: {} };
-  }
-  for (const l of lines) docs[`data/contests/close-1.ranking.${shard(l[1])}.json`].rows.push([...l]);
-  if (withTrades) docs[`data/contests/close-1.trades.${shard(DIDS[0])}.json`].keys[DIDS[0]] = [[1, "b", "44.66", "221.65", "0.98"], [2, "x", "1", "224.00", "0.002240"]];
-  return docs;
-}
+import { shard } from "../src/lib/did-shard.mjs";
+import { DIDS, validRankingV2Files } from "./fixtures/contests-valid.mjs";
 
 function run(mutate = () => {}, withTrades = false) {
-  const docs = build(withTrades);
+  const docs = validRankingV2Files(withTrades);
   mutate(docs, docs["data/contests/index.json"].contests[0], docs["data/contests/close-1.ranking.json"]);
   return () => checkContests(Object.keys(docs), (rel) => docs[rel]);
 }

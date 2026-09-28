@@ -4,7 +4,7 @@
 // the key from ?k=, then the two small files that hold it (its ranking line and its trades).
 import Base from "../../../layouts/Base.astro";
 import Px from "../../../components/Px.astro";
-import { contests, type Contest } from "../../../lib/contests";
+import { SHARDS_BASE, contests, type Contest } from "../../../lib/contests";
 
 export function getStaticPaths() {
   return contests().filter((c) => c.ranking).map((c) => ({ params: { id: c.id }, props: { contest: c } }));
@@ -18,7 +18,7 @@ const card = "rounded-xl border border-border bg-surface";
 const stat = "grid gap-0.5";
 ---
 <Base title={`${c.title}: a trader's page`} description={`Rank, score over time, position and every settled trade of one key in ${c.title}, recounted from the signed trades.`}>
-  <div data-did-page data-url={c.ranking!.file} data-contest={c.title.toUpperCase()} data-sweep={c.ranking!.sweep}
+  <div data-did-page data-url={c.ranking!.file} data-shards={SHARDS_BASE} data-contest={c.title.toUpperCase()} data-sweep={c.ranking!.sweep}
     data-signed={JSON.stringify((c.leaderboard?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check })))}
     data-marks={JSON.stringify(marks)} data-opening={c.opening} data-page={new URL(`/contests/${c.id}/did/`, Astro.site).href}>
     <nav aria-label="Breadcrumb" class="text-sm">

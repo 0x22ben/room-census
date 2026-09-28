@@ -1,7 +1,8 @@
 // Copies the public data contract of the repository into web/.public, the Astro publicDir, byte for
 // byte. Fail closed: an unexpected, missing, linked or inconsistent file stops the build. Nothing
 // outside the allowlist below can reach the site, so the private archive, journals, state, secrets
-// and Git metadata never do.
+// and Git metadata never do. The contest shards are checked like every other file but not copied: the
+// pages read them from the contest-data commit on raw.githubusercontent.com (src/lib/contest-files.mjs).
 import { createHash } from "node:crypto";
 import { copyFileSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
@@ -26,6 +27,12 @@ export const OPTIONAL_DIRECTORIES = {
     || (/^[a-z0-9][a-z0-9_-]{0,47}\.(ranking|trades)\.[0-9a-f]{2}\.json$/.test(name) && validSlug(name.replace(/\.(ranking|trades)\.[0-9a-f]{2}\.json$/, ""))),
 };
 const SNAPSHOT = /^data\/snapshots\/\d{4}-\d{2}-\d{2}T\d{4}Z\.json$/;
+// the 256 ranking shards and 256 trades shards of each contest (about 450 MB in all on 28 Sep 2026, more
+// every 15 minutes): GitHub Pages publishes at most 1 GB, so they stay out of the site
+const OFF_SITE = /^data\/contests\/[a-z0-9][a-z0-9_-]{0,47}\.(ranking|trades)\.[0-9a-f]{2}\.json$/;
+
+/** Whether a checked public file is served from outside the site, and so never staged. */
+export const offSite = (rel) => OFF_SITE.test(rel);
 
 export class StagingError extends Error {}
 
@@ -171,7 +178,8 @@ function checkContests(bytes, json) {
   }
 }
 
-/** Rebuilds `out` from the allowlist of `repo`. Returns the inventory of staged files. */
+/** Rebuilds `out` from the allowlist of `repo`. Returns the inventory of staged files, and how many
+ * checked files were left out of the site (the contest shards). */
 export function stage({ repo, out }) {
   repo = realpathSync(resolve(repo));
   // the only directory this step may delete and rebuild
@@ -188,7 +196,12 @@ export function stage({ repo, out }) {
   const bytes = new Map(files.map((rel) => [rel, readFileSync(regularFile(repo, rel))]));
   const summary = checkConsistency(bytes);
   const inventory = [];
+  let unstaged = 0;
   for (const rel of files) {
+    if (offSite(rel)) {
+      unstaged += 1;
+      continue;
+    }
     const target = join(out, ...rel.split("/"));
     mkdirSync(dirname(target), { recursive: true });
     copyFileSync(join(repo, ...rel.split("/")), target);
@@ -196,7 +209,7 @@ export function stage({ repo, out }) {
     if (sha256(copied) !== sha256(bytes.get(rel))) fail(`copy differs from its source: ${rel}`);
     inventory.push({ path: rel, bytes: copied.length, sha256: sha256(copied) });
   }
-  return { ...summary, files: inventory };
+  return { ...summary, files: inventory, offSite: unstaged };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -204,7 +217,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const result = stage({ repo: resolve(web, ".."), out: resolve(web, ".public") });
     const total = result.files.reduce((n, f) => n + f.bytes, 0);
-    console.log(`staged ${result.files.length} public files (${total} bytes), census ${result.census}, ${result.rooms} rooms`);
+    console.log(`staged ${result.files.length} public files (${total} bytes), census ${result.census}, ${result.rooms} rooms,`
+      + ` ${result.offSite} contest shards checked and left out of the site`);
   } catch (e) {
     console.error(`staging failed: ${e.message}`);
     process.exit(1);

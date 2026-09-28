@@ -5,7 +5,7 @@ import MobileHeader from "../components/MobileHeader.astro";
 import Footer from "../components/Footer.astro";
 import Px from "../components/Px.astro";
 import DidSwitcher from "../components/DidSwitcher.astro";
-import { CSP, TECHNOCORE_CSP, SITE_NAME } from "../lib/site";
+import { CONTEST_CSP, CSP, TECHNOCORE_CSP, SITE_NAME } from "../lib/site";
 import { latest } from "../lib/data";
 import socialCard from "../assets/social-card.png";
 
@@ -16,8 +16,11 @@ import socialCard from "../assets/social-card.png";
 // that talk to Technocore (a room opens a key to write in it): the account is for the other pages.
 // refresh: a page that moved sends the reader to its new address (no script, the policy stays strict)
 interface Props { title: string; description: string; indexable?: boolean; csp?: string; local?: boolean; refresh?: string }
-const { title, description, indexable = true, csp = CSP, local = false, refresh } = Astro.props;
-const switcher = !local && csp !== TECHNOCORE_CSP;
+const { title, description, indexable = true, csp: own, local = false, refresh } = Astro.props;
+const switcher = !local && own !== TECHNOCORE_CSP;
+// the account menu shows the rank of each saved DID, read from the contest's shard files on
+// raw.githubusercontent.com: a page that carries it may read them there, and nothing else changes
+const csp = own ?? (switcher ? CONTEST_CSP : CSP);
 const canonical = new URL(Astro.url.pathname, Astro.site).href;
 const fullTitle = title === SITE_NAME ? title : `${title} | ${SITE_NAME}`;
 const favicon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230B0D10'/%3E%3Cpath d='M9 8v16M14 8v16M19 8v16M24 8v16M6 21l22-10' stroke='%232EC4A6' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E";

@@ -1,5 +1,7 @@
 // A small but complete and valid data/contests/ pair, for the contract and staging tests. Built in code so
 // each test can change one field and see the contract refuse it.
+import { SHARDS, shard } from "../../src/lib/did-shard.mjs";
+
 const did = (tail) => `did:key:z6Mk${tail.padEnd(44, "a")}`;
 export const DIDS = [did("gTDg3hEz4pwiFcJCDjRvR3hZbVWwy23oGuqFbFxu7Hne"), did("eTcR7He7sY6imuJguhifiNKrWceKNus5HGuajbAwymdK"), did("hn3VX65yYQ8XpbqbuyriEWBdwQGR5RZTc76pMmRQPg7F")];
 export const SELF = did("mpb5XhgweP9mfxnA3vpQRu2VcSsGyFC7AfE3ZEFqXxD1");
@@ -44,4 +46,22 @@ export function validRanking() {
     notes: { official: "official note", complete: "complete note", partial: "partial note" },
     rows: [[1, DIDS[0], "76.35", "official", ["44.66", "221.65"]], [2, DIDS[1], "68.40", "partial", null], [3, DIDS[2], "-3.10", "complete", ["-12.40", "229.40"]]],
   };
+}
+
+const hex = (k) => k.toString(16).padStart(2, "0");
+
+/** A valid ranking v2 of close-1 as repository files (path to document): the index, the summary with the
+ * first places, its 256 ranking shards and, with `withTrades`, its 256 files of settled trades. */
+export function validRankingV2Files(withTrades = false) {
+  const lines = [[1, DIDS[0], "76.35", "official", ["44.66", "221.65"]], [2, DIDS[1], "68.41", "signed", null], [3, DIDS[2], "-3.10", "complete", ["-12.40", "229.40"]]];
+  const main = { schema: "room-census/contest-ranking/2", contest: "close-1", sweep: 2, at: "2026-09-25T17:31:00Z", traders: 3, owners: 600784,
+    capture_start: "13:32 UTC", shards: SHARDS, notes: { official: "o", signed: "s", complete: "c", partial: "p" }, top: lines.map((l) => [...l]) };
+  const docs = { "data/contests/index.json": validIndex(), "data/contests/close-1.ranking.json": main };
+  for (let k = 0; k < SHARDS; k++) {
+    docs[`data/contests/close-1.ranking.${hex(k)}.json`] = { schema: "room-census/contest-ranking-shard/1", contest: "close-1", sweep: 2, shard: hex(k), rows: [] };
+    if (withTrades) docs[`data/contests/close-1.trades.${hex(k)}.json`] = { schema: "room-census/contest-trades/1", contest: "close-1", sweep: 2, shard: hex(k), keys: {} };
+  }
+  for (const l of lines) docs[`data/contests/close-1.ranking.${shard(l[1])}.json`].rows.push([...l]);
+  if (withTrades) docs[`data/contests/close-1.trades.${shard(DIDS[0])}.json`].keys[DIDS[0]] = [[1, "b", "44.66", "221.65", "0.98"], [2, "x", "1", "224.00", "0.002240"]];
+  return docs;
 }

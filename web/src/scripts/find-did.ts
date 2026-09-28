@@ -1,10 +1,11 @@
-// "Find my DID": looks a did:key up in the ranking files this site serves. Nothing leaves the site and
-// nothing is stored. A ranked key opens its trader page directly (rank, score over time, position,
-// every trade, the score card to share). Only keys with at least one settled trade are ranked: any
-// other key is told it has no trade yet, as far as our capture shows.
+// "Find my DID": looks a did:key up in the contest's published ranking files (the summary on this site,
+// the shard on raw.githubusercontent.com, src/lib/contest-files.mjs). Nothing is sent but the address of
+// that file, and nothing is stored. A ranked key opens its trader page directly (rank, score over time,
+// position, every trade, the score card to share). Only keys with at least one settled trade are ranked:
+// any other key is told it has no trade yet, as far as our capture shows.
 import { avatarSvg } from "../lib/avatar.mjs";
 import { saved } from "../lib/saved-store";
-import { lookup, type Signed } from "./ranking-lookup";
+import { filesOf, lookup, type Signed } from "./ranking-lookup";
 
 const DID = /^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]{44}$/;
 
@@ -39,6 +40,7 @@ function init(root: HTMLElement) {
   const input = form.querySelector<HTMLInputElement>("input")!;
   const out = root.querySelector<HTMLElement>("[data-find-result]")!;
   const signed: Signed[] = JSON.parse(root.dataset.signed ?? "[]");
+  const files = filesOf(root)!;
   // the visitor's saved DIDs: listed here with their rank, and marked in the Top 100
   const list = root.querySelector<HTMLElement>("[data-saved-list]");
   const drawSaved = () => {
@@ -55,7 +57,7 @@ function init(root: HTMLElement) {
       right.append(rank, pnl);
       a.append(avatarSvg(s.did, 26), names, right);
       li.append(a);
-      lookup(root.dataset.url!, s.did, signed).then(({ row }) => {
+      lookup(files, s.did, signed).then(({ row }) => {
         rank.textContent = row ? `#${row[0].toLocaleString("en-US")}` : "–";
         pnl.textContent = row ? `${Number(row[2]) > 0 ? "+" : ""}${row[2]}` : "No trade";
         pnl.className = `font-mono text-[11px] ${row && Number(row[2]) > 0 ? "text-accent" : row && Number(row[2]) < 0 ? "text-down" : "text-text-muted"}`;
@@ -89,7 +91,7 @@ function init(root: HTMLElement) {
     }
     out.append(el("p", "text-sm text-text-muted", "Searching…"));
     try {
-      const { row } = await lookup(root.dataset.url!, did, signed);
+      const { row } = await lookup(files, did, signed);
       if (row) {
         location.assign(`${location.pathname.replace(/\/?$/, "/")}did/?k=${encodeURIComponent(did)}`);
       } else {
