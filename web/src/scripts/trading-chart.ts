@@ -90,7 +90,7 @@ function build(root: HTMLElement, spec: Spec) {
         x: { grid: { display: false }, border: { color: grid },
           ticks: { color: muted, font: mono, maxRotation: 0, autoSkip: true, maxTicksLimit: canvas.clientWidth < 500 ? 3 : 5,
             callback(this: { getLabelForValue(v: number): string }, v: string | number) { return tick(this.getLabelForValue(Number(v))); } } },
-        y: { ...(robustRange(view.series.flatMap((s) => slice(s.values)), view.min) ?? { min: view.min }), position: "right" as const, grid: { color: grid }, border: { display: false },
+        y: { ...(robustRange(view.series.map((s) => slice(s.values)), view.min) ?? { min: view.min }), position: "right" as const, grid: { color: grid }, border: { display: false },
           ticks: { color: muted, font: mono, maxTicksLimit: 5, callback: (v: string | number) => fmt(Number(v)) } },
       },
       plugins: {
