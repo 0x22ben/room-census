@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { StagingError, offSite, stage } from "../scripts/stage-public-data.mjs";
 import { shard } from "../src/lib/did-shard.mjs";
-import { DIDS, validIndex, validRanking, validRankingV2Files } from "./fixtures/contests-valid.mjs";
+import { DIDS, validIndex, validRanking, validRankingV2Files, validRankingV3Files } from "./fixtures/contests-valid.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -236,4 +236,21 @@ test("a trades shard the contract refuses still stops the build", () => {
   delete docs[own].keys[DIDS[0]];
   contestFiles(docs);
   refused(/bad key/);
+});
+
+// Ranking v3 (Ben, 2026-09-30): no ranking shard, the trades of the signed keys only; the old ranking
+// shards of our recount, left in the folder, stop the build instead of being published.
+test("a ranking v3 stages its summary and checks its trades files off site", () => {
+  contestFiles(validRankingV3Files(true));
+  const result = stage({ repo, out });
+  assert.deepEqual(result.files.map((f) => f.path).filter((p) => p.startsWith("data/contests/")), ["data/contests/close-1.ranking.json", "data/contests/index.json"]);
+  assert.equal(result.offSite, 256);
+});
+
+test("a ranking shard of our recount next to a ranking v3 stops the build", () => {
+  const docs = validRankingV3Files(true);
+  docs[`data/contests/close-1.ranking.${shard(DIDS[2])}.json`] = { schema: "room-census/contest-ranking-shard/1", contest: "close-1", sweep: 2, shard: shard(DIDS[2]), rows: [] };
+  contestFiles(docs);
+  refused(/named by no contest/);
+  assert.ok(!existsSync(out));
 });

@@ -65,3 +65,21 @@ export function validRankingV2Files(withTrades = false) {
   if (withTrades) docs[`data/contests/close-1.trades.${shard(DIDS[0])}.json`].keys[DIDS[0]] = [[1, "b", "44.66", "221.65", "0.98"], [2, "x", "1", "224.00", "0.002240"]];
   return docs;
 }
+
+/** A valid ranking v3 of close-1 (since 2026-09-30, nothing of our recount is published): the index with
+ * no trader count, no position and no active, long or short count, a summary with no row, no ranking
+ * shard and, with `withTrades`, 256 trades files holding keys of the referee's signed top list only. */
+export function validRankingV3Files(withTrades = false) {
+  const index = validIndex();
+  const c = index.contests[0];
+  delete c.ranking.traders;
+  for (const r of c.leaderboard.rows) delete r.position;
+  for (const s of c.series) for (const k of ["active", "long", "short"]) delete s[k];
+  const docs = { "data/contests/index.json": index,
+    "data/contests/close-1.ranking.json": { schema: "room-census/contest-ranking/3", contest: "close-1", sweep: 2, at: "2026-09-25T17:31:00Z", shards: SHARDS } };
+  if (withTrades) {
+    for (let k = 0; k < SHARDS; k++) docs[`data/contests/close-1.trades.${hex(k)}.json`] = { schema: "room-census/contest-trades/1", contest: "close-1", sweep: 2, shard: hex(k), keys: {} };
+    docs[`data/contests/close-1.trades.${shard(DIDS[0])}.json`].keys[DIDS[0]] = [[1, "b", "44.66", "221.65", "0.98"], [2, "x", "1", "224.00", "0.002240"]];
+  }
+  return docs;
+}

@@ -13,8 +13,9 @@ import { DIST, navigate, page, send, skip, start, stop, until } from "./harness.
 const LIVE = existsSync(join(DIST, "data", "contests", "index.json"));
 const rankingDoc = JSON.parse(readFileSync(LIVE ? join(DIST, "data", "contests", "close-1.ranking.json")
   : join(DIST, "contests", "close-1", "ranking.json"), "utf8"));
-// ranking v1 lists every key; v2 lists the first places, the others are in 256 shard files
-const ranking = { rows: rankingDoc.rows ?? rankingDoc.top };
+// ranking v1 lists every key; v2 lists the first places, the others are in 256 shard files; v3 (since
+// 2026-09-30) lists none: nothing of our recount is published
+const ranking = { rows: rankingDoc.rows ?? rankingDoc.top ?? [] };
 const NOBODY = "did:key:z6Mkfw79DoBMgePecy4YaXSSimwzHKYz8sB3JB9X7bKSXMkG";
 // the referee's signed top list, the only ranks and scores the pages show
 const idx = JSON.parse(readFileSync(LIVE ? join(DIST, "data", "contests", "index.json") : join(DIST, "..", "src", "fixtures", "contests.sample.json"), "utf8"));

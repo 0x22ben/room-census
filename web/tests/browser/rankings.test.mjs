@@ -112,7 +112,8 @@ test("the account menu ranks a key of the signed top list, and shows any other a
 
 test("switching DID on a trades page opens the new DID's trades", { skip }, async () => {
   const c = JSON.parse(readFileSync(join(DIST, "data", "contests", "close-1.ranking.json"), "utf8"));
-  const [a, b] = (c.top ?? c.rows).slice(0, 2).map((r) => r[1]);
+  // ranking v3 (since 2026-09-30) lists no key: the referee's signed top list then gives the two keys
+  const [a, b] = (c.top ?? c.rows ?? signedRows.map((r) => [r.rank, r.did])).slice(0, 2).map((r) => r[1]);
   await navigate("/rankings/");
   await page(`(() => { localStorage.clear(); localStorage.setItem("roomcensus.saved", JSON.stringify([{ did: ${JSON.stringify(a)}, nick: "main" }, { did: ${JSON.stringify(b)}, nick: "other" }])); return true; })()`);
   await navigate(`/contests/close-1/did/?k=${a}`);

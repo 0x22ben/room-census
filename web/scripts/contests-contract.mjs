@@ -1,7 +1,8 @@
 // The contract of data/contests/: the index of the contests the witness follows and one ranking file per
 // contest. Every rule is blocking. The staging step runs it before any build, and the witness on the
 // server runs that same staging step on a clone before it commits, so a malformed, incomplete or altered
-// export can never reach the site.
+// export can never reach the site. Since 2026-09-30 the witness publishes ranking v3 (rankingV3): nothing
+// of our own recount; v1 and v2 stay accepted, so a return to the previous export never stops the build.
 import { phase } from "../src/lib/contest-time.mjs";
 import { SHARDS, shard } from "../src/lib/did-shard.mjs";
 
@@ -158,8 +159,26 @@ function rankingV2(doc, c, where, files, read) {
   if (c.self_key) need(c.self_key.settled_trade === byDid.has(c.self_key.did), `${where}: our key's settled-trade status disagrees with the ranking`);
 }
 
-/** The settled trades of every key, in the same 256 shards: optional, published once an hour. */
-function trades(c, sweep, files, read) {
+const RANKING_V3_KEYS = ["at", "contest", "schema", "shards", "sweep"];
+
+/** Ranking v3 (Ben, 2026-09-30: never show a wrong figure): until our recount can be proved against the
+ * referee's signed hashes, nothing of it is published. The summary only names the update and the 256
+ * trades files next to it: no ranking row, no ranking shard, no trader count; the index carries no open
+ * position and no active, long or short count; and only the keys of the referee's signed top list, at
+ * that same update, may have trades published (checked in trades()). */
+function rankingV3(doc, c, where) {
+  need(Object.keys(doc).sort().join() === RANKING_V3_KEYS.join(), `${where}: a v3 summary holds only ${RANKING_V3_KEYS.join(", ")}`);
+  need(doc.sweep === c.ranking.sweep && int(doc.sweep, 1) && iso(doc.at) && doc.shards === SHARDS, `${where}: its update, time or shard count is malformed or differs from the index`);
+  need(c.ranking.traders === undefined, `${where}: the index still counts the traders of our recount`);
+  need(c.leaderboard && c.leaderboard.sweep === doc.sweep, `${where}: the referee's signed top list is not at the same update`);
+  need(c.leaderboard.rows.every((r) => r.position === undefined), `${where}: the signed top list carries positions of our recount`);
+  need((c.series ?? []).every((s) => ["active", "long", "short"].every((k) => s[k] === undefined)),
+    `${where}: the series carries active, long or short counts of our recount`);
+}
+
+/** The settled trades of the keys, in the same 256 shards: optional. `only`, when given, is the set of
+ * the keys whose trades may be published (ranking v3: the referee's signed top list). */
+function trades(c, sweep, files, read, only) {
   const rels = files.filter((f) => f.startsWith(`data/contests/${c.id}.trades.`));
   if (rels.length === 0) return rels;
   need(rels.length === SHARDS, `the trades of ${c.id} are in ${rels.length} files, not ${SHARDS}`);
@@ -171,6 +190,7 @@ function trades(c, sweep, files, read) {
       && d.keys && typeof d.keys === "object" && !Array.isArray(d.keys), `${rel} is not trades shard ${hh} of ${c.id}`);
     for (const [did, list] of Object.entries(d.keys)) {
       need(DID.test(did) && shard(did) === hh && Array.isArray(list) && list.length > 0, `${rel}: bad key ${did}`);
+      need(!only || only.has(did), `${rel}: ${did} is not in the referee's signed top list, its trades are not published`);
       for (const t of list) {
         need(Array.isArray(t) && t.length === 5 && int(t[0], 1) && t[0] <= d.sweep && ["b", "s", "x"].includes(t[1])
           && AMOUNT.test(t[2] ?? "") && AMOUNT.test(t[3] ?? "") && FEE.test(t[4] ?? ""), `${rel}: a trade of ${did} is malformed`);
@@ -228,14 +248,18 @@ export function checkContests(files, read) {
       const rel = `data/contests/${c.id}.ranking.json`;
       need(c.ranking.file === `/${rel}` && files.includes(rel), `ranking of ${c.id} does not resolve: ${c.ranking.file}`);
       const doc = read(rel);
-      if (doc && doc.schema === "room-census/contest-ranking/2" && doc.contest === c.id) {
+      let only;
+      if (doc && doc.schema === "room-census/contest-ranking/3" && doc.contest === c.id) {
+        rankingV3(doc, c, rel);
+        only = new Set(c.leaderboard.rows.map((r) => r.did));
+      } else if (doc && doc.schema === "room-census/contest-ranking/2" && doc.contest === c.id) {
         rankingV2(doc, c, rel, files, read);
         for (let k = 0; k < SHARDS; k++) named.add(`data/contests/${c.id}.ranking.${k.toString(16).padStart(2, "0")}.json`);
       } else {
         ranking(doc, c, rel);
       }
       named.add(rel);
-      for (const t of trades(c, c.ranking.sweep, files, read)) named.add(t);
+      for (const t of trades(c, c.ranking.sweep, files, read, only)) named.add(t);
     }
   }
   for (const rel of files) need(named.has(rel), `contest file named by no contest: ${rel}`);

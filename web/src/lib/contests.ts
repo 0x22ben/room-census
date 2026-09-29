@@ -54,7 +54,9 @@ export type Contest = {
   latest?: { sweep: number; at: string; owners: number; price: string; price_time: string; price_age_s: number };
   series?: SeriesPoint[];
   leaderboard?: { sweep: number; at: string; rows: LeaderRow[] };
-  ranking?: { sweep: number; traders: number; file: string };
+  /** where the trades files of the signed keys are (`file` names the summary next to them); `traders`, the
+   * keys of our recount, is no longer published since ranking v3 (Ben, 2026-09-30) */
+  ranking?: { sweep: number; traders?: number; file: string };
   checks: Check[];
   self_key?: { did: string; registration: { room: string; seq: number; at: string } | null; mint: "confirmed" | "not_established"; settled_trade: boolean };
 };
