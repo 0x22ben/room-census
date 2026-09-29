@@ -19,8 +19,9 @@ REPO = Path(__file__).resolve().parent.parent
 WEB = REPO / "web"
 DIST = WEB / "dist"
 DOMAIN = "https://roomcensus.xyz"
-PAGE_CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; "
-            "base-uri 'none'; form-action 'none'; object-src 'none'")
+# every page counts its views with GoatCounter (src/scripts/count.ts): the path only, no cookie
+PAGE_CSP = ("default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
+            f"connect-src 'self' {contract.GOATCOUNTER}; base-uri 'none'; form-action 'none'; object-src 'none'")
 # My DID and Verify are the only pages that may connect out, and only to Technocore's public read API
 DID_CSP = PAGE_CSP.replace("connect-src 'self'", "connect-src 'self' https://technocore.chat")
 CONNECTS = ("/did/", "/verify/")
@@ -308,7 +309,8 @@ class Artifact(unittest.TestCase):
         self.assertIn(f'{round(latest["summary"]["repetitive_share"] * 100)}%', text)
 
     def test_scripts_are_external_modules_and_only_where_needed(self):
-        """Charts and the room filters need script; every other page works without any."""
+        """Charts and the room filters need script; every other page works without any. Every page also
+        loads the page-view counter (src/scripts/count.ts), which nothing on the page depends on."""
         for page in self.html_pages():
             text = page.read_text(encoding="utf-8")
             scripts = re.findall(r"<script\b([^>]*)>", text)
@@ -319,7 +321,11 @@ class Artifact(unittest.TestCase):
                                                        "data-verify-summary ", "data-wizard ", "data-find-did ",
                                                        "data-trading-chart=", "data-did-page ", "data-did-switcher ",
                                                        "data-rankings "))
-                self.assertEqual(len(scripts), needed)
+                self.assertEqual(len(scripts), needed + 1)
+                srcs = re.findall(r'<script\b[^>]*\bsrc="(/_astro/[\w.-]+\.js)"', text)
+                bundles = [(DIST / src.lstrip("/")).read_text(encoding="utf-8") for src in srcs]
+                self.assertTrue(any(f"`{contract.GOATCOUNTER}`" in js and "/count?p=${encodeURIComponent(location.pathname)}" in js
+                                    for js in bundles), "the page-view counter, sending the path only")
 
     def test_the_built_site_meets_the_legacy_route_contract(self):
         """Same routes, anchors, data files and link integrity as the legacy site, at the domain root."""
@@ -513,7 +519,7 @@ class Artifact(unittest.TestCase):
                 with self.subTest(page=self.route(page)):
                     csp = contract.parse(page).csp or ""
                     self.assertNotIn("technocore.chat", csp)
-                    self.assertIn(contract.csp_directives(csp).get("connect-src"), (["'self'"], ["'self'", CONTEST_FILES]))
+                    self.assertIn(contract.csp_directives(csp).get("connect-src"), (["'self'", contract.GOATCOUNTER], ["'self'", CONTEST_FILES, contract.GOATCOUNTER]))
 
     def test_only_pages_that_look_a_did_up_may_read_the_contest_files(self):
         """Exactly the pages whose script reads the shards name their one path, and each such element says

@@ -1,5 +1,7 @@
 // Site-wide constants: identity, navigation and the Content-Security-Policy every page carries.
 import { RAW_REPOSITORY } from "./contest-files.mjs";
+// page views are counted there (src/scripts/count.ts): the page's path only, no cookie, no referrer
+import { GOATCOUNTER } from "./goatcounter.mjs";
 
 export const SITE_NAME = "Room Census";
 export const REPOSITORY = "https://github.com/0x22ben/room-census";
@@ -10,7 +12,7 @@ const policy = (connect: string) => [
   "img-src 'self' data:",
   "style-src 'self'",
   "script-src 'self'",
-  `connect-src ${connect}`,
+  `connect-src ${connect} ${GOATCOUNTER}`,
   "base-uri 'none'",
   "form-action 'none'",
   "object-src 'none'",

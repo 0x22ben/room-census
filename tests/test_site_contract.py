@@ -137,6 +137,20 @@ class Regressions(unittest.TestCase):
         page.write_text(text.replace("connect-src 'self'", f"connect-src 'self' {contract.CONTEST_FILES}", 1), encoding="utf-8", newline="\n")
         self.assertReported(f"{route}: missing or weakened Content-Security-Policy")
 
+    def test_goatcounter_is_the_one_statistics_origin_and_only_for_connect_src(self):
+        strict = ("default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; "
+                  "base-uri 'none'; form-action 'none'; object-src 'none'")
+        counted = strict.replace("connect-src 'self'", f"connect-src 'self' {contract.GOATCOUNTER}")
+        self.assertIsNone(contract.csp_problem(counted))
+        self.assertIsNone(contract.csp_problem(counted, reads_technocore=True))
+        self.assertIsNone(contract.csp_problem(counted.replace(contract.GOATCOUNTER, f"{contract.CONTEST_FILES} {contract.GOATCOUNTER}"),
+                                               reads_contest_files=True))
+        self.assertIsNotNone(contract.csp_problem(counted.replace(contract.GOATCOUNTER, "https://someone.goatcounter.com")))
+        self.assertIsNotNone(contract.csp_problem(counted.replace(contract.GOATCOUNTER, "https://goatcounter.com")))
+        self.assertIsNotNone(contract.csp_problem(counted.replace("connect-src 'self' ", "connect-src ")))
+        self.assertIsNotNone(contract.csp_problem(counted.replace("script-src 'self'", f"script-src 'self' {contract.GOATCOUNTER}")))
+        self.assertIsNotNone(contract.csp_problem(counted.replace("img-src 'self' data:", f"img-src 'self' data: {contract.GOATCOUNTER}")))
+
     def test_the_contest_files_policy_never_drops_self_or_opens_other_directives(self):
         strict = ("default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; "
                   "base-uri 'none'; form-action 'none'; object-src 'none'")

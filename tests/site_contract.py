@@ -38,12 +38,15 @@ MANIFEST = re.compile(r"^data/manifests/[0-9a-f]{64}\.json$")
 ANCHORS = {"/": ("rooms", "trust", "method"), "/rooms/<slug>/": ("history",)}
 # directives every page must carry exactly: scripts only from the site itself, nothing embedded
 CSP_REQUIRED = {"default-src": ["'self'"], "script-src": ["'self'"], "object-src": ["'none'"], "base-uri": ["'none'"],
-                "connect-src": ["'self'"], "form-action": ["'none'"]}
+                "form-action": ["'none'"]}
 # the only sources any directive may list: no host, scheme wildcard or other origin anywhere
 # ('unsafe-inline' only for the legacy styles, data: only for inline images such as the favicon)
 CSP_ALLOWED = {"style-src": {"'self'", "'unsafe-inline'"}, "img-src": {"'self'", "data:"}}
 # the one origin a page may reach, and only a page that shows or writes to a room
 TECHNOCORE = "https://technocore.chat"
+# the one origin every page may reach: GoatCounter counts page views there (the path only, no cookie;
+# Ben, 2026-09-29), and no other statistics service is allowed
+GOATCOUNTER = "https://roomcensus.goatcounter.com"
 # the one path a page that looks a DID up in a contest may read: the contest shards of this repository,
 # served at a contest-data commit by raw.githubusercontent.com (never the whole host)
 CONTEST_FILES = "https://raw.githubusercontent.com/0x22ben/room-census/"
@@ -119,19 +122,18 @@ def csp_problem(policy, reads_technocore=False, reads_contest_files=False):
     A page that shows a room live, or that writes to one, reads technocore.chat from the browser, so
     its connect-src names that one origin. A page that looks a DID up in a contest (the account menu of
     the top bar, Find my DID, a trader's page, My DIDs) reads the contest shards, so its connect-src
-    names the one path CONTEST_FILES. Everywhere else connect-src stays 'self', and no other directive
-    may name a host on any page.
+    names the one path CONTEST_FILES. Every page may also reach GOATCOUNTER, which counts page views.
+    Nothing else: connect-src names 'self' and those sources only, and no other directive may name a
+    host on any page.
     """
     d = csp_directives(policy)
     allowed = dict(CSP_ALLOWED)
     required = dict(CSP_REQUIRED)
     reachable = ({TECHNOCORE} if reads_technocore else set()) | ({CONTEST_FILES} if reads_contest_files else set())
-    if reachable:
-        # those sources become possible, never required: a page that reads neither keeps 'self'
-        required.pop("connect-src")
-        allowed["connect-src"] = {"'self'"} | reachable
-        if "'self'" not in d.get("connect-src", []):
-            return f"connect-src is {d.get('connect-src')}"
+    # those sources become possible, never required: a page that reads none of them keeps 'self'
+    allowed["connect-src"] = {"'self'", GOATCOUNTER} | reachable
+    if "'self'" not in d.get("connect-src", []):
+        return f"connect-src is {d.get('connect-src')}"
     for name, sources in required.items():
         if d.get(name) != sources:
             return f"{name} is {d.get(name)}"
