@@ -40,6 +40,7 @@ async function shot(name, width = 1440) {
 }
 
 async function find(did) {
+  await until(`document.querySelector("[data-find-did]")?.dataset.ready !== undefined`, "the search to be ready");
   await page(`(() => { const i = document.querySelector("#find-input"); i.value = ${JSON.stringify(did)};
     document.querySelector("[data-find-form]").requestSubmit(); return true; })()`);
   await until(`document.querySelector("[data-find-result]").textContent.length > 0`, "a Find my DID result");
@@ -107,6 +108,7 @@ test("the old leaderboard address lands on the Live page", { skip }, async () =>
 /** Searches a ranked key: the trader page opens, and its rank is read there. */
 async function openFromSearch(did) {
   await navigate("/contests/close-1/");
+  await until(`document.querySelector("[data-find-did]")?.dataset.ready !== undefined`, "the search to be ready");
   await page(`(() => { const i = document.querySelector("#find-input"); i.value = ${JSON.stringify(did)};
     document.querySelector("[data-find-form]").requestSubmit(); return true; })()`);
   await until(`location.pathname === "/contests/close-1/did/"`, "the trader page");

@@ -91,6 +91,7 @@ function init(root: HTMLElement) {
     if (signedLine(signed, did)) location.assign(`${location.pathname.replace(/\/?$/, "/")}did/?k=${encodeURIComponent(did)}`);
     else out.append(notSigned(signed.length, root.dataset.lock, glyph()));
   });
+  root.dataset.ready = "";                                  // the search answers from here on (tests wait for it)
 }
 
 document.querySelectorAll<HTMLElement>("[data-find-did]").forEach(init);
