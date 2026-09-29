@@ -3,8 +3,10 @@
 // reader shares the picture through the system share sheet, or downloads it and posts it themselves.
 
 export type Card = {
-  did: string; score: number; rank: number; traders: number; contest: string; sweep: number;
-  position?: string; line?: number; prices: number[]; official?: boolean;
+  /** players: the registered players the referee signed at the same update as the rank, left out when
+   * that update has none (the traders of our recount return once it is proved) */
+  did: string; score: number; rank: number; players?: number; contest: string; sweep: number;
+  line?: number; prices: number[]; official?: boolean;
   /** how many trades the key made, and what its best one realized (the tiles of mockup CZ6BX) */
   trades?: number; best?: number;
   /** what the curve shows: the NVDA price by default, or the key's own score */
@@ -112,15 +114,15 @@ export async function drawCard(card: Card): Promise<Blob> {
 
   // rank
   const rank = `#${n(card.rank)}`;
-  const of = `of ${n(card.traders)} traders`;
+  const of = card.players !== undefined ? `of ${n(card.players)} players` : "";
   ctx.font = mono(31, true);
   const rw = ctx.measureText(rank).width;
   ctx.font = mono(20, true);
-  const ow = ctx.measureText(of).width;
-  box(ctx, 64, 416, 16 + 24 + 12 + rw + 12 + ow + 16, 60, 10, up ? "#0e2622" : "#2a1518");
+  const ow = of ? 12 + ctx.measureText(of).width : 0;
+  box(ctx, 64, 416, 16 + 24 + 12 + rw + ow + 16, 60, 10, up ? "#0e2622" : "#2a1518");
   icon(ctx, "crown", 80, 434, 24, C.gold);
   text(ctx, rank, 116, 457, mono(31, true), C.text);
-  text(ctx, of, 116 + rw + 12, 454, mono(20, true), C.muted);
+  if (of) text(ctx, of, 116 + rw + 12, 454, mono(20, true), C.muted);
 
   // NVDA over the contest, on the right
   const cx = 664, cy = 175, cwid = 472, ch = 230;
@@ -152,14 +154,13 @@ export async function drawCard(card: Card): Promise<Blob> {
     ctx.restore();
   }
 
-  // three facts under the chart, as in mockup CZ6BX: trades, best trade, open position
-  const [side, qty] = (card.position ?? "").split(" ");
+  // two facts under the chart (mockup CZ6BX had a third, the open position: not signed by the referee,
+  // so left out until our recount is proved, Ben 2026-09-29): trades and best trade
   const facts: [keyof typeof ICON, string, string, string, string][] = [
     ["coins", "Trades", card.trades !== undefined ? n(card.trades) : "-", C.text, C.up],
     ["fire", "Best", card.best !== undefined ? signed(card.best) : "-", C.text, C.gold],
-    ["chart", side && qty ? side : "Position", qty ?? side ?? "-", C.text, side === "Short" ? C.down : C.up],
   ];
-  const fw = (cwid - 24) / 3;
+  const fw = (cwid - 12 * (facts.length - 1)) / facts.length;
   facts.forEach(([ic, label, value, color, tint], i) => {
     const fx = cx + i * (fw + 12);
     box(ctx, fx, 421, fw, 90, 10, C.surface, C.border);
@@ -201,7 +202,7 @@ function download(blob: Blob, name: string) {
  * after, still within the click's grace time; if the browser blocks it anyway, the reader gets a link.
  * Must be called inside the click. Returns the address of the post on X. */
 export function shareOnX(card: Card, pageUrl: string, blob: Promise<Blob>, told: (how: "copied" | "downloaded" | "failed", opened: boolean) => void): string {
-  const post = `${card.mine === false ? "Score" : "My score"} in ${card.contest.replace(" · ", " ")}: ${signed(card.score)} POLF, #${n(card.rank)} of ${n(card.traders)} traders${card.official ? ", signed by the referee" : " (Room Census recount)"}.`;
+  const post = `${card.mine === false ? "Score" : "My score"} in ${card.contest.replace(" · ", " ")}: ${signed(card.score)} POLF, #${n(card.rank)}${card.players !== undefined ? ` of ${n(card.players)} players` : ""}${card.official ? ", signed by the referee" : " (Room Census recount)"}.`;
   const intent = `https://x.com/intent/post?text=${encodeURIComponent(post)}&url=${encodeURIComponent(pageUrl)}`;
   const name = `room-census-${card.did.slice(-8)}.png`;
   let done = false;

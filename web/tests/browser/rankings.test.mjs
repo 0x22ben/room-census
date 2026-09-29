@@ -1,15 +1,19 @@
-// Rankings (beta) and the saved-DIDs switcher in a real headless browser: the page says it is beta and
-// unofficial, shows a podium and the first hundred, pins a searched DID; a DID saved in the top bar is
-// pinned too, marked on the trader page, and forgotten on demand.
+// Rankings (beta) and the saved-DIDs switcher in a real headless browser: the page is paused until our
+// recount is proved and shows no ranking (Ben, 2026-09-29: never show a wrong figure); a DID saved in
+// the top bar is marked on the trader page and forgotten on demand; My DIDs ranks only the keys of the
+// referee's signed top list.
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 
 import { DIST, navigate, page, send, skip, start, stop, until } from "./harness.mjs";
 
 const doc = JSON.parse(readFileSync(join(DIST, "rankings", "ranking.json"), "utf8"));
-const NOBODY = "did:key:z6Mkfw79DoBMgePecy4YaXSSimwzHKYz8sB3JB9X7bKSXMkG";
+// the referee's signed top list of the live contest: the only ranks and scores the saved DIDs show
+const INDEX = join(DIST, "data", "contests", "index.json");
+const contests = JSON.parse(readFileSync(existsSync(INDEX) ? INDEX : join(DIST, "..", "src", "fixtures", "contests.sample.json"), "utf8"));
+const signedRows = contests.contests.find((c) => c.id === "close-1").leaderboard.rows;
 
 async function shot(name, width = 1440) {
   if (!process.env.SHOT_DIR) return;
@@ -25,40 +29,21 @@ async function shot(name, width = 1440) {
 before(start);
 after(stop);
 
-test("rankings say beta and unofficial, and show a podium and the first hundred", { skip }, async () => {
+test("rankings are paused until our recount is proved, and show no ranking", { skip }, async () => {
   await navigate("/rankings/");
-  const head = await page(`document.querySelector("main").textContent`);
-  assert.match(head, /BETA/);
-  assert.match(head, /Unofficial\. Made by Room Census, not by FLOP Labs\./);
-  // a shared first place stands on one step, every DID of it (Sonnet: the 4 writers of the winning poem)
-  const first = doc.rows.filter((r) => r[0] === 1).length;
-  assert.equal(await page(`document.querySelectorAll("[data-podium] svg[viewBox='0 0 5 5']").length`), first > 1 ? first : Math.min(3, doc.rows.length));
-  if (first > 1) assert.match(await page(`document.querySelector("[data-podium]").textContent`), /MARAGUNG-FLOP|maragung-flop/i);
-  // every line says why FLOP Labs paid it; a long tie shows three lines and how many more share it
-  const lines = await page(`[...document.querySelectorAll("[data-rankings] tbody:not([data-pinned]) tr[data-did]")].map((tr) => [tr.dataset.did, tr.textContent])`);
-  assert.ok(lines.length > 0 && lines.length <= 100);
-  lines.forEach(([did, text], i) => {
-    assert.equal(did, doc.rows[i][1]);
-    assert.match(text, /Wrote the poem|Voted for the winner/);
-  });
-  const more = await page(`[...document.querySelectorAll("[data-rankings] tr[data-more]")].map((tr) => tr.textContent.trim())`);
-  const ties = Object.values(Object.groupBy(doc.rows, (r) => r[0])).filter((g) => g.length > 10);
-  if (ties.length) assert.ok(more[0].startsWith(`+ ${(ties[0].length - 3).toLocaleString("en-US")} more DIDs at #${ties[0][0][0]}`), more[0]);
-  assert.ok(doc.rows.every((r, i) => i === 0 || r[2] <= doc.rows[i - 1][2]), "sorted by FLOP");
-  await shot("rankings");
+  const main = await page(`document.querySelector("main").textContent`);
+  assert.match(main, /BETA/);
+  assert.match(main, /Unofficial\. Made by Room Census, not by FLOP Labs\./);
+  assert.match(main, /Paused: the ranking returns once our recount is proved\./);
+  // no podium, no table, no search, no DID
+  assert.equal(await page(`document.querySelectorAll("main table, main form, [data-podium], [data-rankings]").length`), 0);
+  assert.doesNotMatch(main, /z6Mk[1-9A-HJ-NP-Za-km-z]{44}|\d FLOP/);
+  // the sidebar still leads here, marked as the current page
+  assert.equal(await page(`document.querySelector('nav[aria-label="Primary"] a[aria-current="page"]').getAttribute("href")`), "/rankings/");
+  await shot("rankings-paused");
 });
 
-test("a searched DID is pinned with its rank, and a DID with no FLOP is told so", { skip }, async () => {
-  await navigate("/rankings/");
-  const [rank, did] = doc.rows[doc.rows.length - 1];
-  await page(`(() => { document.querySelector("#rank-input").value = ${JSON.stringify(did)}; document.querySelector("[data-rank-form]").requestSubmit(); return true; })()`);
-  await until(`document.querySelector("[data-pinned] tr") !== null`, "the pinned row");
-  assert.equal(await page(`document.querySelector("[data-pinned] tr td").textContent`), String(rank));
-  await page(`(() => { document.querySelector("#rank-input").value = ${JSON.stringify(NOBODY)}; document.querySelector("[data-rank-form]").requestSubmit(); return true; })()`);
-  await until(`/0 FLOP/.test(document.querySelector("[data-rank-result]").textContent)`, "the no-FLOP answer");
-});
-
-test("a DID signed in from the top bar shows everywhere and can be forgotten", { skip }, async () => {
+test("a DID signed in from the top bar is marked on its trader page and can be forgotten", { skip }, async () => {
   const [, did] = doc.rows[0];
   await navigate("/rankings/");
   await page(`localStorage.clear()`);
@@ -67,14 +52,14 @@ test("a DID signed in from the top bar shows everywhere and can be forgotten", {
   await page(`(() => { document.querySelector("[popovertarget=did-menu]").click(); document.querySelector("[data-sw-did]").value = ${JSON.stringify(did)};
     document.querySelector("[data-sw-form]").requestSubmit(); return true; })()`);
   await until(`document.querySelector("[data-sw-nick]").textContent === "main"`, "the saved DID in the top bar");
-  await until(`[...document.querySelectorAll("[data-pinned] tr")].some((tr) => tr.dataset.pinned === ${JSON.stringify(did)})`, "the pinned saved DID");
-  await shot("rankings-saved");
+  // a rank cached by an earlier version of the site: it names the DID, so it goes with it
+  await page(`(() => { localStorage.setItem("roomcensus.saved.ranks", JSON.stringify({ ${JSON.stringify(did)}: { at: Date.now(), r: { rank: 7, pnl: "1.00" } } })); return true; })()`);
   await navigate(`/contests/close-1/did/?k=${did}`);
   await until(`document.querySelector("[data-save]").getAttribute("aria-pressed") === "true"`, "Saved on the trader page");
   await page(`document.querySelector("[data-save]").click()`);
   await until(`document.querySelector("[data-sw-nick]").textContent === "Sign in"`, "the DID removed everywhere");
   assert.equal(await page(`localStorage.getItem("roomcensus.saved")`), "[]");
-  assert.ok(!(await page(`localStorage.getItem("roomcensus.saved.ranks") ?? ""`)).includes(did), "its cached rank is gone too");
+  assert.equal(await page(`localStorage.getItem("roomcensus.saved.ranks")`), "{}", "its cached rank is gone too");
 });
 
 test("My DIDs adds many at once, renames, switches and removes", { skip }, async () => {
@@ -88,6 +73,12 @@ test("My DIDs adds many at once, renames, switches and removes", { skip }, async
   await page(`(() => { document.querySelector("[data-md-add]").requestSubmit(); return true; })()`);
   await until(`document.querySelectorAll("[data-md-list] tr").length === 2`, "the two rows");
   assert.match(await page(`document.querySelector("[data-md-hint]").textContent`), /2 DIDs added\. 1 not a did:key\./);
+  // a rank and a score only for a key of the signed top list; any other: "–", not verified
+  for (const did of [a, b]) {
+    const line = signedRows.find((r) => r.did === did);
+    const cells = await page(`[...document.querySelector('[data-md-list] tr[data-did="${did}"]').children].slice(1, 3).map((td) => td.textContent)`);
+    assert.deepEqual(cells, line ? [`#${line.rank}`, Number(line.pnl) > 0 ? `+${line.pnl}` : line.pnl] : ["–", "not verified"]);
+  }
   assert.equal(await page(`document.querySelector("[data-md-input]").value`), "not-a-did");
   assert.equal(await page(`document.querySelector("[data-md-count]").textContent`), "2");
   assert.equal(await page(`document.querySelector("[data-sw-nick]").textContent`), "main");
@@ -103,6 +94,20 @@ test("My DIDs adds many at once, renames, switches and removes", { skip }, async
   await page(`document.querySelector("[data-md-list] tr [aria-label^=Remove]").click()`);
   await until(`document.querySelectorAll("[data-md-list] tr").length === 1`, "one row left");
   assert.equal(await page(`document.querySelector("[data-sw-nick]").textContent`), "main");
+});
+
+test("the account menu ranks a key of the signed top list, and shows any other as not verified", { skip }, async () => {
+  const { rank, did, pnl } = signedRows[0];
+  const other = doc.rows.map((r) => r[1]).find((d) => !signedRows.some((r) => r.did === d));
+  await navigate("/my-dids/");
+  await page(`(() => { localStorage.clear(); localStorage.setItem("roomcensus.saved", JSON.stringify([{ did: ${JSON.stringify(did)}, nick: "main" }, { did: ${JSON.stringify(other)}, nick: "alpha" }])); return true; })()`);
+  await navigate("/my-dids/");
+  await until(`document.querySelector("[data-sw-nick]").textContent === "main"`, "the saved DID in the top bar");
+  assert.equal(await page(`document.querySelector("[data-sw-rank]").textContent`), `#${rank}`);
+  assert.equal(await page(`document.querySelector("[data-sw-me-rank]").textContent`), `#${rank}`);
+  assert.equal(await page(`document.querySelector("[data-sw-me-pnl]").textContent`), Number(pnl) > 0 ? `+${pnl}` : pnl);
+  assert.deepEqual(await page(`[...document.querySelectorAll("[data-sw-list] button > span:last-child span")].map((x) => x.textContent)`), ["–", "not verified"]);
+  await page(`localStorage.clear()`);
 });
 
 test("switching DID on a trades page opens the new DID's trades", { skip }, async () => {

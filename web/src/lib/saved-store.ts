@@ -3,7 +3,8 @@
 // anything malformed is ignored, and storage errors leave the page working without memory.
 const SAVED = "roomcensus.saved";
 const ACTIVE = "roomcensus.saved.active";
-// ranks of the saved DIDs, cached by the top-bar switcher; forgotten with the DIDs
+// ranks of the saved DIDs, cached by earlier versions of the top-bar switcher: nothing writes them any
+// more, but a visitor's browser may still hold them, and they name DIDs, so they go with the DIDs
 export const RANKS = "roomcensus.saved.ranks";
 const DID = /^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]{44}$/;
 const NICK = /^[\p{L}\p{N} ._-]{1,20}$/u;

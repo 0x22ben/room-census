@@ -2,7 +2,7 @@
 // Everything goes through saved-store (this browser only); every change redraws the page and the top bar.
 import { avatarSvg } from "../lib/avatar.mjs";
 import { active, isDid, remove, rename, save, saved, setActive, type Saved } from "../lib/saved-store";
-import { filesOf, type Signed } from "./ranking-lookup";
+import type { Signed } from "./ranking-lookup";
 import { pnlText, pnlTone, rankText, ranker, short } from "./saved-ranks";
 
 function el(tag: string, cls: string, text?: string): HTMLElement {
@@ -16,7 +16,7 @@ const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
 function init(root: HTMLElement) {
   const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
-  const rankOf = ranker(filesOf(root), JSON.parse(root.dataset.signed ?? "[]") as Signed[]);
+  const rankOf = ranker(JSON.parse(root.dataset.signed ?? "[]") as Signed[]);
   const contestId = root.dataset.contest;
   const max = Number(root.dataset.max);
   const icons = document.querySelector<HTMLTemplateElement>("[data-md-icons]")!.content;
@@ -99,9 +99,10 @@ function init(root: HTMLElement) {
     box.append(names);
     who.append(box);
 
-    const rank = el("td", "px-4 py-2.5 text-right font-mono font-semibold", "…");
-    const pnl = el("td", "px-4 py-2.5 text-right font-mono text-text-muted", "");
-    rankOf(s.did).then((r) => { rank.textContent = rankText(r); pnl.textContent = pnlText(r); pnl.className = `px-4 py-2.5 text-right font-mono ${pnlTone(r)}`; });
+    // a rank and a score only for a key of the referee's signed top list; any other: "–", not verified
+    const r = rankOf(s.did);
+    const rank = el("td", "px-4 py-2.5 text-right font-mono font-semibold", rankText(r));
+    const pnl = el("td", `px-4 py-2.5 text-right font-mono ${pnlTone(r)}`, pnlText(r));
 
     const act = el("td", "px-4 py-2.5");
     const acts = el("div", "flex items-center justify-end gap-2");

@@ -1,13 +1,14 @@
 ---
 // A contest, live: five numbers, the chart, "Find my DID" and the referee's signed top list checked by
-// our recount. Keys that never traded are not ranked; searching one says so. Room Census builds no
-// ranking of its own beyond what the recount of signed trades gives.
+// our recount. Until our recount can be proved against the referee's signed hashes, a rank or a score
+// shows only for what the referee signs itself: its top list, the price, the registered players and
+// its settled and void counts (Ben, 2026-09-29: never show a wrong figure).
 import Base from "../../../layouts/Base.astro";
 import ContestHeader from "../../../components/ContestHeader.astro";
 import Help from "../../../components/Help.astro";
 import Px from "../../../components/Px.astro";
 import TradingChart, { type View } from "../../../components/TradingChart.astro";
-import { SHARDS_BASE, change, contests, countdown, phaseOf, positionParts, shortDid, signed, sparklines, tabs, topTraders, type Contest } from "../../../lib/contests";
+import { change, contests, countdown, phaseOf, shortDid, signed, signedRows, sparklines, tabs, topTraders, type Contest } from "../../../lib/contests";
 
 export function getStaticPaths() {
   return contests().map((c) => ({ params: { id: c.id }, props: { contest: c } }));
@@ -31,30 +32,25 @@ if (s.length) {
     { label: "#1 score", token: "--color-accent", values: s.map((p) => num(p.top)) },
     ...(has("line") ? [{ label: "Prize line", token: "--color-warning", values: s.map((p) => num(p.line)), dashed: true }] : []),
   ] });
-  if (has("long")) views.push({ id: "sides", label: "Long / Short", min: 0, series: [
-    { label: "Long", token: "--color-accent", values: s.map((p) => p.long ?? null) },
-    { label: "Short", token: "--color-down", values: s.map((p) => p.short ?? null) },
-  ] });
-  views.push(has("active")
-    ? { id: "traders", label: "Traders", min: 0, series: [{ label: "Active traders", token: "--color-accent", values: s.map((p) => p.active ?? null) }] }
-    : { id: "players", label: "Players", min: 0, series: [{ label: "Registered players", token: "--color-accent", values: s.map((p) => p.owners) }] });
+  // the long, short and active series come from our recount: they return once it is proved
+  views.push({ id: "players", label: "Players", min: 0, series: [{ label: "Registered players", token: "--color-accent", values: s.map((p) => p.owners) }] });
 }
 
 const price = c.latest?.price;
 const move = change(s[0]?.price, price);
-const actives = s.map((p) => p.active).filter((v): v is number => v !== undefined);
-const traders = c.ranking?.traders;
-const hourAgo = actives.length > 12 ? actives[actives.length - 1] - actives[actives.length - 13] : undefined;
-const top = topTraders(c, 100);
+// the registered players, signed by the referee at each update (12 updates of 5 minutes: one hour)
+const owners = s.map((p) => p.owners);
+const players = c.latest?.owners;
+const hourAgo = owners.length > 12 ? owners[owners.length - 1] - owners[owners.length - 13] : undefined;
+const top = topTraders(c);
 const sparks = sparklines(c, top);
-const withPosition = top.some((r) => r.position !== undefined);
 const prizeN = Number(c.prize.replace(/[^0-9]/g, ""));
 const clock = phase === "live" ? { label: "Locks in", value: countdown(c.trading_lock_at) }
   : phase === "closed" && c.final_price_at ? { label: "Final price in", value: countdown(c.final_price_at) }
   : phase === "upcoming" ? { label: "Starts in", value: countdown(c.opening) } : { label: "Ended", value: "Final" };
 const cells = [
   { icon: "chart-line", tone: "accent", label: "NVDA", value: price ? price : "–", delta: move, deltaTone: move?.startsWith("−") ? "text-down" : "text-accent" },
-  { icon: "users", tone: "accent", label: "Active traders", value: traders !== undefined ? traders.toLocaleString("en-US") : "–",
+  { icon: "users", tone: "accent", label: "Registered players", value: players !== undefined ? players.toLocaleString("en-US") : "–",
     delta: hourAgo !== undefined ? `${hourAgo >= 0 ? "+" : "−"}${compact(Math.abs(hourAgo))} 1h` : undefined, deltaTone: "text-accent" },
   { icon: "crown", tone: "warning", label: "#1 score", value: lb?.rows[0] ? signed(lb.rows[0].pnl) : "–", delta: lb?.rows[0] ? "POLF" : undefined, deltaTone: "text-text-muted", valueTone: "text-accent" },
   { icon: "trophy", tone: "warning", label: "Prize · top 3", value: prizeN ? compact(prizeN) : c.prize, delta: "FLOP", deltaTone: "text-text-muted" },
@@ -63,7 +59,7 @@ const cells = [
 const tile = { accent: "bg-accent-soft text-accent", warning: "bg-warning-soft text-warning" } as const;
 const current = tabs(c)[0].label;
 ---
-<Base title={`${c.title}: live leaderboard and PnL`} description={`${c.title}, live: price, active traders, the referee's signed top list and our recount, and every trader's page.`}>
+<Base title={`${c.title}: live leaderboard and PnL`} description={`${c.title}, live: price, registered players and the referee's signed top list, each key of it with its own page.`}>
   <ContestHeader contest={c} current={current} />
 
   {c.latest ? (
@@ -96,8 +92,8 @@ const current = tabs(c)[0].label;
 
       {c.ranking && (
         <section aria-labelledby="find-title" class="grid content-start gap-3 rounded-xl border border-border bg-surface p-4 sm:p-5"
-          data-find-did data-url={c.ranking.file} data-shards={SHARDS_BASE}
-          data-signed={JSON.stringify((lb?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check })))}
+          data-find-did
+          data-signed={JSON.stringify(signedRows(c))}
           data-lock={phase === "live" ? countdown(c.trading_lock_at) : undefined}>
           <h2 id="find-title" class="flex items-center gap-2 font-semibold"><Px name="search" size={24} class="text-accent" />Find my DID</h2>
           <div class="grid gap-1">
@@ -110,7 +106,8 @@ const current = tabs(c)[0].label;
             <button type="submit" class="min-h-8 rounded-md bg-accent px-3 text-sm font-semibold text-on-accent">Find</button>
           </form>
           <div data-find-result aria-live="polite"></div>
-          <noscript><p class="text-sm text-text-muted">Searching needs JavaScript. The full ranking is also a file: <a class="text-link" href={c.ranking.file}>ranking.json</a>.</p></noscript>
+          <template data-find-icon><Px name="circle-question" size={24} /></template>
+          <noscript><p class="text-sm text-text-muted">Searching needs JavaScript.</p></noscript>
         </section>
       )}
     </div>
@@ -120,8 +117,7 @@ const current = tabs(c)[0].label;
     <section aria-labelledby="top-title" class="mt-4 overflow-hidden rounded-xl border border-border bg-surface">
       <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3.5 sm:px-5">
         <h2 id="top-title" class="flex items-center gap-2 font-semibold"><Px name="trending-up" size={24} class="text-accent" />Top {top.length}
-          <Help term="Top traders" text="The first places are the referee's signed top list, with our check next to each score. The next places come from our recount of the signed trades. Keys with equal scores share the places they span." /></h2>
-        {traders !== undefined && <p class="font-mono text-xs text-text-muted">{traders.toLocaleString("en-US")} active</p>}
+          <Help term="Top traders" text="The referee's signed top list, with its ranks and signed scores, and our check next to each score. The places after it come back once our recount can be proved against the referee's signed records. Keys with equal scores share the places they span." /></h2>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
@@ -130,51 +126,43 @@ const current = tabs(c)[0].label;
               <th scope="col" class="w-16 px-4 py-2 font-semibold sm:px-5">#</th>
               <th scope="col" class="px-4 py-2 font-semibold">Trader</th>
               <th scope="col" class="px-4 py-2 text-right font-semibold">Score</th>
-              {withPosition && <th scope="col" class="hidden px-4 py-2 font-semibold sm:table-cell">Position</th>}
               {sparks.size > 0 && <th scope="col" class="hidden px-4 py-2 font-semibold md:table-cell">24h</th>}
               <th scope="col" class="w-12 px-4 py-2 sm:px-5"><span class="sr-only">Source</span></th>
               <th scope="col" class="w-8 pr-4 sm:pr-5"><span class="sr-only">Open</span></th>
             </tr>
           </thead>
           <tbody>
-            {top.map(({ rank, did, pnl, source, check, position }) => {
-              const pos = positionParts(position);
-              const side = pos?.side === "Short" ? "text-down" : pos?.side === "Flat" ? "text-text-muted" : "text-accent";
-              return (
-                <tr class:list={["relative border-t border-border transition-colors hover:bg-surface-raised focus-within:bg-surface-raised", rank <= 3 && "bg-accent-soft/40"]}>
-                  <td class="px-4 py-2.5 sm:px-5">
-                    <span class:list={["inline-flex items-center gap-1.5 font-mono", rank <= 3 ? "font-bold text-text" : "text-text-secondary"]}>
-                      {rank === 1 && <Px name="crown" size={12} class="text-warning" label="First place" />}{rank}
-                    </span>
+            {top.map(({ rank, did, pnl, check }) => (
+              <tr class:list={["relative border-t border-border transition-colors hover:bg-surface-raised focus-within:bg-surface-raised", rank <= 3 && "bg-accent-soft/40"]}>
+                <td class="px-4 py-2.5 sm:px-5">
+                  <span class:list={["inline-flex items-center gap-1.5 font-mono", rank <= 3 ? "font-bold text-text" : "text-text-secondary"]}>
+                    {rank === 1 && <Px name="crown" size={12} class="text-warning" label="First place" />}{rank}
+                  </span>
+                </td>
+                <td class="px-4 py-2.5">
+                  {/* the whole row opens the trader's page: the link covers it */}
+                  <a class="font-mono text-text no-underline outline-none after:absolute after:inset-0 after:content-[''] focus-visible:underline" href={`/contests/${c.id}/did/?k=${did}`}
+                    aria-label={`${shortDid(did)}, rank ${rank}: open its trades`}>{shortDid(did)}</a>
+                </td>
+                <td class:list={["px-4 py-2.5 text-right font-mono font-semibold whitespace-nowrap tabular-nums", Number(pnl) < 0 ? "text-down" : "text-accent"]}>{signed(pnl)}</td>
+                {sparks.size > 0 && (
+                  <td class="hidden px-4 py-2.5 md:table-cell">
+                    {sparks.get(did) && <svg width="96" height="26" viewBox="0 0 96 26" aria-hidden="true" class:list={["block", sparks.get(did)!.up ? "text-accent" : "text-down"]}>
+                      <path d={sparks.get(did)!.d} fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>}
                   </td>
-                  <td class="px-4 py-2.5">
-                    {/* the whole row opens the trader's page: the link covers it */}
-                    <a class="font-mono text-text no-underline outline-none after:absolute after:inset-0 after:content-[''] focus-visible:underline" href={`/contests/${c.id}/did/?k=${did}`}
-                      aria-label={`${shortDid(did)}, rank ${rank}: open its trades`}>{shortDid(did)}</a>
-                    {pos && <span class:list={["mt-0.5 block font-mono text-xs sm:hidden", side]}>{pos.side} {pos.detail}</span>}
-                  </td>
-                  <td class:list={["px-4 py-2.5 text-right font-mono font-semibold whitespace-nowrap tabular-nums", Number(pnl) < 0 ? "text-down" : "text-accent"]}>{signed(pnl)}</td>
-                  {withPosition && <td class:list={["hidden px-4 py-2.5 font-mono text-xs whitespace-nowrap sm:table-cell", side]}>{pos ? `${pos.side} ${pos.detail}`.trim() : ""}</td>}
-                  {sparks.size > 0 && (
-                    <td class="hidden px-4 py-2.5 md:table-cell">
-                      {sparks.get(did) && <svg width="96" height="26" viewBox="0 0 96 26" aria-hidden="true" class:list={["block", sparks.get(did)!.up ? "text-accent" : "text-down"]}>
-                        <path d={sparks.get(did)!.d} fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" /></svg>}
-                    </td>
-                  )}
-                  <td class="px-4 py-2.5 text-right sm:px-5">
-                    {source === "signed" && check === "differs" && <Px name="warning-diamond" size={12} class="inline text-warning" label="Signed by the referee; our recount finds a different score" />}
-                    {source === "signed" && check === "pending" && <Px name="hourglass" size={12} class="inline text-text-muted" label="Signed by the referee; not checked by our recount yet" />}
-                    {source === "signed" && check === "match" && <Px name="check" size={24} class="inline text-accent" label="Signed by the referee and checked by our recount" />}
-                    {source !== "signed" && <Px name="calculator" size={12} class:list={["inline", source === "partial" ? "text-text-muted" : "text-text-secondary"]}
-                            label={source === "partial" ? "Our recount; it may miss trades from before our capture" : "Our recount of the signed trades"} />}
-                  </td>
-                  <td class="pr-4 text-right text-text-muted sm:pr-5"><Px name="chevron-right" size={12} class="inline" /></td>
-                </tr>
-              );
-            })}
+                )}
+                <td class="px-4 py-2.5 text-right sm:px-5">
+                  {check === "differs" && <Px name="warning-diamond" size={12} class="inline text-warning" label="Signed by the referee; our recount finds a different score" />}
+                  {check === "pending" && <Px name="hourglass" size={12} class="inline text-text-muted" label="Signed by the referee; not checked by our recount yet" />}
+                  {check === "match" && <Px name="check" size={24} class="inline text-accent" label="Signed by the referee and checked by our recount" />}
+                </td>
+                <td class="pr-4 text-right text-text-muted sm:pr-5"><Px name="chevron-right" size={12} class="inline" /></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
+      <p class="border-t border-border px-4 py-3.5 text-sm text-text-secondary sm:px-5" data-top-note>Top {top.length}, signed by the referee. The rest of the ranking returns once our recount is proved.</p>
     </section>
   )}
   {c.ranking && <script>import "../../../scripts/find-did.ts";</script>}

@@ -1,17 +1,16 @@
 ---
 // The visitor's account, top right of every page (Pencil mockup TwddI): "Sign in" with a DID, then the
-// active DID with its avatar, nickname and rank in the live contest, and an account menu to open its
+// active DID with its avatar, nickname and signed rank in the live contest, and an account menu to open its
 // trades, rename it, switch to another DID, add one, manage them all or sign out. There is no password
 // and nothing is signed: the DIDs stay in this browser (src/lib/saved-store.ts). The menu is a native popover.
 import Px from "./Px.astro";
-import { SHARDS_BASE, contests, phaseOf } from "../lib/contests";
+import { contests, phaseOf, signedRows } from "../lib/contests";
 
 const c = contests().find((x) => x.ranking && phaseOf(x) === "live") ?? contests().find((x) => x.ranking);
-const signed = (c?.leaderboard?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check }));
 const item = "flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm hover:bg-surface";
 const field = "min-h-10 w-full rounded-lg border border-border bg-bg px-3 text-sm outline-none placeholder:text-text-muted";
 ---
-<div data-did-switcher data-url={c?.ranking?.file} data-shards={c?.ranking && SHARDS_BASE} data-contest={c?.id} data-contest-title={c?.short} data-signed={JSON.stringify(signed)}>
+<div data-did-switcher data-contest={c?.id} data-contest-title={c?.short} data-signed={JSON.stringify(signedRows(c))}>
   <button type="button" popovertarget="did-menu" data-sw-pill class="inline-flex min-h-9 items-center gap-2 rounded-md border border-accent bg-surface-raised px-3 text-sm font-semibold text-text hover:bg-accent-soft">
     <span data-sw-avatar class="inline-flex"><Px name="user" size={12} class="text-accent" /></span>
     <span data-sw-nick>Sign in</span>

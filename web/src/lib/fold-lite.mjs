@@ -54,17 +54,18 @@ export function matchesLine(acct, line) {
   return Math.abs(held - Number(line[0])) < 0.005 && Math.abs(entry - Number(line[1])) < 0.01;
 }
 
-/** Whether a key's published trades add up to its ranking line at the ranking's sweep: every trade settled
- * by then, the same open position, and the same score at that sweep's mark (within 0.02 POLF). A position
- * check alone misses a sale and a buyback both left out. Only then may a page show numbers replayed from
- * those trades: cash, fees, a score curve, best trades (Ben, 2026-09-29: never a wrong figure). */
-export function verifiedTrades(trades, marks, sweep, pnl, line) {
+/** Whether a key's published trades add up to its signed score at the update the referee signed it:
+ * every trade settled by then, and the same score at that update's mark (within 0.02 POLF). No open
+ * position is compared: the referee signs the score, not the position. Only then may a page show
+ * numbers replayed from those trades: cash, fees, a score curve, best trades (Ben, 2026-09-29: never a
+ * wrong figure). */
+export function verifiedTrades(trades, marks, sweep, pnl) {
   if (!trades?.length || trades[trades.length - 1][0] > sweep) return false;
   const mark = marks.find((m) => m[0] === sweep);
   if (!mark) return false;
   const acct = new Account();
   for (const t of trades) acct.applyTrade(t);
-  return matchesLine(acct, line) && Math.abs(acct.value(Number(mark[1])) - MINT - Number(pnl)) <= 0.02;
+  return Math.abs(acct.value(Number(mark[1])) - MINT - Number(pnl)) <= 0.02;
 }
 
 /** Score after each mark ([sweep, price]), the trades of a sweep settling before its mark. */

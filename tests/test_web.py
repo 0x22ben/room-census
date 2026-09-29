@@ -43,6 +43,9 @@ DID_DISCLAIMER = ("This page summarizes public Technocore activity. It does not 
                   "eligibility for any reward.")
 # the wizard's own result for a signature it checked itself (ROOM_CENSUS_UX_SPEC.md, exceptions): only in the My DID script
 WIZARD_VERIFIED = ('"Verified"', "`Verified`", "`Verified. The signature matches ")
+# a key outside the referee's signed top list, in the saved DIDs and on its trader page (Pencil mockup
+# FbqCS, Ben 2026-09-29): a negation that claims nothing, allowed in any script
+NOT_VERIFIED = ('"not verified"', "`not verified`")
 BUILT = (DIST / "index.html").is_file()
 
 
@@ -427,6 +430,8 @@ class Artifact(unittest.TestCase):
             if script.name.startswith("did.astro"):
                 for allowed in WIZARD_VERIFIED:
                     code = code.replace(allowed, " ")
+            for allowed in NOT_VERIFIED:
+                code = code.replace(allowed, " ")
             strings = " ".join(a or b for a, b in re.findall(r'"([^"\n]*)"|`([^`]*)`', code)).replace(DID_DISCLAIMER, " ")
             for pattern in claims + list(self.OVERCLAIM):
                 with self.subTest(script=script.name, pattern=pattern):
@@ -551,6 +556,40 @@ class Artifact(unittest.TestCase):
         for f in sorted(contests.iterdir()) if contests.is_dir() else ():
             with self.subTest(file=f.name):
                 self.assertRegex(f.name, r"^(index|[a-z0-9][a-z0-9_-]{0,47}\.ranking)\.json$")
+
+    def test_contest_pages_show_a_rank_or_a_score_only_where_the_referee_signs_it(self):
+        """Until our recount can be proved against the referee's signed hashes, the Live page ranks only the
+        referee's signed top list, counts the players the referee signs, and the Rankings page is paused
+        (Pencil mockup FbqCS, Ben 2026-09-29: never show a wrong figure)."""
+        index = DIST / "data" / "contests" / "index.json"
+        doc = json.loads((index if index.is_file() else WEB / "src" / "fixtures" / "contests.sample.json").read_text(encoding="utf-8"))
+        c = next(x for x in doc["contests"] if x["id"] == "close-1")
+        rows = c["leaderboard"]["rows"]
+        live = DIST / "contests" / "close-1" / "index.html"
+        text = live.read_text(encoding="utf-8")
+        visible = re.sub(r"\s+", " ", self.visible_text(live))
+        table = re.search(r'<section aria-labelledby="top-title".*?</section>', text, re.S).group(0)
+        self.assertEqual(re.findall(r'href="/contests/close-1/did/\?k=([^"]+)"', table), [r["did"] for r in rows])
+        # the open positions are our recount's, not signed: no column, no side, and none handed to a script
+        self.assertNotRegex(re.sub(r"<[^>]+>", " ", table), r"Position|\bLong\b|\bShort\b|\bFlat\b")
+        for page in (live, DIST / "contests" / "close-1" / "did" / "index.html"):
+            signed = json.loads(html.unescape(re.search(r'<[^>]*data-(?:find-did|did-page)[^>]*\sdata-signed="([^"]*)"', page.read_text(encoding="utf-8")).group(1)))
+            self.assertEqual(signed, [{"rank": r["rank"], "did": r["did"], "pnl": r["pnl"], "check": r["check"]} for r in rows])
+        self.assertNotIn("Open position", self.visible_text(DIST / "contests" / "close-1" / "did" / "index.html"))
+        self.assertIn(f"Top {len(rows)}, signed by the referee. The rest of the ranking returns once our recount is proved.", visible)
+        self.assertIn(f"Registered players {c['latest']['owners']:,}", visible)
+        self.assertNotIn("Active traders", visible)
+        self.assertNotRegex(visible, r"[\d,]+ active\b")
+        self.assertEqual(re.findall(r'data-view="([a-z]+)"', text), ["price", "scores", "players"] if any(p.get("top") for p in c["series"]) else ["price", "players"])
+        # the contests list counts the same signed players, not the traders of our recount
+        cards = re.sub(r"\s+", " ", self.visible_text(DIST / "contests" / "index.html"))
+        self.assertIn(f"Players {c['latest']['owners']:,}", cards)
+        self.assertNotIn("Traders", cards)
+        paused = DIST / "rankings" / "index.html"
+        self.assertIn("Paused: the ranking returns once our recount is proved.", self.visible_text(paused))
+        main = re.search(r"<main\b.*?</main>", paused.read_text(encoding="utf-8"), re.S).group(0)
+        self.assertNotIn("<table", main)
+        self.assertIsNone(re.search(r"z6Mk[1-9A-HJ-NP-Za-km-z]{44}", main), "no DID in the paused page")
 
     def test_verify_runs_only_the_checks_it_can_and_names_the_published_fingerprints(self):
         text = (DIST / "verify" / "index.html").read_text(encoding="utf-8")

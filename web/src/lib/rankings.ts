@@ -89,21 +89,3 @@ export function rankings(): { paid: Paid[]; pending: Pending[]; rows: RankedDid[
   return { ...cache, pending: [{ id: "close-1", title: "Close Call", prize: "1,000,000 FLOP", note: "for the top 3, paid after 4 October" }] };
 }
 
-/** The first place: every DID at rank 1 and, when they are one team of one contest (Sonnet's winning
- * poem), that team and its prize. */
-export function champions(): { rows: RankedDid[]; team?: { name: string; prize: string; flop: number } } {
-  const { paid, rows } = rankings();
-  const first = rows.filter((r) => r.rank === 1);
-  const ids = new Set(first.flatMap((r) => Object.keys(r.by)));
-  const c = ids.size === 1 ? paid.find((p) => ids.has(p.id)) : undefined;
-  const entries = new Set(first.map((r) => c?.roles.get(r.did)?.entry));
-  if (!c || first.length < 2 || entries.size !== 1) return { rows: first };
-  return { rows: first, team: { name: [...entries][0]!, prize: c.prize, flop: first.reduce((t, r) => t + r.flop, 0) } };
-}
-
-/** "1st", "2nd", "3rd", "4th"... */
-export function ordinal(n: number): string {
-  const t = n % 100;
-  const s = t >= 11 && t <= 13 ? "th" : n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th";
-  return `${n}${s}`;
-}

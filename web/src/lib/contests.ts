@@ -5,7 +5,6 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import sample from "../fixtures/contests.sample.json";
 import { json } from "./files";
-import sampleRanking from "../fixtures/close-1.ranking.sample.json";
 import { contestFilesBase } from "./contest-files.mjs";
 import { shard, shardFile } from "./did-shard.mjs";
 import { scoreCurve, verifiedTrades } from "./fold-lite.mjs";
@@ -32,7 +31,8 @@ const shardJson = <T>(rel: string): T => JSON.parse(readFileSync(resolve(REPOSIT
 
 export type CheckState = "ok" | "warn" | "wait";
 export type Check = { state: CheckState; title: string; text: string; help: string };
-/** An open position rebuilt by our recount: [signed net contracts, average entry price]; null when none. */
+/** An open position rebuilt by our recount: [signed net contracts, average entry price]; null when none.
+ * The referee does not sign it: no page shows it until our recount is proved. */
 export type Position = [string, string] | null;
 export type LeaderRow = { rank: number; did: string; pnl: string; check: "match" | "pending" | "differs"; position?: Position };
 export type Contest = {
@@ -81,58 +81,48 @@ export function tabs(c: Contest): { label: string; href: string }[] {
   ];
 }
 
-/** One line of a contest's full ranking file: rank, DID, profit, source of the number, open position. */
-export type RankRow = [number, string, string, "official" | "signed" | "complete" | "partial", Position?];
-/** Ranking v1 holds every row; v2 holds the first places and 256 shard files next to it. */
-type RankingDoc = { rows: RankRow[] } | { top: RankRow[]; shards: number };
+export type SignedRow = { rank: number; did: string; pnl: string; check: LeaderRow["check"] };
 
-export type TopRow = { rank: number; did: string; pnl: string; source: "signed" | "complete" | "partial"; check?: LeaderRow["check"]; position?: Position };
+/** The referee's signed top list of a contest: rank, DID, signed score and our check. Until our recount
+ * can be proved against the referee's signed hashes, these lines are the only ranks and scores the site
+ * shows, and the open position of a line stays out too: the referee signs the score, the position is
+ * our recount's (Ben, 2026-09-29: never show a wrong figure). The pages hand this same list to their
+ * scripts (data-signed). */
+export const signedRows = (c: Contest | undefined): SignedRow[] =>
+  (c?.leaderboard?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check }));
 
-/** The first `limit` places: every line of the referee's signed top list first, with its rank, its
- * signed score and our check, then the next keys of our recount of the signed trades (the file "Find
- * my DID" searches), numbered on from there. A key of the signed list is never shown twice. */
-export function topTraders(c: Contest, limit = 100): TopRow[] {
-  const signedRows = c.leaderboard?.rows ?? [];
-  const doc = !c.ranking ? undefined : !LIVE ? (c.id === "close-1" ? (sampleRanking as RankingDoc) : undefined)
-    : json<RankingDoc>(c.ranking.file.replace(/^\//, ""));
-  // ranking v2 already lists the signed list first, with the referee's ranks: read its first places
-  if (doc && "top" in doc) {
-    const checks = new Map(signedRows.map((r) => [r.did, r.check]));
-    return doc.top.slice(0, limit).map(([rank, did, pnl, source, position]) => source === "official" || source === "signed"
-      ? { rank, did, pnl, source: "signed", check: source === "official" ? "match" : (checks.get(did) ?? "pending"), position }
-      : { rank, did, pnl, source, position });
-  }
-  const out: TopRow[] = signedRows.slice(0, limit).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, source: "signed", check: r.check, position: r.position }));
-  if (!doc || out.length >= limit) return out;
-  const file: RankRow[] = doc.rows;
-  const seen = new Set(out.map((r) => r.did));
-  for (const [, did, pnl, source, position] of file) {
-    if (out.length >= limit) break;
-    if (seen.has(did)) continue;
-    out.push({ rank: out.length + 1, did, pnl, source: source === "partial" ? "partial" : "complete", position });
-  }
-  return out;
+/** The Top list of the Live page: the referee's signed top list only, with its ranks, its signed scores
+ * and our check. The next places of our recount return once it is proved. */
+export const topTraders = (c: Contest): SignedRow[] => signedRows(c);
+
+/** The registered players the referee signed at the update its top list was signed at, from the series;
+ * undefined when that update has none. */
+export function playersAtSigned(c: Contest): number | undefined {
+  const at = c.leaderboard?.sweep;
+  return at === undefined ? undefined : (c.series ?? []).find((p) => p.n === at)?.owners;
 }
 
 /** The last day of each key's score (288 updates), replayed at build time from the published trades,
  * as a 96 x 26 SVG path, and whether it went up. Keys without published trades get nothing, and so do
- * keys whose trades do not add up to their ranking line (verifiedTrades): never a wrong curve. */
-export function sparklines(c: Contest, rows: { did: string; pnl: string; position?: RankRow[4] }[]): Map<string, { d: string; up: boolean }> {
+ * keys whose trades do not add up to their signed score at the update it was signed (verifiedTrades):
+ * never a wrong curve. */
+export function sparklines(c: Contest, rows: { did: string; pnl: string }[]): Map<string, { d: string; up: boolean }> {
   const out = new Map<string, { d: string; up: boolean }>();
   if (!c.ranking || !LIVE) return out;
-  // up to the ranking's sweep only: the published trades say nothing of a key's later trades
+  // up to the update the scores were signed at only: the published trades say nothing of later trades
+  const sweep = c.leaderboard?.sweep ?? c.ranking.sweep;
   const marks = (c.series ?? []).map((p) => [p.n, Number(p.global ?? p.price ?? 0)] as [number, number])
-    .filter(([n, v]) => v > 0 && n <= c.ranking!.sweep);
+    .filter(([n, v]) => v > 0 && n <= sweep);
   const recent = marks.slice(-289);
   const files = new Map<string, Record<string, Trade[]> | null>();
-  for (const { did, pnl, position } of rows) {
+  for (const { did, pnl } of rows) {
     const s = shard(did);
     if (!files.has(s)) {
       const rel = shardFile(c.ranking.file, "trades", s).replace(/^\//, "");
       files.set(s, hasShard(rel) ? shardJson<{ keys: Record<string, Trade[]> }>(rel).keys : null);
     }
     const trades = files.get(s)?.[did];
-    if (!trades?.length || !verifiedTrades(trades, marks, c.ranking.sweep, pnl, position)) continue;
+    if (!trades?.length || !verifiedTrades(trades, marks, sweep, pnl)) continue;
     const all = scoreCurve(trades, marks).slice(-recent.length);
     const [w, h] = [96, 26];
     const range = robustRange(all);
@@ -140,27 +130,6 @@ export function sparklines(c: Contest, rows: { did: string; pnl: string; positio
     const y = (v: number) => (h - 2 - ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo || 1)) * (h - 4)).toFixed(1);
     const d = all.map((v, i) => `${i ? "L" : "M"}${((i / Math.max(1, all.length - 1)) * w).toFixed(1)} ${y(v)}`).join(" ");
     out.set(did, { d, up: all[all.length - 1] >= all[0] });
-  }
-  return out;
-}
-
-/** The rank and score of some keys in a contest's published ranking, read at build time from their
- * shard files (ranking v2) or from the one file (v1). Keys that did not trade are left out. */
-export function ranksOf(c: Contest, dids: string[]): Map<string, { rank: number; pnl: string }> {
-  const out = new Map<string, { rank: number; pnl: string }>();
-  if (!c.ranking || !LIVE) return out;
-  const main = json<RankingDoc>(c.ranking.file.replace(/^\//, ""));
-  if (!("top" in main)) {
-    const want = new Set(dids);
-    for (const [rank, did, pnl] of main.rows) if (want.has(did)) out.set(did, { rank, pnl });
-    return out;
-  }
-  const byShard = new Map<string, string[]>();
-  for (const d of dids) byShard.set(shard(d), [...(byShard.get(shard(d)) ?? []), d]);
-  for (const [s, list] of byShard) {
-    const rows = shardJson<{ rows: RankRow[] }>(shardFile(c.ranking.file, "ranking", s).replace(/^\//, "")).rows;
-    const want = new Set(list);
-    for (const [rank, did, pnl] of rows) if (want.has(did)) out.set(did, { rank, pnl });
   }
   return out;
 }
@@ -181,14 +150,6 @@ export function countdown(iso: string): string {
 
 /** "did:key:z6MkgTDg…u7Hne": the start and the end, enough to recognise a key. */
 export const shortDid = (did: string): string => `${did.slice(8, 16)}…${did.slice(-5)}`;
-
-/** "Long" / "Short" / "Flat" and "44.66 @ 221.65"; undefined when the export carries no position. */
-export function positionParts(p: Position | undefined): { side: string; detail: string } | undefined {
-  if (p === undefined) return undefined;
-  if (p === null) return { side: "Flat", detail: "" };
-  const short = p[0].startsWith("-");
-  return { side: short ? "Short" : "Long", detail: `${short ? p[0].slice(1) : p[0]} @ ${p[1]}` };
-}
 
 /** Signed profit with its unit: "+71.87", "-3.20", "0.00". */
 export const signed = (v: string): string => (v.startsWith("-") || Number(v) === 0 ? v : `+${v}`);

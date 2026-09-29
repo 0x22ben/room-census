@@ -1,6 +1,6 @@
-// The full Rankings list, for "Find my rank" and the saved DIDs: every DID FLOP Labs paid, with its
-// shared rank, total FLOP, FLOP per contest and why it was paid there (a role, named in "roles").
-// Built from the payout maps and allocation lists in src/data/flop-labs.
+// The full Rankings list: every DID FLOP Labs paid, with its shared rank, total FLOP, FLOP per contest
+// and why it was paid there (a role, named in "roles"). Built from the payout maps and allocation lists
+// in src/data/flop-labs, not from our recount: it stays published while the Rankings page is paused.
 import type { APIRoute } from "astro";
 import { rankings } from "../../lib/rankings";
 
