@@ -107,6 +107,22 @@ test("Find my DID opens a ranked key's page, says a key has not traded yet, or r
   assert.match(await find("did:key:nope"), /Not a did:key/);
 });
 
+test("the saved DIDs have column labels above them, and none without a saved DID", { skip }, async () => {
+  const [rank, did] = ranking.rows[0];
+  await navigate("/contests/close-1/");
+  await page(`(() => { localStorage.removeItem("roomcensus.saved"); return true; })()`);
+  await navigate("/contests/close-1/");
+  assert.equal(await page(`document.querySelector("[data-saved-head]").hidden`), true);
+  await page(`(() => { localStorage.setItem("roomcensus.saved", JSON.stringify([{ did: ${JSON.stringify(did)}, nick: "main" }]));
+    return true; })()`);
+  await navigate("/contests/close-1/");
+  await until(`document.querySelector("[data-saved-list] li") !== null`, "the saved DID");
+  assert.equal(await page(`document.querySelector("[data-saved-head]").hidden`), false);
+  assert.equal(await page(`[...document.querySelectorAll("[data-saved-head] span")].map((x) => x.innerText).join(" | ")`), "TRADER | RANK · SCORE");
+  await until(`document.querySelector("[data-saved-list] li").textContent.includes("#${rank.toLocaleString("en-US")}")`, "the saved DID's rank");
+  await page(`(() => { localStorage.removeItem("roomcensus.saved"); return true; })()`);
+});
+
 test("Share on X opens a prefilled post on X and puts the 1200 x 675 card on the clipboard", { skip }, async () => {
   const [, did] = ranking.rows[0];
   await navigate(`/contests/close-1/did/?k=${did}`);

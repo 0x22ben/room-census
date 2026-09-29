@@ -43,8 +43,10 @@ function init(root: HTMLElement) {
   const files = filesOf(root)!;
   // the visitor's saved DIDs: listed here with their rank, and marked in the Top 100
   const list = root.querySelector<HTMLElement>("[data-saved-list]");
+  const head = root.querySelector<HTMLElement>("[data-saved-head]");
   const drawSaved = () => {
     const mine = saved();
+    if (head) head.hidden = mine.length === 0;   // the column labels, only above a list
     list?.replaceChildren(...mine.map((s) => {
       const li = el("li", "");
       const a = el("a", "flex items-center gap-2.5 rounded-lg px-2 py-1.5 no-underline hover:bg-surface-raised") as HTMLAnchorElement;
