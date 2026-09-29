@@ -46,7 +46,7 @@ const actives = s.map((p) => p.active).filter((v): v is number => v !== undefine
 const traders = c.ranking?.traders;
 const hourAgo = actives.length > 12 ? actives[actives.length - 1] - actives[actives.length - 13] : undefined;
 const top = topTraders(c, 100);
-const sparks = sparklines(c, top.map((r) => r.did));
+const sparks = sparklines(c, top);
 const withPosition = top.some((r) => r.position !== undefined);
 const prizeN = Number(c.prize.replace(/[^0-9]/g, ""));
 const clock = phase === "live" ? { label: "Locks in", value: countdown(c.trading_lock_at) }

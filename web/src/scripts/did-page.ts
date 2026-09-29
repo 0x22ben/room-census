@@ -3,7 +3,7 @@
 // to draw the score after each referee update, the best trades and the open position. Numbers here are
 // floating point, for display: the ranking line carries the recounted score itself.
 import { CategoryScale, Chart, Filler, LinearScale, LineController, LineElement, PointElement, Tooltip } from "chart.js";
-import { Account, MINT } from "../lib/fold-lite.mjs";
+import { Account, MINT, verifiedTrades } from "../lib/fold-lite.mjs";
 import { robustRange } from "../lib/robust-range.mjs";
 import { isSaved, remove, save } from "../lib/saved-store";
 import { drawCard, shareOnX, type Card } from "./pnl-card";
@@ -101,19 +101,32 @@ function init(root: HTMLElement) {
           if (t[1] !== "x") best.push({ gain, t });
         }
       };
-      for (const [sweep, mark, at] of marks) {
+      // up to the ranking's sweep only: a later trade of this key is not published yet
+      for (const [sweep, mark, at] of marks.filter((m) => m[0] <= found.sweep)) {
         settle(sweep);
         if (sweep >= first) curve.push({ at, v: acct.value(mark) - MINT });
       }
       settle(Infinity);
     }
-    q("[data-count]").textContent = trades ? n(trades.length) : "–";
-    q("[data-fees]").textContent = trades ? acct.fees.toFixed(2) : "–";
+    // The replay must land on the ranking line: the same open position at the same entry. Some keys'
+    // published trades do not add up (a trade missing from the history inherited before sweep 975): then
+    // nothing computed from them is shown, only the rank, the score and the position (Ben, 2026-09-29:
+    // never a wrong figure)
+    const complete = !trades || verifiedTrades(trades, marks, found.sweep, row[2], row[4]);
+    const shown = trades && complete;
+    q("[data-count]").textContent = shown ? n(trades.length) : "–";
+    q("[data-fees]").textContent = shown ? acct.fees.toFixed(2) : "–";
     // the POLF this key still has free: not locked as collateral in its open position (Ben, 2026-09-29)
-    q("[data-cash]").textContent = trades ? acct.cash.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "–";
+    q("[data-cash]").textContent = shown ? acct.cash.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "–";
+    if (!complete) {
+      const note = q("[data-no-trades]");
+      note.textContent = "Part of this key's trade history is missing from our capture, so nothing is computed from it here.";
+      note.classList.remove("hidden");
+      note.dataset.incomplete = "";
+    }
 
     // score over a day before now, when there is enough history
-    if (curve.length > 288) {
+    if (complete && curve.length > 288) {
       const day = curve[curve.length - 1].v - curve[curve.length - 289].v;
       const d = q("[data-day]");
       d.textContent = `${signed(day)}  24h`;
@@ -121,7 +134,7 @@ function init(root: HTMLElement) {
     }
 
     // best trades: what each one realized, fees included
-    const top = best.filter((b) => b.gain > 0).sort((a, b) => b.gain - a.gain).slice(0, 5);
+    const top = complete ? best.filter((b) => b.gain > 0).sort((a, b) => b.gain - a.gain).slice(0, 5) : [];
     if (top.length) {
       const list = q("[data-best]");
       list.hidden = false;
@@ -137,7 +150,7 @@ function init(root: HTMLElement) {
     }
 
     // chart
-    if (curve.length > 1) {
+    if (complete && curve.length > 1) {
       const color = css(score >= 0 ? "--color-accent" : "--color-down");
       new Chart(q<HTMLCanvasElement>("[data-chart]"), {
         type: "line",
@@ -158,12 +171,12 @@ function init(root: HTMLElement) {
       });
     } else {
       q("[data-chart]").parentElement!.hidden = true;
-      if (!trades) q("[data-no-trades]").classList.remove("hidden");
+      if (!trades || !complete) q("[data-no-trades]").classList.remove("hidden");
     }
 
-    // open position: from the recount line, valued at the latest mark
+    // open position: from the ranking line, valued at the ranking's sweep, where the line is true
     const pos = row[4];
-    const mark = marks.length ? marks[marks.length - 1][1] : undefined;
+    const mark = marks.find((m) => m[0] === found.sweep)?.[1];
     const body = q("[data-position]");
     const tr = el("tr", "border-t border-border");
     if (pos === undefined || pos === null || mark === undefined) {
@@ -183,10 +196,11 @@ function init(root: HTMLElement) {
     const list = q("[data-trades]");
     const draw = (filter: string) => {
       list.replaceChildren();
-      const rows = (trades ?? []).slice().reverse().filter((t) => filter === "All" || (filter === "Buy" ? t[1] === "b" : t[1] === "s"));
+      const rows = (shown && trades ? trades : []).slice().reverse().filter((t) => filter === "All" || (filter === "Buy" ? t[1] === "b" : t[1] === "s"));
       if (!rows.length) {
         const r = el("tr", "border-t border-border");
-        const td = el("td", "px-4 py-3 text-text-muted sm:px-5", trades ? "No trade." : "The trades of this key appear here within the hour.");
+        const td = el("td", "px-4 py-3 text-text-muted sm:px-5", !complete ? "Part of this key's trade history is missing from our capture, so nothing is computed from it here."
+          : trades ? "No trade." : "The trades of this key appear here within the hour.");
         td.setAttribute("colspan", "4");
         r.append(td);
         list.append(r);
@@ -213,8 +227,9 @@ function init(root: HTMLElement) {
     const cardData: Card = { did, score, rank: row[0], traders: found.traders, contest: root.dataset.contest ?? "", official,
       sweep: found.sweep, position: pos === undefined ? undefined : pos === null ? "Flat" : `${Number(pos[0]) > 0 ? "Long" : "Short"} ${Math.abs(Number(pos[0])).toFixed(1)}`,
       line: signedList.length >= 3 ? Number(signedList[2].pnl) : undefined,
-      prices: curve.length > 1 ? curve.map((p) => p.v) : marks.map((m) => m[1]), curveLabel: curve.length > 1 ? "SCORE" : "NVDA", mine: false,
-      trades: trades?.length, best: top.length ? top[0].gain : undefined };
+      prices: complete && curve.length > 1 ? curve.map((p) => p.v) : marks.map((m) => m[1]),
+      curveLabel: complete && curve.length > 1 ? "SCORE" : "NVDA", mine: false,
+      trades: shown ? trades.length : undefined, best: top.length ? top[0].gain : undefined };
     // drawn once, as soon as the page has its numbers; a click before it is ready waits for it
     const ready = drawCard(cardData);
     ready.catch(() => undefined);

@@ -8,7 +8,7 @@ import { json } from "./files";
 import sampleRanking from "../fixtures/close-1.ranking.sample.json";
 import { contestFilesBase } from "./contest-files.mjs";
 import { shard, shardFile } from "./did-shard.mjs";
-import { scoreCurve } from "./fold-lite.mjs";
+import { scoreCurve, verifiedTrades } from "./fold-lite.mjs";
 import { robustRange } from "./robust-range.mjs";
 
 type Trade = [number, "b" | "s" | "x", string, string, string];
@@ -115,21 +115,24 @@ export function topTraders(c: Contest, limit = 100): TopRow[] {
 }
 
 /** The last day of each key's score (288 updates), replayed at build time from the published trades,
- * as a 96 x 26 SVG path, and whether it went up. Keys without published trades get nothing. */
-export function sparklines(c: Contest, dids: string[]): Map<string, { d: string; up: boolean }> {
+ * as a 96 x 26 SVG path, and whether it went up. Keys without published trades get nothing, and so do
+ * keys whose trades do not add up to their ranking line (verifiedTrades): never a wrong curve. */
+export function sparklines(c: Contest, rows: { did: string; pnl: string; position?: RankRow[4] }[]): Map<string, { d: string; up: boolean }> {
   const out = new Map<string, { d: string; up: boolean }>();
   if (!c.ranking || !LIVE) return out;
-  const marks = (c.series ?? []).map((p) => [p.n, Number(p.global ?? p.price ?? 0)] as [number, number]).filter(([, v]) => v > 0);
+  // up to the ranking's sweep only: the published trades say nothing of a key's later trades
+  const marks = (c.series ?? []).map((p) => [p.n, Number(p.global ?? p.price ?? 0)] as [number, number])
+    .filter(([n, v]) => v > 0 && n <= c.ranking!.sweep);
   const recent = marks.slice(-289);
   const files = new Map<string, Record<string, Trade[]> | null>();
-  for (const did of dids) {
+  for (const { did, pnl, position } of rows) {
     const s = shard(did);
     if (!files.has(s)) {
       const rel = shardFile(c.ranking.file, "trades", s).replace(/^\//, "");
       files.set(s, hasShard(rel) ? shardJson<{ keys: Record<string, Trade[]> }>(rel).keys : null);
     }
     const trades = files.get(s)?.[did];
-    if (!trades?.length) continue;
+    if (!trades?.length || !verifiedTrades(trades, marks, c.ranking.sweep, pnl, position)) continue;
     const all = scoreCurve(trades, marks).slice(-recent.length);
     const [w, h] = [96, 26];
     const range = robustRange(all);
