@@ -109,6 +109,8 @@ function init(root: HTMLElement) {
     }
     q("[data-count]").textContent = trades ? n(trades.length) : "–";
     q("[data-fees]").textContent = trades ? acct.fees.toFixed(2) : "–";
+    // the POLF this key still has free: not locked as collateral in its open position (Ben, 2026-09-29)
+    q("[data-cash]").textContent = trades ? acct.cash.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "–";
 
     // score over a day before now, when there is enough history
     if (curve.length > 288) {

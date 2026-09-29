@@ -175,6 +175,9 @@ test("a trader's page opens from the table with its rank, score and position", {
   assert.equal(await page(`document.querySelector("[data-rank]").textContent`), "#1");
   assert.equal(await page(`document.querySelector("[data-score]").textContent`), score.replace("-", "−"));
   assert.match(await page(`document.querySelector("[data-position]").textContent`), /Long|Short|Flat|–/);
+  // the free POLF, replayed from the key's trades like its fees: a number with two decimals
+  assert.match(await page(`document.querySelector("[data-cash]").textContent`), /^(\d{1,3}(,\d{3})*\.\d{2}|–)$/);
+  assert.match(await page(`document.querySelector("[data-cash]").parentElement.textContent`), /Cash/);
   await shot("contest-did");
   await navigate("/contests/close-1/did/?k=nope");
   assert.match(await page(`document.querySelector("[data-problem]").textContent`), /Open this page from the contest/);
