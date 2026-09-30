@@ -6,7 +6,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, before, test } from "node:test";
 
-import { DIST, navigate, page, send, skip, start, stop, until } from "./harness.mjs";
+import { verifiedTrades } from "../../src/lib/fold-lite.mjs";
+import { shard } from "../../src/lib/did-shard.mjs";
+import { dayChange, lastDay, signedCurve, sparkPath } from "../../src/lib/signed-history.mjs";
+import { DIST, WEB, navigate, page, rewrites, send, skip, sleep, start, stop, until } from "./harness.mjs";
 
 // live when the witness published data/contests/, sample otherwise: the pages must work in both
 const LIVE = existsSync(join(DIST, "data", "contests", "index.json"));
@@ -15,6 +18,27 @@ const rankingDoc = JSON.parse(readFileSync(LIVE ? join(DIST, "data", "contests",
 // ranking v1 lists every key; v2 lists the first places, the others are in 256 shard files; v3 (since
 // 2026-09-30) lists none: nothing of our recount is published
 const ranking = { rows: rankingDoc.rows ?? rankingDoc.top ?? [] };
+// The referee's signed scores (leaderboard.history): a key of the signed list whose published trades do
+// not add up to its line has its curve drawn from them; any other key keeps its replayed curve or none.
+const INDEX = LIVE ? JSON.parse(readFileSync(join(DIST, "data", "contests", "index.json"), "utf8")).contests.find((c) => c.id === "close-1") : undefined;
+// The repository's copy of the contest files (update 667) predates the history: then the trader page
+// is served with the real signed scores of two of its keys at that update, as the build would put them
+// in (fixtures/close-1.history-667.json, read from the referee's signed records our recount stores).
+const FIXTURE = JSON.parse(readFileSync(join(WEB, "tests", "fixtures", "close-1.history-667.json"), "utf8"));
+const INJECTED = LIVE && !INDEX.leaderboard.history && INDEX.leaderboard.sweep === FIXTURE.sweep;
+const HISTORY = INJECTED ? FIXTURE.history : INDEX?.leaderboard.history;
+const MARKS = (INDEX?.series ?? []).map((p) => [p.n, Number(p.global ?? p.price ?? 0), p.at]).filter(([, v]) => v > 0);
+const tradesOf = (did) => {
+  const f = join(WEB, "..", "data", "contests", `close-1.trades.${shard(did)}.json`);
+  return existsSync(f) ? JSON.parse(readFileSync(f, "utf8")).keys[did] : undefined;
+};
+const verified = (row) => verifiedTrades(tradesOf(row[1]), MARKS, rankingDoc.sweep, row[2], row[4]);
+const SIGNED_KEYS = LIVE ? ranking.rows.filter((r) => (r[3] === "official" || r[3] === "signed") && !verified(r)
+  && signedCurve(HISTORY?.[r[1]], MARKS).length > 1) : [];
+// one with a 24h change when there is one
+const SIGNED_KEY = SIGNED_KEYS.find((r) => dayChange(HISTORY[r[1]]) !== undefined) ?? SIGNED_KEYS[0];
+const OTHER_KEY = ranking.rows.find((r) => r[3] !== "official" && r[3] !== "signed");
+const noSigned = skip || (!SIGNED_KEY && "no key of the signed list with unverified trades and a signed history in this data");
 const NOBODY = "did:key:z6Mkfw79DoBMgePecy4YaXSSimwzHKYz8sB3JB9X7bKSXMkG";
 
 async function shot(name, width = 1440) {
@@ -36,8 +60,17 @@ async function find(did) {
   return page(`document.querySelector("[data-find-result]").textContent`);
 }
 
-before(start);
-after(stop);
+before(async () => {
+  await start();
+  if (INJECTED) {
+    const numbers = Object.fromEntries(Object.entries(FIXTURE.history).map(([did, pts]) => [did, pts.map(([n, v]) => [n, Number(v)])]));
+    rewrites.set("/contests/close-1/did/", (html) => {
+      assert.ok(html.includes(' data-history="{}"'), "the built trader page carries an empty history");
+      return html.replace(' data-history="{}"', ` data-history="${JSON.stringify(numbers).replaceAll('"', "&quot;")}"`);
+    });
+  }
+});
+after(async () => { rewrites.clear(); await stop(); });
 
 test("the list shows each contest with its status and opens it", { skip }, async () => {
   await navigate("/contests/");
@@ -186,3 +219,59 @@ test("a trader's page opens from the table with its rank, score and position", {
   assert.match(await page(`document.querySelector("[data-problem]").textContent`), /Open this page from the contest/);
 });
 
+
+test("a signed key whose trades do not add up shows its curve from the referee's signed scores", { skip: noSigned }, async () => {
+  const [rank, did, pnl] = SIGNED_KEY;
+  const points = HISTORY[did];
+  await navigate(`/contests/close-1/did/?k=${did}`);
+  await until(`!document.querySelector("[data-head]").hidden`, "the trader page");
+  await until(`document.querySelector("[data-chart]").dataset.signed !== undefined`, "the signed curve");
+  assert.equal(await page(`document.querySelector("[data-rank]").textContent`), `#${rank}`);
+  assert.equal(await page(`document.querySelector("[data-score]").textContent`), pnl.startsWith("-") ? pnl.replace("-", "−") : `+${pnl}`);
+  // every signed point that has a mark time, and nothing else
+  assert.equal(await page(`Number(document.querySelector("[data-chart]").dataset.signed)`), signedCurve(points, MARKS).length);
+  assert.equal(await page(`document.querySelector("[data-chart]").parentElement.hidden`), false);
+  assert.ok(await page(`document.querySelector("[data-chart]").width > 0`), "the chart is drawn");
+  assert.equal(await page(`document.querySelector("[data-signed-curve]").hidden`), false);
+  assert.match(await page(`document.querySelector("[data-signed-curve]").textContent`), /Referee's signed scores/);
+  assert.match(await page(`document.querySelector("[data-chart]").getAttribute("aria-label")`), /referee's signed score/);
+  assert.match(await page(`document.querySelector("[data-no-trades]").textContent`), /the referee's signed scores.*missing from our capture/);
+  // the 24h change only when both signed ends are there
+  const day = dayChange(points);
+  const shown = await page(`document.querySelector("[data-day]").textContent`);
+  if (day === undefined) assert.equal(shown, "");
+  else assert.equal(shown, `${day > 0 ? "+" : day < 0 ? "−" : ""}${Math.abs(day).toFixed(2)}  24h`);
+  // still nothing replayed from trades that do not add up
+  for (const k of ["count", "fees", "cash"]) assert.equal(await page(`document.querySelector("[data-${k}]").textContent`), "–");
+  assert.equal(await page(`document.querySelector("[data-best]").hidden`), true);
+  assert.match(await page(`document.querySelector("[data-trades]").textContent`), /missing from our capture/);
+  await sleep(1200);                                                        // the chart's drawing animation
+  await shot("contest-did-signed");
+  await shot("contest-did-signed-mobile", 390);
+});
+
+test("a key outside the signed list keeps its replayed curve, or none", { skip: skip || (!OTHER_KEY && "no key outside the signed list") }, async () => {
+  const [rank, did] = OTHER_KEY;
+  await navigate(`/contests/close-1/did/?k=${did}`);
+  await until(`!document.querySelector("[data-head]").hidden`, "the trader page");
+  assert.equal(await page(`document.querySelector("[data-rank]").textContent`), `#${rank.toLocaleString("en-US")}`);
+  await until(`document.querySelector("[data-trades]").children.length > 0`, "its trades");
+  assert.equal(await page(`document.querySelector("[data-signed-curve]").hidden`), true);
+  assert.equal(await page(`document.querySelector("[data-chart]").dataset.signed ?? null`), null);
+  if (LIVE && tradesOf(did)?.length && !verified(OTHER_KEY)) {
+    assert.equal(await page(`document.querySelector("[data-chart]").parentElement.hidden`), true);
+    assert.equal(await page(`document.querySelector("[data-count]").textContent`), "–");
+  }
+  if (LIVE && verified(OTHER_KEY)) assert.notEqual(await page(`document.querySelector("[data-count]").textContent`), "–");
+});
+
+// built at build time from the index: without a history in it, a key whose trades do not add up gets none
+test("the Top 100 draws a signed key's last day from its signed scores, and nothing without them", { skip: noSigned }, async () => {
+  const [, did] = SIGNED_KEY;
+  const day = lastDay(INDEX.leaderboard.history?.[did], INDEX.leaderboard.sweep);
+  const want = sparkPath(day.map((p) => Number(p[1])), day.map((p) => p[0]));
+  await navigate("/contests/close-1/");
+  const d = await page(`document.querySelector('section[aria-labelledby=top-title] a[href$="${did}"]').closest("tr").querySelector("svg[viewBox='0 0 96 26'] path")?.getAttribute("d") ?? null`);
+  if (want) assert.equal(d, want.d);
+  else assert.equal(d, null);
+});

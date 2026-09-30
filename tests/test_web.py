@@ -544,6 +544,24 @@ class Artifact(unittest.TestCase):
             self.assertIn(route, reading)
         self.assertNotIn("/did/", reading)
 
+    def test_the_trader_page_carries_the_signed_scores_of_the_signed_list_only(self):
+        """The trader page draws a signed key's curve from the referee's signed scores (leaderboard.history):
+        it holds those of the keys of the signed list, as numbers, and nothing for any other key; an index
+        without them gives an empty history."""
+        live = DIST / "data" / "contests" / "index.json"
+        index = json.loads((live if live.is_file() else WEB / "src" / "fixtures" / "contests.sample.json").read_text(encoding="utf-8"))
+        for c in index["contests"]:
+            page = DIST / "contests" / c["id"] / "did" / "index.html"
+            if not c.get("ranking") or not page.is_file():
+                continue
+            with self.subTest(contest=c["id"]):
+                tag = re.search(r"<div [^>]*\bdata-did-page\b[^>]*>", page.read_text(encoding="utf-8")).group(0)
+                shown = json.loads(html.unescape(re.search(r'\sdata-history="([^"]*)"', tag).group(1)))
+                lb = c.get("leaderboard") or {}
+                history = lb.get("history") or {}
+                want = {r["did"]: [[n, float(v)] for n, v in history[r["did"]]] for r in lb.get("rows", []) if history.get(r["did"])}
+                self.assertEqual(shown, want)
+
     def test_the_contest_shards_stay_out_of_the_artifact(self):
         """GitHub Pages publishes at most 1 GB: only the contest index and each ranking summary are in the site."""
         self.assertEqual([f.relative_to(DIST).as_posix() for f in DIST.rglob("*") if SHARD_FILE.search(f.name)], [])

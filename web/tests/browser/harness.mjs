@@ -43,6 +43,9 @@ let profile;
 let ws;
 let id = 0;
 const pending = new Map();
+/** Pages the server changes before serving them: path (as requested) to a function of the page's text.
+ * A test puts fixture data into a built page with it, and removes it after. */
+export const rewrites = new Map();
 /** Protocol events go to every listener in this set. */
 export const listeners = new Set();
 export const site = { origin: "" };
@@ -90,7 +93,9 @@ export async function start() {
     if (path.endsWith("/")) file = join(file, "index.html");
     if (!existsSync(file) && SHARD.test(path)) file = join(WEB, "..", ...path.slice(1).split("/"));
     if (!existsSync(file)) { res.writeHead(404).end(); return; }
-    res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream" }).end(readFileSync(file));
+    const rewrite = rewrites.get(path);
+    res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream" })
+      .end(rewrite ? rewrite(readFileSync(file, "utf8")) : readFileSync(file));
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
   site.origin = `http://127.0.0.1:${server.address().port}`;

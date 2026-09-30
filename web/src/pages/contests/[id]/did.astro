@@ -14,13 +14,18 @@ const { contest: c } = Astro.props;
 const s = c.series ?? [];
 // the mark of each update: the agents' own price the referee scores with, else the market price
 const marks = s.map((p) => [p.n, Number(p.global ?? p.price ?? 0), p.at] as const).filter(([, v]) => v > 0);
+// the referee's signed scores of each key of its signed list, [update, score]: the page draws a key's
+// curve from them when its published trades do not add up (numbers here, for a smaller page)
+const lb = c.leaderboard;
+const history = Object.fromEntries((lb?.rows ?? []).filter((r) => lb?.history?.[r.did]?.length)
+  .map((r) => [r.did, lb!.history![r.did].map(([n, v]) => [n, Number(v)])]));
 const card = "rounded-xl border border-border bg-surface";
 const stat = "grid gap-0.5";
 ---
 <Base title={`${c.title}: a trader's page`} description={`Rank, score over time, position and every settled trade of one key in ${c.title}, recounted from the signed trades.`}>
   <div data-did-page data-url={c.ranking!.file} data-shards={SHARDS_BASE} data-contest={c.title.toUpperCase()} data-sweep={c.ranking!.sweep}
     data-signed={JSON.stringify((c.leaderboard?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check })))}
-    data-marks={JSON.stringify(marks)} data-opening={c.opening} data-page={new URL(`/contests/${c.id}/did/`, Astro.site).href}>
+    data-marks={JSON.stringify(marks)} data-history={JSON.stringify(history)} data-history-sweep={lb?.sweep} data-opening={c.opening} data-page={new URL(`/contests/${c.id}/did/`, Astro.site).href}>
     <nav aria-label="Breadcrumb" class="text-sm">
       <ol class="flex flex-wrap items-center gap-1.5">
         <li><a href="/contests/" class="inline-flex min-h-11 items-center gap-1.5 text-link no-underline hover:underline"><Px name="arrow-left" size={12} />Contests</a></li>
@@ -70,6 +75,7 @@ const stat = "grid gap-0.5";
                 <span class="font-mono text-3xl font-bold tabular-nums" data-score>–</span><span class="font-mono text-sm text-text-muted">POLF</span></h2>
               <p class="font-mono text-xs" data-day></p>
             </div>
+            <p class="flex items-center gap-1 rounded-md bg-surface-raised px-2 py-1 text-xs text-text-secondary" data-signed-curve hidden><Px name="check" size={12} class="text-accent" />Referee's signed scores</p>
           </div>
           <div class="relative h-64 min-w-0"><canvas role="img" aria-label="Score after each referee update" tabindex="0" data-chart></canvas></div>
           <p class="hidden text-sm text-text-muted" data-no-trades>The trades of this key appear here within the hour.</p>

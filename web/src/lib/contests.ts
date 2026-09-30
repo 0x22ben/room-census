@@ -9,7 +9,7 @@ import sampleRanking from "../fixtures/close-1.ranking.sample.json";
 import { contestFilesBase } from "./contest-files.mjs";
 import { shard, shardFile } from "./did-shard.mjs";
 import { scoreCurve, verifiedTrades } from "./fold-lite.mjs";
-import { robustRange } from "./robust-range.mjs";
+import { lastDay, sparkPath } from "./signed-history.mjs";
 
 type Trade = [number, "b" | "s" | "x", string, string, string];
 import { PHASE_LABEL, after, phase, until } from "./contest-time.mjs";
@@ -53,7 +53,10 @@ export type Contest = {
   check: { level: "ok" | "partial"; label: string };
   latest?: { sweep: number; at: string; owners: number; price: string; price_time: string; price_age_s: number };
   series?: SeriesPoint[];
-  leaderboard?: { sweep: number; at: string; rows: LeaderRow[] };
+  /** the referee's signed top list at `sweep`; `history`, for each of its keys, the referee's signed
+   * scores [update, score] at the updates where the key was listed (every update of the last day, one in
+   * 12 before), absent from an export that does not carry it */
+  leaderboard?: { sweep: number; at: string; rows: LeaderRow[]; history?: Record<string, SignedPoint[]> };
   /** where the trades files of the signed keys are (`file` names the summary next to them); `traders`, the
    * keys of our recount, is no longer published since ranking v3 (Ben, 2026-09-30) */
   ranking?: { sweep: number; traders?: number; file: string };
@@ -61,6 +64,8 @@ export type Contest = {
   self_key?: { did: string; registration: { room: string; seq: number; at: string } | null; mint: "confirmed" | "not_established"; settled_trade: boolean };
 };
 export type Phase = "upcoming" | "live" | "closed" | "ended";
+/** One signed score of a key: [update, score exactly as the referee signed it]. */
+export type SignedPoint = [number, string];
 /** One referee update. Beyond players and price, every field is optional: an export that cannot
  * establish a number leaves it out. global: the agents' own price (volume-weighted, signed by the
  * referee); top and line: the #1 score and the score holding the last prize place, from its signed top
@@ -117,8 +122,10 @@ export function topTraders(c: Contest, limit = 100): TopRow[] {
 }
 
 /** The last day of each key's score (288 updates), replayed at build time from the published trades,
- * as a 96 x 26 SVG path, and whether it went up. Keys without published trades get nothing, and so do
- * keys whose trades do not add up to their ranking line (verifiedTrades): never a wrong curve. */
+ * as a 96 x 26 SVG path, and whether it went up. Keys whose trades are missing or do not add up to their
+ * ranking line (verifiedTrades) are never replayed: a key of the referee's signed list then gets the
+ * last day of its signed scores (leaderboard.history), placed by update; any other key gets nothing.
+ * Never a wrong curve. */
 export function sparklines(c: Contest, rows: { did: string; pnl: string; position?: RankRow[4] }[]): Map<string, { d: string; up: boolean }> {
   const out = new Map<string, { d: string; up: boolean }>();
   if (!c.ranking || !LIVE) return out;
@@ -126,6 +133,7 @@ export function sparklines(c: Contest, rows: { did: string; pnl: string; positio
   const marks = (c.series ?? []).map((p) => [p.n, Number(p.global ?? p.price ?? 0)] as [number, number])
     .filter(([n, v]) => v > 0 && n <= c.ranking!.sweep);
   const recent = marks.slice(-289);
+  const history = c.leaderboard?.history;
   const files = new Map<string, Record<string, Trade[]> | null>();
   for (const { did, pnl, position } of rows) {
     const s = shard(did);
@@ -134,14 +142,14 @@ export function sparklines(c: Contest, rows: { did: string; pnl: string; positio
       files.set(s, hasShard(rel) ? shardJson<{ keys: Record<string, Trade[]> }>(rel).keys : null);
     }
     const trades = files.get(s)?.[did];
-    if (!trades?.length || !verifiedTrades(trades, marks, c.ranking.sweep, pnl, position)) continue;
-    const all = scoreCurve(trades, marks).slice(-recent.length);
-    const [w, h] = [96, 26];
-    const range = robustRange(all);
-    const lo = range?.min ?? Math.min(...all), hi = range?.max ?? Math.max(...all);
-    const y = (v: number) => (h - 2 - ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo || 1)) * (h - 4)).toFixed(1);
-    const d = all.map((v, i) => `${i ? "L" : "M"}${((i / Math.max(1, all.length - 1)) * w).toFixed(1)} ${y(v)}`).join(" ");
-    out.set(did, { d, up: all[all.length - 1] >= all[0] });
+    let spark: { d: string; up: boolean } | undefined;
+    if (trades?.length && verifiedTrades(trades, marks, c.ranking.sweep, pnl, position)) {
+      spark = sparkPath(scoreCurve(trades, marks).slice(-recent.length));
+    } else if (history?.[did]) {
+      const day: SignedPoint[] = lastDay(history[did], c.leaderboard!.sweep);
+      spark = sparkPath(day.map((p) => Number(p[1])), day.map((p) => p[0]));
+    }
+    if (spark) out.set(did, spark);
   }
   return out;
 }

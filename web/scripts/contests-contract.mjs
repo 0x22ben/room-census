@@ -44,6 +44,24 @@ function checks(c, where) {
   need((c.check.level === "ok") === allOk, `${where}: summary level does not follow its checks`);
 }
 
+/** The referee's signed scores of the keys of its signed list (leaderboard.history): for each key of the
+ * list, [update, score] at updates up to the list's own, in strictly increasing order, each score in the
+ * form the referee signs. A key outside the list, an empty or unordered history, a later update or any
+ * other shape stops the build: the trader pages draw these points as signed. */
+function signedHistory(lb, rows, where) {
+  const h = lb.history;
+  need(h !== null && typeof h === "object" && !Array.isArray(h), `${where}: the signed history is not an object`);
+  for (const [did, points] of Object.entries(h)) {
+    need(rows.has(did), `${where}: the signed history names ${did}, which is not a row of the signed list`);
+    need(Array.isArray(points) && points.length > 0, `${where}: the signed history of ${did} is empty or not a list`);
+    points.forEach((p, i) => {
+      need(Array.isArray(p) && p.length === 2 && int(p[0], 1) && p[0] <= lb.sweep && typeof p[1] === "string" && PNL.test(p[1]),
+        `${where}: point ${i + 1} of the signed history of ${did} is not [update, score] up to update ${lb.sweep}`);
+      need(i === 0 || p[0] > points[i - 1][0], `${where}: the signed history of ${did} is not in strictly increasing update order`);
+    });
+  }
+}
+
 function contest(c, capturedAt, where) {
   need(text(c.title, 80) && text(c.short, 40) && text(c.summary, 200), `${where}: title, short name or summary missing`);
   need(iso(c.opening) && iso(c.trading_lock_at), `${where}: opening or trading lock is not an ISO time`);
@@ -91,6 +109,7 @@ function contest(c, capturedAt, where) {
       need(PNL.test(r.pnl ?? "") && ROW_CHECK.has(r.check), `${where}: leaderboard row ${i + 1} is malformed`);
       need(r.position === undefined || position(r.position), `${where}: leaderboard row ${i + 1} has a malformed position`);
     });
+    if (lb.history !== undefined) signedHistory(lb, seen, where);
   }
   if (c.self_key !== undefined) {
     const s = c.self_key;
