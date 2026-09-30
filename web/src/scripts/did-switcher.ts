@@ -1,9 +1,9 @@
 // The account of the top bar. Signed out: "Sign in" opens a small form (a DID, an optional nickname).
-// Signed in: the active DID with its signed rank in the live contest, and a menu to open its trades, rename it,
+// Signed in: the active DID with its rank in the live contest, and a menu to open its trades, rename it,
 // switch to another saved DID, add one, manage them all or sign out (forgets every DID in this browser).
 import { avatarSvg } from "../lib/avatar.mjs";
 import { active, forgetAll, isDid, rename, save, saved, setActive, type Saved } from "../lib/saved-store";
-import type { Signed } from "./ranking-lookup";
+import { filesOf, type Signed } from "./ranking-lookup";
 import { pnlText, pnlTone, rankText, ranker, short } from "./saved-ranks";
 
 function el(tag: string, cls: string, text?: string): HTMLElement {
@@ -23,7 +23,7 @@ function follow(did: string) {
 function init(root: HTMLElement) {
   const q = <T extends HTMLElement>(s: string) => root.querySelector<T>(s)!;
   const signedList: Signed[] = JSON.parse(root.dataset.signed ?? "[]");
-  const rankOf = ranker(signedList);
+  const rankOf = ranker(filesOf(root), signedList);
   const contestId = root.dataset.contest;
   const menu = q("#did-menu");
   let adding = false;
@@ -40,7 +40,7 @@ function init(root: HTMLElement) {
     }
     av.replaceChildren(avatarSvg(a.did, 22));
     q("[data-sw-nick]").textContent = a.nick;
-    q("[data-sw-rank]").textContent = rankText(rankOf(a.did));
+    rankOf(a.did).then((r) => { if (active()?.did === a.did) q("[data-sw-rank]").textContent = rankText(r); });
   }
 
   function other(s: Saved): HTMLElement {
@@ -52,8 +52,10 @@ function init(root: HTMLElement) {
     const names = el("span", "grid min-w-0 flex-1");
     names.append(el("span", "truncate font-semibold", s.nick), el("span", "font-mono text-[11px] text-text-muted", short(s.did)));
     const right = el("span", "grid justify-items-end");
-    const r = rankOf(s.did);
-    right.append(el("span", "font-mono text-xs font-semibold", rankText(r)), el("span", `font-mono text-[11px] ${pnlTone(r)}`, pnlText(r)));
+    const rank = el("span", "font-mono text-xs font-semibold", "…");
+    const pnl = el("span", "font-mono text-[11px] text-text-muted", "");
+    right.append(rank, pnl);
+    rankOf(s.did).then((r) => { rank.textContent = rankText(r); pnl.textContent = pnlText(r); pnl.className = `font-mono text-[11px] ${pnlTone(r)}`; });
     b.append(names, right);
     b.addEventListener("click", () => { setActive(s.did); follow(s.did); });
     li.append(b);
@@ -74,10 +76,14 @@ function init(root: HTMLElement) {
     q("[data-sw-me-avatar]").replaceChildren(avatarSvg(a.did, 32));
     q("[data-sw-me-nick]").textContent = a.nick;
     q("[data-sw-me-did]").textContent = short(a.did);
-    const r = rankOf(a.did);
-    q("[data-sw-me-rank]").textContent = rankText(r);
-    q("[data-sw-me-pnl]").textContent = pnlText(r);
-    q("[data-sw-me-pnl]").className = `font-mono text-[11px] ${pnlTone(r)}`;
+    q("[data-sw-me-rank]").textContent = "…";
+    q("[data-sw-me-pnl]").textContent = "";
+    rankOf(a.did).then((r) => {
+      if (active()?.did !== a.did) return;
+      q("[data-sw-me-rank]").textContent = rankText(r);
+      q("[data-sw-me-pnl]").textContent = pnlText(r);
+      q("[data-sw-me-pnl]").className = `font-mono text-[11px] ${pnlTone(r)}`;
+    });
     q<HTMLAnchorElement>("[data-sw-trades]").href = `/contests/${contestId}/did/?k=${encodeURIComponent(a.did)}`;
     const others = list.filter((s) => s.did !== a.did);
     q("[data-sw-others-box]").hidden = others.length === 0;

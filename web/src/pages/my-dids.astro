@@ -1,17 +1,17 @@
 ---
 // My DIDs: every DID the visitor signed in with, kept only in this browser (Pencil mockup AUQcK). Add one
 // or many at once (one per line), search them, rename, switch, open their trades or remove them. Ranks
-// and scores come from the referee's signed top list of the live contest, as in the account menu: any
-// other key shows "–", not verified, until our recount can be proved.
+// and scores come from the live contest's published ranking, as in the account menu.
 import Base from "../layouts/Base.astro";
 import Px from "../components/Px.astro";
-import { contests, phaseOf, signedRows } from "../lib/contests";
+import { SHARDS_BASE, contests, phaseOf } from "../lib/contests";
 import { MAX } from "../lib/saved-store";
 
 const c = contests().find((x) => x.ranking && phaseOf(x) === "live") ?? contests().find((x) => x.ranking);
+const signed = (c?.leaderboard?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check }));
 ---
-<Base title="My DIDs" description="The DIDs you signed in with on Room Census, with the rank and score the referee signs for them. Saved only in your browser.">
-  <div data-my-dids data-contest={c?.id} data-signed={JSON.stringify(signedRows(c))} data-max={MAX} class="grid grid-cols-1 gap-5">
+<Base title="My DIDs" description="The DIDs you signed in with on Room Census, with their rank and score. Saved only in your browser.">
+  <div data-my-dids data-url={c?.ranking?.file} data-shards={c?.ranking && SHARDS_BASE} data-contest={c?.id} data-signed={JSON.stringify(signed)} data-max={MAX} class="grid grid-cols-1 gap-5">
     <section aria-labelledby="my-dids-title" class="grid gap-1">
       <h1 id="my-dids-title" class="flex items-center gap-2.5 text-3xl font-bold tracking-tight">
         My DIDs <span data-md-count class="rounded-md bg-surface-raised px-2 py-0.5 font-mono text-xs font-bold text-text-secondary">0</span>

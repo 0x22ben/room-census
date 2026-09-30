@@ -21,8 +21,7 @@ const tint = (id: string) => TINT[id as keyof typeof TINT] ?? TINT["close-1"];
 const at = new Date(CAPTURED_AT);
 const time = `${at.getUTCDate()} ${"Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ")[at.getUTCMonth()]} ${at.toISOString().slice(11, 16)}`;
 type Stat = { label: string; value: string; gold?: boolean };
-/** The numbers of a card: prize, then time left or the winner, then the registered players the referee
- * signs (the traders counted by our recount return once it is proved: Ben, 2026-09-29). */
+/** The numbers of a card: prize, then time left or the winner, then the active traders. */
 function stats(c: Contest, short: boolean): Stat[] {
   const p = phaseOf(c);
   const out: Stat[] = [{ label: "Prize", value: short ? prizeShort(c.prize) : c.prize, gold: true }];
@@ -30,7 +29,7 @@ function stats(c: Contest, short: boolean): Stat[] {
   else if (p === "upcoming") out.push({ label: "Starts in", value: countdown(c.opening) });
   else if (p === "closed") out.push({ label: "Final price at", value: dateTimeUtc(c.final_price_at!) });
   else if (c.winner) out.push({ label: c.winner_source === "named by the referee" ? "Winner · referee" : "Winner", value: c.winner });
-  if (c.latest) out.push({ label: "Players", value: short ? compact(c.latest.owners) : n(c.latest.owners) });
+  if (c.ranking) out.push({ label: "Traders", value: short ? compact(c.ranking.traders) : n(c.ranking.traders) });
   return out;
 }
 const chip = "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold tracking-widest uppercase";

@@ -1,16 +1,13 @@
-// The trading page of one key: reads ?k=, its line of the referee's signed top list and its settled
-// trades, then replays the trades with the contest's accounting (close_call_fold.py: first in, first
-// out, fees taken from cash) to draw the score after each referee update and the best trades. Numbers
-// here are floating point, for display: the signed line carries the score itself. No open position is
-// shown: the referee does not sign it.
-// Until our recount can be proved against the referee's signed hashes, a key outside the signed top
-// list shows no rank, no score and nothing replayed (Ben, 2026-09-29: never show a wrong figure).
+// The trading page of one key: reads ?k=, its ranking line and its settled trades, then replays the
+// trades with the contest's accounting (close_call_fold.py: first in, first out, fees taken from cash)
+// to draw the score after each referee update, the best trades and the open position. Numbers here are
+// floating point, for display: the ranking line carries the recounted score itself.
 import { CategoryScale, Chart, Filler, LinearScale, LineController, LineElement, PointElement, Tooltip } from "chart.js";
 import { Account, MINT, verifiedTrades } from "../lib/fold-lite.mjs";
 import { robustRange } from "../lib/robust-range.mjs";
 import { isSaved, remove, save } from "../lib/saved-store";
 import { drawCard, shareOnX, type Card } from "./pnl-card";
-import { filesOf, signedLine, tradesOf, type Signed } from "./ranking-lookup";
+import { filesOf, lookup, tradesOf, type Signed } from "./ranking-lookup";
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler);
 
@@ -40,7 +37,7 @@ function init(root: HTMLElement) {
   const did = new URLSearchParams(location.search).get("k")?.trim() ?? "";
   const problem = (text: string) => { const p = q("[data-problem]"); p.textContent = text; p.classList.remove("hidden"); };
   if (!DID.test(did)) {
-    problem("Open this page from the contest: pick a trader in the top list or search a DID.");
+    problem("Open this page from the contest: pick a trader in the Top 100 or search a DID.");
     return;
   }
   const short = `${did.slice(8, 16)}…${did.slice(-6)}`;
@@ -59,37 +56,35 @@ function init(root: HTMLElement) {
   const signedList: Signed[] = JSON.parse(root.dataset.signed ?? "[]");
   const marks: Mark[] = JSON.parse(root.dataset.marks ?? "[]");
   const opening = Date.parse(root.dataset.opening ?? "");
-  // the update the top list was signed at, and the registered players the referee signed at that update
-  const sweep = Number(root.dataset.sweep);
-  const players = root.dataset.players ? Number(root.dataset.players) : undefined;
   const files = filesOf(root)!;
-  q("[data-head]").hidden = false;
-  q("[data-short]").textContent = short;
-  q("[data-copy]").addEventListener("click", () => navigator.clipboard?.writeText(did));
-
-  const line = signedLine(signedList, did);
-  if (!line) {
-    // Rank, Trades, Fees and Cash keep their "–", and nothing else is drawn: no score, no curve, no
-    // trade. Save stays; Share on X goes, so no score of this key is ever shared.
-    q("[data-source]").textContent = "not verified";
-    q("[data-share]").hidden = true;
-    const note = q("[data-unsigned]");
-    note.textContent = `Not in the referee's signed top ${signedList.length}: nothing is shown for this key until it can be proved.`;
-    note.hidden = false;
-    return;
-  }
-
-  // the rank and the score: the referee's own, signed
-  const score = Number(line.pnl);
-  q("[data-body]").hidden = false;
-  q("[data-source]").textContent = "signed by the referee";
-  q("[data-rank]").textContent = `#${n(line.rank)}`;
-  const scoreEl = q("[data-score]");
-  scoreEl.textContent = signed(score);
-  scoreEl.classList.add(tone(score));
 
   (async () => {
+    let found;
+    try {
+      found = await lookup(files, did, signedList);
+    } catch {
+      problem("The ranking could not be read. Try again in a moment.");
+      return;
+    }
+    const row = found.row;
+    if (!row) {
+      problem("No trade yet: this key has no settled trade in our capture.");
+      return;
+    }
     const trades = await tradesOf(files, did);
+    const score = Number(row[2]);
+    const official = row[3] === "official" || row[3] === "signed";
+
+    q("[data-head]").hidden = false;
+    q("[data-body]").hidden = false;
+    q("[data-short]").textContent = short;
+    q("[data-source]").textContent = official ? "signed by the referee"
+      : row[3] === "partial" ? "our recount · may miss its earliest trades" : "our recount of the signed trades";
+    q("[data-rank]").textContent = `#${n(row[0])}`;
+    const scoreEl = q("[data-score]");
+    scoreEl.textContent = signed(score);
+    scoreEl.classList.add(tone(score));
+    q("[data-copy]").addEventListener("click", () => navigator.clipboard?.writeText(did));
 
     // replay the trades after each update
     const acct = new Account();
@@ -106,17 +101,18 @@ function init(root: HTMLElement) {
           if (t[1] !== "x") best.push({ gain, t });
         }
       };
-      // up to the update the line was signed at only: the line says nothing of later trades
-      for (const [update, mark, at] of marks.filter((m) => m[0] <= sweep)) {
-        settle(update);
-        if (update >= first) curve.push({ at, v: acct.value(mark) - MINT });
+      // up to the ranking's sweep only: a later trade of this key is not published yet
+      for (const [sweep, mark, at] of marks.filter((m) => m[0] <= found.sweep)) {
+        settle(sweep);
+        if (sweep >= first) curve.push({ at, v: acct.value(mark) - MINT });
       }
       settle(Infinity);
     }
-    // The replay must land on the signed score at the update it was signed. Some keys' published trades
-    // do not add up (a trade missing from the history inherited before sweep 975): then nothing computed
-    // from them is shown, only the signed rank and score (Ben, 2026-09-29: never a wrong figure)
-    const complete = !trades || verifiedTrades(trades, marks, sweep, line.pnl);
+    // The replay must land on the ranking line: the same open position at the same entry. Some keys'
+    // published trades do not add up (a trade missing from the history inherited before sweep 975): then
+    // nothing computed from them is shown, only the rank, the score and the position (Ben, 2026-09-29:
+    // never a wrong figure)
+    const complete = !trades || verifiedTrades(trades, marks, found.sweep, row[2], row[4]);
     const shown = trades && complete;
     q("[data-count]").textContent = shown ? n(trades.length) : "–";
     q("[data-fees]").textContent = shown ? acct.fees.toFixed(2) : "–";
@@ -178,6 +174,24 @@ function init(root: HTMLElement) {
       if (!trades || !complete) q("[data-no-trades]").classList.remove("hidden");
     }
 
+    // open position: from the ranking line, valued at the ranking's sweep, where the line is true
+    const pos = row[4];
+    const mark = marks.find((m) => m[0] === found.sweep)?.[1];
+    const body = q("[data-position]");
+    const tr = el("tr", "border-t border-border");
+    if (pos === undefined || pos === null || mark === undefined) {
+      tr.append(el("td", "px-4 py-3 text-text-muted sm:px-5", pos === null ? "Flat" : "–"));
+      for (let i = 0; i < 4; i++) tr.append(el("td", "px-4 py-3"));
+    } else {
+      const qty = Number(pos[0]), entry = Number(pos[1]);
+      const upnl = qty > 0 ? qty * (mark - entry) : -qty * (entry - mark);
+      const side = qty > 0 ? "Long" : "Short";
+      tr.append(el("td", "px-4 py-3 sm:px-5", ""), el("td", "px-4 py-3 font-mono", Math.abs(qty).toFixed(2)), el("td", "px-4 py-3 font-mono", entry.toFixed(2)),
+        el("td", "px-4 py-3 font-mono", mark.toFixed(2)), el("td", `px-4 py-3 text-right font-mono font-semibold sm:px-5 ${tone(upnl)}`, signed(upnl)));
+      tr.firstElementChild!.append(el("span", `rounded-md px-2 py-0.5 text-xs font-semibold ${side === "Long" ? "bg-accent-soft text-accent" : "bg-down-soft text-down"}`, side));
+    }
+    body.append(tr);
+
     // every trade, newest first
     const list = q("[data-trades]");
     const draw = (filter: string) => {
@@ -210,7 +224,8 @@ function init(root: HTMLElement) {
     }));
 
     // share: the score card with this key's own curve; it always says Score, since a saved DID proves no ownership
-    const cardData: Card = { did, score, rank: line.rank, players, contest: root.dataset.contest ?? "", official: true, sweep,
+    const cardData: Card = { did, score, rank: row[0], traders: found.traders, contest: root.dataset.contest ?? "", official,
+      sweep: found.sweep, position: pos === undefined ? undefined : pos === null ? "Flat" : `${Number(pos[0]) > 0 ? "Long" : "Short"} ${Math.abs(Number(pos[0])).toFixed(1)}`,
       line: signedList.length >= 3 ? Number(signedList[2].pnl) : undefined,
       prices: complete && curve.length > 1 ? curve.map((p) => p.v) : marks.map((m) => m[1]),
       curveLabel: complete && curve.length > 1 ? "SCORE" : "NVDA", mine: false,

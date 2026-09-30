@@ -1,12 +1,11 @@
-// "Find my DID": looks a did:key up in the referee's signed top list, handed to the page (data-signed).
-// Nothing is sent and nothing is stored. A key of that list opens its trader page directly (rank, score
-// over time, every trade, the score card to share). Until our recount can be proved against
-// the referee's signed hashes, any other key is told it is not in the signed top list, with no rank and
-// no score (Ben, 2026-09-29: never show a wrong figure).
+// "Find my DID": looks a did:key up in the contest's published ranking files (the summary on this site,
+// the shard on raw.githubusercontent.com, src/lib/contest-files.mjs). Nothing is sent but the address of
+// that file, and nothing is stored. A ranked key opens its trader page directly (rank, score over time,
+// position, every trade, the score card to share). Only keys with at least one settled trade are ranked:
+// any other key is told it has no trade yet, as far as our capture shows.
 import { avatarSvg } from "../lib/avatar.mjs";
 import { saved } from "../lib/saved-store";
-import { signedLine, type Signed } from "./ranking-lookup";
-import { pnlText, pnlTone, rankText, ranker } from "./saved-ranks";
+import { filesOf, lookup, type Signed } from "./ranking-lookup";
 
 const DID = /^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]{44}$/;
 
@@ -17,14 +16,13 @@ function el(tag: string, cls: string, text?: string): HTMLElement {
   return e;
 }
 
-function notSigned(top: number, lock: string | undefined, glyph: Node | undefined): HTMLElement {
+function noTrade(lock: string | undefined): HTMLElement {
   const box = el("div", "grid gap-3");
   const head = el("div", "flex items-center gap-3");
-  const icon = el("span", "grid size-10 shrink-0 place-items-center rounded-full bg-surface-raised text-text-secondary");
+  const icon = el("span", "grid size-10 place-items-center rounded-lg bg-warning-soft font-mono text-lg font-bold text-warning", "0");
   icon.setAttribute("aria-hidden", "true");
-  if (glyph) icon.append(glyph);
   const texts = el("p", "grid");
-  texts.append(el("span", "font-semibold", `Not in the signed top ${top}`), el("span", "text-xs text-text-muted", "Its score shows once it can be proved"));
+  texts.append(el("span", "font-semibold", "No trade yet"), el("span", "text-xs text-text-muted", "No settled trade in our capture"));
   head.append(icon, texts);
   box.append(head);
   if (lock) {
@@ -42,9 +40,8 @@ function init(root: HTMLElement) {
   const input = form.querySelector<HTMLInputElement>("input")!;
   const out = root.querySelector<HTMLElement>("[data-find-result]")!;
   const signed: Signed[] = JSON.parse(root.dataset.signed ?? "[]");
-  const rankOf = ranker(signed);
-  const glyph = () => root.querySelector<HTMLTemplateElement>("[data-find-icon]")?.content.firstElementChild?.cloneNode(true);
-  // the visitor's saved DIDs: listed here with their signed rank, and marked in the Top list
+  const files = filesOf(root)!;
+  // the visitor's saved DIDs: listed here with their rank, and marked in the Top 100
   const list = root.querySelector<HTMLElement>("[data-saved-list]");
   const head = root.querySelector<HTMLElement>("[data-saved-head]");
   const drawSaved = () => {
@@ -57,10 +54,16 @@ function init(root: HTMLElement) {
       const names = el("span", "grid min-w-0 flex-1");
       names.append(el("span", "truncate text-sm font-semibold text-text", s.nick), el("span", "font-mono text-[11px] text-text-muted", `${s.did.slice(8, 14)}…${s.did.slice(-6)}`));
       const right = el("span", "grid justify-items-end");
-      const r = rankOf(s.did);
-      right.append(el("span", "font-mono text-sm font-semibold text-text", rankText(r)), el("span", `font-mono text-[11px] ${pnlTone(r)}`, pnlText(r)));
+      const rank = el("span", "font-mono text-sm font-semibold text-text", "…");
+      const pnl = el("span", "font-mono text-[11px] text-text-muted", "");
+      right.append(rank, pnl);
       a.append(avatarSvg(s.did, 26), names, right);
       li.append(a);
+      lookup(files, s.did, signed).then(({ row }) => {
+        rank.textContent = row ? `#${row[0].toLocaleString("en-US")}` : "–";
+        pnl.textContent = row ? `${Number(row[2]) > 0 ? "+" : ""}${row[2]}` : "No trade";
+        pnl.className = `font-mono text-[11px] ${row && Number(row[2]) > 0 ? "text-accent" : row && Number(row[2]) < 0 ? "text-down" : "text-text-muted"}`;
+      }).catch(() => { rank.textContent = "–"; });
       return li;
     }));
     const dids = new Map(mine.map((s) => [s.did, s.nick]));
@@ -80,7 +83,7 @@ function init(root: HTMLElement) {
   window.addEventListener("roomcensus:saved", drawSaved);
   drawSaved();
 
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const did = input.value.trim();
     out.replaceChildren();
@@ -88,8 +91,17 @@ function init(root: HTMLElement) {
       out.append(el("p", "text-sm text-warning", "Not a did:key: it starts with did:key:z6Mk and has 56 characters."));
       return;
     }
-    if (signedLine(signed, did)) location.assign(`${location.pathname.replace(/\/?$/, "/")}did/?k=${encodeURIComponent(did)}`);
-    else out.append(notSigned(signed.length, root.dataset.lock, glyph()));
+    out.append(el("p", "text-sm text-text-muted", "Searching…"));
+    try {
+      const { row } = await lookup(files, did, signed);
+      if (row) {
+        location.assign(`${location.pathname.replace(/\/?$/, "/")}did/?k=${encodeURIComponent(did)}`);
+      } else {
+        out.replaceChildren(noTrade(root.dataset.lock));
+      }
+    } catch {
+      out.replaceChildren(el("p", "text-sm text-warning", "The ranking could not be read. Try again in a moment."));
+    }
   });
   root.dataset.ready = "";                                  // the search answers from here on (tests wait for it)
 }

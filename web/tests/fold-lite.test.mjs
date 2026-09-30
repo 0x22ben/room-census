@@ -48,23 +48,19 @@ test("a replay that lands on the ranking line matches it; one missing a trade do
   assert.equal(matchesLine(c, ["10.00", "200.00"]), false);
 });
 
-test("published trades are verified only if they add up to the signed score at the signed update", () => {
+test("published trades are verified only if they add up to the line's position and score at its sweep", () => {
   const trades = [[1, "b", "10", "200", "20"], [3, "s", "10", "210", "21"]];
   const marks = [[1, 200], [2, 205], [3, 210], [4, 212]];
   // flat after the sale: cash 10,000 - 20 - 2000 ... + 2100 - 21 = 10,059
-  assert.equal(verifiedTrades(trades, marks, 3, "59.00"), true);
-  assert.equal(verifiedTrades(trades, marks, 4, "59.00"), true);             // flat: the mark no longer moves it
-  assert.equal(verifiedTrades(trades, marks, 3, "59.01"), true);             // within 0.02 POLF
-  assert.equal(verifiedTrades(trades, marks, 3, "59.03"), false);            // just outside it
-  assert.equal(verifiedTrades(trades, marks, 3, "60.00"), false);            // a score off by 1
-  assert.equal(verifiedTrades(trades, marks, 2, "59.00"), false);            // a trade after the signed update
-  assert.equal(verifiedTrades(trades, marks, 5, "59.00"), false);            // no mark for that update
-  assert.equal(verifiedTrades([], marks, 3, "0.00"), false);
-  assert.equal(verifiedTrades(undefined, marks, 3, "0.00"), false);
-  // a sale and a buyback both missing change the score, and the score alone catches it
+  assert.equal(verifiedTrades(trades, marks, 3, "59.00", null), true);
+  assert.equal(verifiedTrades(trades, marks, 4, "59.00", null), true);             // flat: the mark no longer moves it
+  assert.equal(verifiedTrades(trades, marks, 3, "60.00", null), false);            // a score off by 1
+  assert.equal(verifiedTrades(trades, marks, 2, "59.00", null), false);            // a trade after the ranking's sweep
+  assert.equal(verifiedTrades(trades, marks, 5, "59.00", null), false);            // no mark for that sweep
+  assert.equal(verifiedTrades(trades, marks, 3, "59.00", undefined), false);       // no position to check
+  assert.equal(verifiedTrades([], marks, 3, "0.00", null), false);
+  // a sale and a buyback both missing: same position, another score
   const full = [[1, "b", "10", "200", "20"], [2, "s", "10", "205", "20.5"], [2, "b", "10", "205", "20.5"]];
-  assert.equal(verifiedTrades(full, marks, 3, "39.00"), true);               // 10,000 - 61 + 100 = 10,039
-  assert.equal(verifiedTrades(full.slice(0, 1), marks, 3, "39.00"), false);  // 10,000 - 20 + 100 = 10,080
-  // an open position is valued at the signed update's mark: a long of 10 bought at 200, marked at 212
-  assert.equal(verifiedTrades(full.slice(0, 1), marks, 4, "100.00"), true);  // 10,000 - 20 + 120 = 10,100
+  assert.equal(verifiedTrades(full, marks, 3, "39.00", ["10", "205"]), true);       // 10,000 - 61 + 100 = 10,039
+  assert.equal(verifiedTrades(full.slice(0, 1), marks, 3, "39.00", ["10", "205"]), false);
 });
