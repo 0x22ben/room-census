@@ -320,7 +320,7 @@ class Artifact(unittest.TestCase):
                 needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched ", "data-my-dids ",
                                                        "data-verify-summary ", "data-wizard ", "data-find-did ",
                                                        "data-trading-chart=", "data-did-page ", "data-did-switcher ",
-                                                       "data-rankings "))
+                                                       "data-rankings ", "data-paid-check "))
                 self.assertEqual(len(scripts), needed + 1)
                 srcs = re.findall(r'<script\b[^>]*\bsrc="(/_astro/[\w.-]+\.js)"', text)
                 bundles = [(DIST / src.lstrip("/")).read_text(encoding="utf-8") for src in srcs]

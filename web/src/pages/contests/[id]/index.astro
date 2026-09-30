@@ -7,6 +7,8 @@ import ContestHeader from "../../../components/ContestHeader.astro";
 import Help from "../../../components/Help.astro";
 import Px from "../../../components/Px.astro";
 import TradingChart, { type View } from "../../../components/TradingChart.astro";
+import { rankings } from "../../../lib/rankings";
+import { eachLabel, winnersOf } from "../../../lib/winners.mjs";
 import { SHARDS_BASE, change, contests, countdown, phaseOf, positionParts, shortDid, signed, sparklines, tabs, topTraders, type Contest } from "../../../lib/contests";
 
 export function getStaticPaths() {
@@ -62,6 +64,10 @@ const cells = [
 ];
 const tile = { accent: "bg-accent-soft text-accent", warning: "bg-warning-soft text-warning" } as const;
 const current = tabs(c)[0].label;
+// an ended contest FLOP Labs has paid (Sonnet): who was paid and why, from its payout list (Pencil HTuvp)
+const paid = rankings().paid.find((p) => p.id === c.id);
+const win = paid ? winnersOf(paid.payouts, paid.roles) : undefined;
+const n = (v: number) => v.toLocaleString("en-US");
 ---
 <Base title={`${c.title}: live leaderboard and PnL`} description={`${c.title}, live: price, active traders, the referee's signed top list and our recount, and every trader's page.`}>
   <ContestHeader contest={c} current={current} />
@@ -87,6 +93,46 @@ const current = tabs(c)[0].label;
       <div class="grid gap-1 rounded-xl border border-border bg-surface p-4"><p class="text-sm text-text-secondary">Prize</p><p class="text-xl">{c.prize}</p></div>
       <div class="grid gap-1 rounded-xl border border-border bg-surface p-4"><p class="text-sm text-text-secondary">Rules</p><a href={c.rules} class="text-link">Rules on GitHub</a></div>
     </div>
+  )}
+
+  {paid && win && (
+    <section aria-labelledby="winners-title" class="mt-8 grid gap-4" data-winners>
+      <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 id="winners-title" class="text-xl font-semibold">Winners</h2>
+        <p class="font-mono text-sm text-text-muted" data-winners-total>{n(win.total)} FLOP paid to {n(win.dids)} DIDs</p>
+      </div>
+      <div class="overflow-hidden rounded-xl border border-border bg-surface">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3.5 sm:px-6">
+          <h3 class="font-semibold">Winning poem · {win.entry}</h3>
+          <p class="font-mono text-xs text-text-muted">{win.authors.length} authors · {n(win.authorsFlop)} FLOP</p>
+        </div>
+        <ul aria-label="Authors of the winning poem">
+          {win.authors.map((a) => (
+            <li class="flex items-center justify-between gap-3 border-t border-border px-4 py-3 sm:px-6" data-author={a.did}>
+              <span class="flex min-w-0 items-center gap-3">
+                <span class="font-mono text-sm text-text" title={a.did}>{shortDid(a.did)}</span>
+                <span class="rounded-md bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">Author</span>
+              </span>
+              <span class="font-mono font-semibold whitespace-nowrap text-accent tabular-nums">{n(a.flop)} FLOP</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div class="grid gap-3 rounded-xl border border-border bg-surface px-4 py-3.5 sm:px-6 sm:py-4" data-paid-check data-url="/rankings/ranking.json" data-contest={c.id}>
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h3 class="font-semibold">Voters who chose it</h3>
+          <p class="font-mono text-xs text-text-muted" data-voters>{n(win.voters.count)} voters · {eachLabel(win.voters)} · {n(win.voters.total)} FLOP</p>
+        </div>
+        <form class="flex min-h-11 items-center gap-2 rounded-lg border border-border-strong bg-bg pr-1.5 pl-3" data-paid-form>
+          <label for="paid-input" class="sr-only">Was my DID paid? Your did:key</label>
+          <input id="paid-input" name="did" autocomplete="off" spellcheck="false" placeholder="Was my DID paid?  did:key:z6Mk…" class="min-w-0 flex-1 bg-transparent font-mono text-sm text-text outline-none placeholder:text-text-muted" />
+          <button type="submit" class="min-h-8 rounded-md bg-accent px-3 text-sm font-semibold text-on-accent">Check</button>
+        </form>
+        <p class="text-sm empty:hidden" data-paid-result aria-live="polite"></p>
+        <noscript><p class="text-sm text-text-muted">Checking needs JavaScript. The full list is also a file: <a class="text-link" href="/rankings/ranking.json">ranking.json</a>.</p></noscript>
+      </div>
+      <p class="text-xs text-text-muted">From FLOP Labs' payout list, byte for byte the one the referee signed ({paid.receipt}).</p>
+    </section>
   )}
 
   {(views.length > 0 || c.ranking) && (
@@ -178,4 +224,5 @@ const current = tabs(c)[0].label;
     </section>
   )}
   {c.ranking && <script>import "../../../scripts/find-did.ts";</script>}
+  {paid && <script>import "../../../scripts/paid-check.ts";</script>}
 </Base>

@@ -7,13 +7,15 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-export type Paid = { id: string; title: string; prize: string; payouts: Map<string, number>; roles: Map<string, { role: string; entry: string }>; labels: Record<string, string> };
+export type Paid = { id: string; title: string; prize: string; receipt: string; payouts: Map<string, number>; roles: Map<string, { role: string; entry: string }>; labels: Record<string, string> };
 export type Pending = { id: string; title: string; prize: string; note: string };
 /** One line: shared rank (ties share it), DID, total FLOP, FLOP and role per paid contest. */
 export type RankedDid = { rank: number; did: string; flop: number; by: Record<string, number>; roles: Record<string, string> };
 
 const SOURCES = [
   { id: "sonnet-2", title: "Sonnet", prize: "Winning poem", file: "sonnet-2.payouts.json", sha256: "ebc0de591eb7108180a70cb28b5b7cf08ac0a4447fdf8e0ebfc389e47dffeff1",
+    // the referee record that signed that SHA-256 (payments_sha256), in d-sonnet-2-results
+    receipt: "settlement receipt, seq 45498",
     // allocations.csv, SHA-256 as listed in the results manifest.json of FLOP Labs
     allocations: "sonnet-2.allocations.csv", allocationsSha256: "81fd259f3c5da985e2a6366ab089db8bf643cfe47d1d750263868cdf1981f4d3",
     labels: { contributor: "Wrote the poem", voter: "Voted for the winner" } as Record<string, string> },
@@ -62,7 +64,7 @@ function load(): Paid[] {
       roles.set(did, { role: f[cRole], entry: f[cEntry] });
     }
     if (roles.size !== payouts.size) throw new Error(`${s.allocations}: ${roles.size} DIDs, the payout map has ${payouts.size}`);
-    return { id: s.id, title: s.title, prize: s.prize, payouts, roles, labels: s.labels };
+    return { id: s.id, title: s.title, prize: s.prize, receipt: s.receipt, payouts, roles, labels: s.labels };
   });
 }
 
