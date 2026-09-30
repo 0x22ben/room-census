@@ -130,7 +130,7 @@ const traderHref = (did: string) => (live.has(did) ? `/contests/close-1/did/?k=$
             <th scope="col" class="hidden px-4 py-2 sm:table-cell">Contests</th>
             <th scope="col" class="hidden px-4 py-2 md:table-cell">Role</th>
             {paid.map((c) => <th scope="col" class="hidden px-4 py-2 lg:table-cell">{c.title}</th>)}
-            {pending.map((p) => <th scope="col" class="hidden px-4 py-2 lg:table-cell">{p.title}</th>)}
+            {pending.map((p) => <th scope="col" class="hidden px-4 py-2 lg:table-cell">{p.title} (our recount)</th>)}
             <th scope="col" class="w-8 pr-4 sm:pr-5"><span class="sr-only">Open</span></th>
           </tr>
         </thead>
