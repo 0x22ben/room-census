@@ -6,6 +6,15 @@ export const SHARDS = 256;
 /** "bf" for did:key:z6MkgTDg…u7Hne. */
 export function shard(did) {
   let h = 0x811c9dc5;
+  // a did:key is ASCII, where each character is its own UTF-8 byte: no encoder needed (the staging check
+  // hashes about 9 million keys)
+  if (/^[\x00-\x7f]*$/.test(did)) {
+    for (let i = 0; i < did.length; i++) {
+      h ^= did.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return (h % SHARDS).toString(16).padStart(2, "0");
+  }
   for (const byte of new TextEncoder().encode(did)) {
     h ^= byte;
     h = Math.imul(h, 0x01000193) >>> 0;

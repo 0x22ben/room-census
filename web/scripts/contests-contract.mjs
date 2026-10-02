@@ -23,6 +23,7 @@ const HEX2 = /^[0-9a-f]{2}$/;
 const AMOUNT = /^\d{1,9}(\.\d{1,2})?$/;
 const FEE = /^\d{1,12}(\.\d{1,30})?$/;
 const MINT = new Set(["confirmed", "not_established"]);
+const SIDES = new Set(["b", "s", "x"]);
 
 const fail = (msg) => { throw new ContestContractError(msg); };
 const need = (ok, msg) => { if (!ok) fail(msg); };
@@ -121,7 +122,8 @@ function contest(c, capturedAt, where) {
 }
 
 /** Ranking v2: a summary with the first places, and every key in one of 256 files by the hash of its
- * DID. The referee's signed list comes first with its own ranks and signed scores, then our recount. */
+ * DID. The referee's signed list comes first with its own ranks and signed scores, then our recount.
+ * `files` is the set of the staged paths. */
 function rankingV2(doc, c, where, files, read) {
   need(doc.sweep === c.ranking.sweep && int(doc.sweep, 1), `${where}: its update differs from the index`);
   need(int(doc.traders) && c.ranking.traders === doc.traders && doc.shards === SHARDS, `${where}: trader count or shard count differs`);
@@ -151,31 +153,40 @@ function rankingV2(doc, c, where, files, read) {
       }
     }
   });
-  // every key in its shard, every rank once
+  // every key in its shard, every rank once. The shards are read, checked and dropped one at a time
+  // (about 9 million keys and 1 GB of rankings on 2 Oct 2026): only the rank bitmap, the key count and
+  // the shard rows of the top-list keys are kept. A key is repeated only within its own shard, since
+  // each row must sit in the shard its DID hashes to, so a set of one shard's keys finds every repeat.
   const ranks = new Uint8Array(doc.traders + 1);
-  const byDid = new Map();
+  const ofTop = new Map(doc.top.map((r) => [r[1], undefined]));
+  const self = c.self_key ? c.self_key.did : undefined;
+  let keys = 0, selfListed = false;
   for (let k = 0; k < SHARDS; k++) {
     const hh = k.toString(16).padStart(2, "0");
     const rel = `data/contests/${c.id}.ranking.${hh}.json`;
-    need(files.includes(rel), `${where}: shard ${hh} is missing`);
+    need(files.has(rel), `${where}: shard ${hh} is missing`);
     const d = read(rel);
     need(d && d.schema === "room-census/contest-ranking-shard/1" && d.contest === c.id && d.sweep === doc.sweep && d.shard === hh && Array.isArray(d.rows),
       `${rel} is not shard ${hh} of this ranking`);
+    const listed = new Set();
     d.rows.forEach((r, i) => {
       row(r, `${rel}: row ${i + 1}`);
       need(shard(r[1]) === hh, `${rel}: ${r[1]} belongs to shard ${shard(r[1])}`);
       need(r[0] <= doc.traders && ranks[r[0]] === 0, `${rel}: rank ${r[0]} is out of range or repeated`);
       ranks[r[0]] = 1;
-      need(!byDid.has(r[1]), `${rel}: ${r[1]} is listed twice`);
-      byDid.set(r[1], r);
+      need(!listed.has(r[1]), `${rel}: ${r[1]} is listed twice`);
+      listed.add(r[1]);
+      if (ofTop.has(r[1])) ofTop.set(r[1], [r[0], r[2], r[3]]);
+      if (r[1] === self) selfListed = true;
     });
+    keys += listed.size;
   }
-  need(byDid.size === doc.traders, `${where}: the shards hold ${byDid.size} keys, not ${doc.traders}`);
+  need(keys === doc.traders, `${where}: the shards hold ${keys} keys, not ${doc.traders}`);
   for (const r of doc.top) {
-    const same = byDid.get(r[1]);
-    need(same && same[0] === r[0] && same[2] === r[2] && same[3] === r[3], `${where}: ${r[1]} differs between the top list and its shard`);
+    const same = ofTop.get(r[1]);
+    need(same && same[0] === r[0] && same[1] === r[2] && same[2] === r[3], `${where}: ${r[1]} differs between the top list and its shard`);
   }
-  if (c.self_key) need(c.self_key.settled_trade === byDid.has(c.self_key.did), `${where}: our key's settled-trade status disagrees with the ranking`);
+  if (c.self_key) need(c.self_key.settled_trade === selfListed, `${where}: our key's settled-trade status disagrees with the ranking`);
 }
 
 const RANKING_V3_KEYS = ["at", "contest", "schema", "shards", "sweep"];
@@ -211,7 +222,7 @@ function trades(c, sweep, files, read, only) {
       need(DID.test(did) && shard(did) === hh && Array.isArray(list) && list.length > 0, `${rel}: bad key ${did}`);
       need(!only || only.has(did), `${rel}: ${did} is not in the referee's signed top list, its trades are not published`);
       for (const t of list) {
-        need(Array.isArray(t) && t.length === 5 && int(t[0], 1) && t[0] <= d.sweep && ["b", "s", "x"].includes(t[1])
+        need(Array.isArray(t) && t.length === 5 && int(t[0], 1) && t[0] <= d.sweep && SIDES.has(t[1])
           && AMOUNT.test(t[2] ?? "") && AMOUNT.test(t[3] ?? "") && FEE.test(t[4] ?? ""), `${rel}: a trade of ${did} is malformed`);
       }
     }
@@ -250,10 +261,13 @@ function ranking(doc, c, where) {
   if (c.self_key) need(c.self_key.settled_trade === seen.has(c.self_key.did), `${where}: our key's settled-trade status disagrees with the ranking`);
 }
 
-/** Checks data/contests/ as a whole. `files` are the staged paths under data/contests/, `read(rel)` parses one. */
+/** Checks data/contests/ as a whole. `files` are the staged paths under data/contests/, `read(rel)` parses one.
+ * Each file is read once and nothing of a shard is kept but a compact summary, so `read` may load it from
+ * disk on every call: the whole export never has to be in memory. */
 export function checkContests(files, read) {
   if (files.length === 0) return;
-  need(files.includes("data/contests/index.json"), "data/contests/ has files but no index.json");
+  const present = new Set(files);
+  need(present.has("data/contests/index.json"), "data/contests/ has files but no index.json");
   const index = read("data/contests/index.json");
   need(index && index.schema === "room-census-contests/2" && iso(index.captured_at) && Array.isArray(index.contests) && index.contests.length > 0,
     "data/contests/index.json is not a room-census-contests/2 document");
@@ -265,14 +279,14 @@ export function checkContests(files, read) {
     contest(c, index.captured_at, `contest ${c.id}`);
     if (c.ranking) {
       const rel = `data/contests/${c.id}.ranking.json`;
-      need(c.ranking.file === `/${rel}` && files.includes(rel), `ranking of ${c.id} does not resolve: ${c.ranking.file}`);
+      need(c.ranking.file === `/${rel}` && present.has(rel), `ranking of ${c.id} does not resolve: ${c.ranking.file}`);
       const doc = read(rel);
       let only;
       if (doc && doc.schema === "room-census/contest-ranking/3" && doc.contest === c.id) {
         rankingV3(doc, c, rel);
         only = new Set(c.leaderboard.rows.map((r) => r.did));
       } else if (doc && doc.schema === "room-census/contest-ranking/2" && doc.contest === c.id) {
-        rankingV2(doc, c, rel, files, read);
+        rankingV2(doc, c, rel, present, read);
         for (let k = 0; k < SHARDS; k++) named.add(`data/contests/${c.id}.ranking.${k.toString(16).padStart(2, "0")}.json`);
       } else {
         ranking(doc, c, rel);

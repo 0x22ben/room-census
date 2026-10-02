@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { StagingError, offSite, stage } from "../scripts/stage-public-data.mjs";
 import { shard } from "../src/lib/did-shard.mjs";
 import { DIDS, validIndex, validRanking, validRankingV2Files, validRankingV3Files } from "./fixtures/contests-valid.mjs";
+import { MUTATIONS, TRADE_MUTATIONS } from "./fixtures/contests-v2-mutations.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -237,6 +238,18 @@ test("a trades shard the contract refuses still stops the build", () => {
   contestFiles(docs);
   refused(/bad key/);
 });
+
+// The shards are read from disk one at a time and never all kept in memory: from the files, staging
+// refuses every alteration the contract refuses in memory (contests-contract-v2.test.mjs).
+for (const [name, mutate, pattern, withTrades] of [...MUTATIONS.map((m) => [...m, false]), ...TRADE_MUTATIONS.map((m) => [...m, true])]) {
+  test(`staging from the files refuses: ${name}`, () => {
+    const docs = validRankingV2Files(withTrades);
+    mutate(docs, docs["data/contests/index.json"].contests[0], docs["data/contests/close-1.ranking.json"]);
+    contestFiles(docs);
+    refused(pattern);
+    assert.ok(!existsSync(out));
+  });
+}
 
 // Ranking v3 (Ben, 2026-09-30): no ranking shard, the trades of the signed keys only; the old ranking
 // shards of our recount, left in the folder, stop the build instead of being published.

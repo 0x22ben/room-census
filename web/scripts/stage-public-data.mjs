@@ -178,6 +178,21 @@ function checkContests(bytes, json) {
   }
 }
 
+/** The bytes of the public files, for checkConsistency: a read-only Map of the files the site serves,
+ * read once here, checked, then copied and compared with these same bytes. The off-site contest shards
+ * (about 2 GB on 2 Oct 2026) are not kept: each is read from disk when the contract checks it, then
+ * dropped, so the whole export never sits in memory. Every file is checked as a regular file first. */
+function publicBytes(repo, files) {
+  for (const rel of files) regularFile(repo, rel);
+  const kept = new Map(files.filter((rel) => !offSite(rel)).map((rel) => [rel, readFileSync(regularFile(repo, rel))]));
+  const all = new Set(files);
+  return {
+    has: (rel) => all.has(rel),
+    keys: () => all.values(),
+    get: (rel) => (kept.has(rel) ? kept.get(rel) : all.has(rel) ? readFileSync(regularFile(repo, rel)) : undefined),
+  };
+}
+
 /** Rebuilds `out` from the allowlist of `repo`. Returns the inventory of staged files, and how many
  * checked files were left out of the site (the contest shards). */
 export function stage({ repo, out }) {
@@ -193,7 +208,7 @@ export function stage({ repo, out }) {
   out = join(repo, "web", ".public");
   rmSync(out, { recursive: true, force: true });       // first: a failed run leaves nothing to fall back on
   const files = allowlist(repo);
-  const bytes = new Map(files.map((rel) => [rel, readFileSync(regularFile(repo, rel))]));
+  const bytes = publicBytes(repo, files);
   const summary = checkConsistency(bytes);
   const inventory = [];
   let unstaged = 0;

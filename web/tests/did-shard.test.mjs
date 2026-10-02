@@ -10,6 +10,17 @@ test("a key lands in the same shard as on the server", () => {
   assert.equal(shard("did:key:z6MkowHQwsx9xr84WbWN3YCnKutyBnBXkT1ChKY4uEAAMzte"), "5e");
 });
 
+test("the ASCII fast path hashes the same UTF-8 bytes as the encoder", () => {
+  const reference = (s) => {
+    let h = 0x811c9dc5;
+    for (const byte of new TextEncoder().encode(s)) h = Math.imul(h ^ byte, 0x01000193) >>> 0;
+    return (h % 256).toString(16).padStart(2, "0");
+  };
+  for (const s of ["", "did:key:z6MkgTDg3hEz4pwiFcJCDjRvR3hZbVWwy23oGuqFbFxu7Hne", "\x7f~", "did:key:z6Mké", "日本", "a\u{1F600}b"]) {
+    assert.equal(shard(s), reference(s), JSON.stringify(s));
+  }
+});
+
 test("shards are two lowercase hex digits and the file sits next to the ranking", () => {
   for (let i = 0; i < 200; i++) assert.match(shard(`did:key:z6Mk${i}`), /^[0-9a-f]{2}$/);
   assert.equal(shardFile("/data/contests/close-1.ranking.json", "trades", "0a"), "/data/contests/close-1.trades.0a.json");
