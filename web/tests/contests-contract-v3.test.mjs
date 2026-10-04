@@ -45,3 +45,30 @@ for (const [name, mutate, pattern] of MUTATIONS) {
     assert.throws(run(mutate), (e) => e instanceof ContestContractError && pattern.test(e.message), `${name}: ${pattern}`);
   });
 }
+
+// The closing price the referee posted (2026-10-04): published for an ended contest, with the trade it comes from.
+const ENDED = (d, c) => {
+  d["data/contests/index.json"].captured_at = "2026-10-04T10:00:15.644705Z";
+  c.status = "ended";
+  c.final = { price: "234.69", trade: { tid: 868189527772348, time: "2026-10-04T09:59:40.596000Z" } };
+};
+const ended = (more = () => {}) => (d, c, m) => { ENDED(d, c); more(d, c, m); };
+
+test("an ended contest may carry the referee's closing price and its trade", () => {
+  assert.doesNotThrow(run(ended()));
+});
+
+const FINAL_MUTATIONS = [
+  ["a closing price with one decimal", (d, c) => { c.final.price = "234.7"; }, /final price is malformed/],
+  ["a closing price that is not text", (d, c) => { c.final.price = 234.69; }, /final price is malformed/],
+  ["a closing price with a key we do not know", (d, c) => { c.final.note = "x"; }, /final price is malformed/],
+  ["a closing trade id that is not a whole number", (d, c) => { c.final.trade.tid = "868189527772348"; }, /final price is malformed/],
+  ["a closing trade time that is not a time", (d, c) => { c.final.trade.time = "yesterday"; }, /final price is malformed/],
+  ["a closing trade after the final price time", (d, c) => { c.final.trade.time = "2026-10-04T10:00:01Z"; }, /not before the final price time/],
+  ["a closing price on a contest that has not ended", (d, c) => { c.status = "closed"; d["data/contests/index.json"].captured_at = "2026-10-04T09:30:00Z"; }, /only for an ended contest/],
+];
+for (const [name, mutate, pattern] of FINAL_MUTATIONS) {
+  test(`refused: ${name}`, () => {
+    assert.throws(run(ended(mutate)), (e) => e instanceof ContestContractError && pattern.test(e.message), `${name}: ${pattern}`);
+  });
+}

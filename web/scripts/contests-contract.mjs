@@ -77,6 +77,14 @@ function contest(c, capturedAt, where) {
     `${where}: coverage must be null or start at or after the opening`);
   if (c.coverage_start !== null) need(Date.parse(c.coverage_start) <= Date.parse(capturedAt), `${where}: coverage starts after the capture time`);
   if (c.winner !== undefined) need(text(c.winner, 60) && text(c.winner_source, 60), `${where}: a winner needs its source`);
+  if (c.final !== undefined) {   // the closing price the referee posted: a signed fact, shown once the contest has ended
+    const f = c.final;
+    need(f !== null && typeof f === "object" && Object.keys(f).sort().join() === "price,trade" && typeof f.price === "string" && PRICE.test(f.price)
+      && f.trade !== null && typeof f.trade === "object" && Object.keys(f.trade).sort().join() === "tid,time" && int(f.trade.tid, 1) && iso(f.trade.time),
+      `${where}: the final price is malformed (expected a price and the trade it comes from)`);
+    need(c.final_price_at !== null && c.status === "ended", `${where}: a final price is published only for an ended contest with a final price time`);
+    need(Date.parse(f.trade.time) < Date.parse(c.final_price_at), `${where}: the final price trade is not before the final price time`);
+  }
   checks(c, where);
   if (c.latest !== undefined) {
     const l = c.latest;
