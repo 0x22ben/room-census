@@ -154,7 +154,7 @@ test("the saved DIDs have column labels above them, and none without a saved DID
   await navigate("/contests/close-1/");
   await until(`document.querySelector("[data-saved-list] li") !== null`, "the saved DID");
   assert.equal(await page(`document.querySelector("[data-saved-head]").hidden`), false);
-  assert.equal(await page(`[...document.querySelectorAll("[data-saved-head] span")].map((x) => x.innerText).join(" | ")`), "TRADER | RANK · SCORE · OUR RECOUNT");
+  assert.equal(await page(`[...document.querySelectorAll("[data-saved-head] span")].map((x) => x.innerText).join(" | ")`), "TRADER | RANK · SCORE");
   await until(`document.querySelector("[data-saved-list] li").textContent.includes("#${rank.toLocaleString("en-US")}")`, "the saved DID's rank");
   await page(`(() => { localStorage.removeItem("roomcensus.saved"); return true; })()`);
 });

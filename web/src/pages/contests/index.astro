@@ -29,7 +29,7 @@ function stats(c: Contest, short: boolean): Stat[] {
   else if (p === "upcoming") out.push({ label: "Starts in", value: countdown(c.opening) });
   else if (p === "closed") out.push({ label: "Final price at", value: dateTimeUtc(c.final_price_at!) });
   else if (c.winner) out.push({ label: c.winner_source === "named by the referee" ? "Winner · referee" : "Winner", value: c.winner });
-  if (c.ranking) out.push({ label: "Traders (our recount)", value: short ? compact(c.ranking.traders) : n(c.ranking.traders) });
+  if (c.ranking) out.push({ label: "Traders", value: short ? compact(c.ranking.traders) : n(c.ranking.traders) });
   return out;
 }
 const chip = "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono text-[10px] font-bold tracking-widest uppercase";

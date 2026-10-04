@@ -172,8 +172,8 @@ export async function drawCard(card: Card): Promise<Blob> {
   });
 
   // where the number comes from
-  icon(ctx, "check", 64, 585, 24, C.up);
-  text(ctx, `${card.official ? "Signed by the referee" : "Our recount of signed trades"} · update ${card.sweep}`, 98, 604, mono(18), C.soft);
+  if (card.official) icon(ctx, "check", 64, 585, 24, C.up);          // the check mark only vouches for a referee-signed score
+  text(ctx, `${card.official ? "Signed by the referee · update" : "Update"} ${card.sweep}`, card.official ? 98 : 64, 604, mono(18), C.soft);
   ctx.font = mono(25);
   ctx.letterSpacing = "1px";
   const uw = ctx.measureText("roomcensus.xyz").width;

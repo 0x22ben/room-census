@@ -82,8 +82,7 @@ function init(root: HTMLElement) {
     q("[data-head]").hidden = false;
     q("[data-body]").hidden = false;
     q("[data-short]").textContent = short;
-    q("[data-source]").textContent = official ? "signed by the referee"
-      : row[3] === "partial" ? "our recount · may miss its earliest trades" : "our recount of the signed trades";
+    q("[data-source]").textContent = official ? " · signed by the referee" : "";
     q("[data-rank]").textContent = `#${n(row[0])}`;
     const scoreEl = q("[data-score]");
     scoreEl.textContent = signed(score);

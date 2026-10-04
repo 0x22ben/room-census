@@ -38,7 +38,7 @@ if (s.length) {
     { label: "Short", token: "--color-down", values: s.map((p) => p.short ?? null) },
   ] });
   views.push(has("active")
-    ? { id: "traders", label: "Traders", min: 0, series: [{ label: "Active traders (our recount)", token: "--color-accent", values: s.map((p) => p.active ?? null) }] }
+    ? { id: "traders", label: "Traders", min: 0, series: [{ label: "Active traders", token: "--color-accent", values: s.map((p) => p.active ?? null) }] }
     : { id: "players", label: "Players", min: 0, series: [{ label: "Registered players", token: "--color-accent", values: s.map((p) => p.owners) }] });
 }
 
@@ -56,7 +56,7 @@ const clock = phase === "live" ? { label: "Locks in", value: countdown(c.trading
   : phase === "upcoming" ? { label: "Starts in", value: countdown(c.opening) } : { label: "Ended", value: "Final" };
 const cells = [
   { icon: "chart-line", tone: "accent", label: "NVDA", value: price ? price : "–", delta: move, deltaTone: move?.startsWith("−") ? "text-down" : "text-accent" },
-  { icon: "users", tone: "accent", label: "Active traders · our recount", value: traders !== undefined ? traders.toLocaleString("en-US") : "–",
+  { icon: "users", tone: "accent", label: "Active traders", value: traders !== undefined ? traders.toLocaleString("en-US") : "–",
     delta: hourAgo !== undefined ? `${hourAgo >= 0 ? "+" : "−"}${compact(Math.abs(hourAgo))} 1h` : undefined, deltaTone: "text-accent" },
   { icon: "crown", tone: "warning", label: "#1 score", value: lb?.rows[0] ? signed(lb.rows[0].pnl) : "–", delta: lb?.rows[0] ? "POLF" : undefined, deltaTone: "text-text-muted", valueTone: "text-accent" },
   { icon: "trophy", tone: "warning", label: "Prize · top 3", value: prizeN ? compact(prizeN) : c.prize, delta: "FLOP", deltaTone: "text-text-muted" },
@@ -147,7 +147,7 @@ const n = (v: number) => v.toLocaleString("en-US");
           data-lock={phase === "live" ? countdown(c.trading_lock_at) : undefined}>
           <h2 id="find-title" class="flex items-center gap-2 font-semibold"><Px name="search" size={24} class="text-accent" />Find my DID</h2>
           <div class="grid gap-1">
-            <p class="flex justify-between px-2 font-mono text-[10px] font-semibold tracking-wider text-text-muted uppercase" data-saved-head hidden><span>Trader</span><span>Rank · Score · our recount</span></p>
+            <p class="flex justify-between px-2 font-mono text-[10px] font-semibold tracking-wider text-text-muted uppercase" data-saved-head hidden><span>Trader</span><span>Rank · Score</span></p>
             <ul class="grid gap-1" data-saved-list aria-label="Saved DIDs"></ul>
           </div>
           <form class="flex min-h-11 items-center gap-2 rounded-lg border border-border-strong bg-bg pr-1.5 pl-3" data-find-form>
@@ -211,8 +211,6 @@ const n = (v: number) => v.toLocaleString("en-US");
                     {source === "signed" && check === "differs" && <Px name="warning-diamond" size={12} class="inline text-warning" label="Signed by the referee; our recount finds a different score" />}
                     {source === "signed" && check === "pending" && <Px name="hourglass" size={12} class="inline text-text-muted" label="Signed by the referee; not checked by our recount yet" />}
                     {source === "signed" && check === "match" && <Px name="check" size={24} class="inline text-accent" label="Signed by the referee and checked by our recount" />}
-                    {source !== "signed" && <Px name="calculator" size={12} class:list={["inline", source === "partial" ? "text-text-muted" : "text-text-secondary"]}
-                            label={source === "partial" ? "Our recount; it may miss trades from before our capture" : "Our recount of the signed trades"} />}
                   </td>
                   <td class="pr-4 text-right text-text-muted sm:pr-5"><Px name="chevron-right" size={12} class="inline" /></td>
                 </tr>
