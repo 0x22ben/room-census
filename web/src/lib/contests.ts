@@ -8,10 +8,7 @@ import { json } from "./files";
 import sampleRanking from "../fixtures/close-1.ranking.sample.json";
 import { contestFilesBase } from "./contest-files.mjs";
 import { shard, shardFile } from "./did-shard.mjs";
-import { scoreCurve, verifiedTrades } from "./fold-lite.mjs";
-import { lastDay, sparkPath } from "./signed-history.mjs";
 
-type Trade = [number, "b" | "s" | "x", string, string, string];
 import { PHASE_LABEL, after, phase, until } from "./contest-time.mjs";
 import { dateTimeUtc } from "./format";
 
@@ -27,7 +24,6 @@ export const SHARDS_BASE: string = contestFilesBase(process.env.CONTEST_DATA_REF
 // The shards are not in the site, so the build reads them from the checkout (data/contests/, filled by
 // pages.yml from that same commit), after the staging step has checked every one of them.
 const REPOSITORY = resolve(process.cwd(), "..");
-const hasShard = (rel: string): boolean => existsSync(resolve(REPOSITORY, rel));
 const shardJson = <T>(rel: string): T => JSON.parse(readFileSync(resolve(REPOSITORY, rel), "utf8")) as T;
 
 export type CheckState = "ok" | "warn" | "wait";
@@ -85,7 +81,7 @@ export const CAPTURED_AT: string = doc.captured_at;
 export const contests = (): Contest[] => doc.contests;
 export const contest = (id: string): Contest | undefined => contests().find((c) => c.id === id);
 
-/** Tabs of a contest page: Live (the numbers, the chart and the ranking) and Verify (the checks). */
+/** Tabs of a contest page: Live (the numbers and the ranking) and Verify (the checks). */
 export function tabs(c: Contest): { label: string; href: string }[] {
   const base = `/contests/${c.id}/`;
   return [
@@ -123,39 +119,6 @@ export function topTraders(c: Contest, limit = 100): TopRow[] {
     if (out.length >= limit) break;
     if (seen.has(did)) continue;
     out.push({ rank: out.length + 1, did, pnl, source: source === "partial" ? "partial" : "complete", position });
-  }
-  return out;
-}
-
-/** The last day of each key's score (288 updates), replayed at build time from the published trades,
- * as a 96 x 26 SVG path, and whether it went up. Keys whose trades are missing or do not add up to their
- * ranking line (verifiedTrades) are never replayed: a key of the referee's signed list then gets the
- * last day of its signed scores (leaderboard.history), placed by update; any other key gets nothing.
- * Never a wrong curve. */
-export function sparklines(c: Contest, rows: { did: string; pnl: string; position?: RankRow[4] }[]): Map<string, { d: string; up: boolean }> {
-  const out = new Map<string, { d: string; up: boolean }>();
-  if (!c.ranking || !LIVE) return out;
-  // up to the ranking's sweep only: the published trades say nothing of a key's later trades
-  const marks = (c.series ?? []).map((p) => [p.n, Number(p.global ?? p.price ?? 0)] as [number, number])
-    .filter(([n, v]) => v > 0 && n <= c.ranking!.sweep);
-  const recent = marks.slice(-289);
-  const history = c.leaderboard?.history;
-  const files = new Map<string, Record<string, Trade[]> | null>();
-  for (const { did, pnl, position } of rows) {
-    const s = shard(did);
-    if (!files.has(s)) {
-      const rel = shardFile(c.ranking.file, "trades", s).replace(/^\//, "");
-      files.set(s, hasShard(rel) ? shardJson<{ keys: Record<string, Trade[]> }>(rel).keys : null);
-    }
-    const trades = files.get(s)?.[did];
-    let spark: { d: string; up: boolean } | undefined;
-    if (trades?.length && verifiedTrades(trades, marks, c.ranking.sweep, pnl, position)) {
-      spark = sparkPath(scoreCurve(trades, marks).slice(-recent.length));
-    } else if (history?.[did]) {
-      const day: SignedPoint[] = lastDay(history[did], c.leaderboard!.sweep);
-      spark = sparkPath(day.map((p) => Number(p[1])), day.map((p) => p[0]));
-    }
-    if (spark) out.set(did, spark);
   }
   return out;
 }

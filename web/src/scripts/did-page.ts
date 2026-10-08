@@ -1,24 +1,16 @@
 // The trading page of one key: reads ?k=, its ranking line and its settled trades, then replays the
 // trades with the contest's accounting (close_call_fold.py: first in, first out, fees taken from cash)
-// to draw the score after each referee update, the best trades and the open position. Numbers here are
-// floating point, for display: the ranking line carries the recounted score itself. When a key of the
-// referee's signed list has trades that do not add up, its curve is drawn from the referee's own signed
-// scores instead (leaderboard.history, data-history), exact at every point it has.
-import { CategoryScale, Chart, Filler, LinearScale, LineController, LineElement, PointElement, Tooltip } from "chart.js";
+// to show the best trades, the open position and every trade. Numbers here are floating point, for
+// display: the ranking line carries the recounted score itself. No chart: the contest is over.
 import { Account, MINT, verifiedTrades } from "../lib/fold-lite.mjs";
-import { robustRange } from "../lib/robust-range.mjs";
-import { dayChange, signedCurve, withBreaks } from "../lib/signed-history.mjs";
 import { isSaved, remove, save } from "../lib/saved-store";
 import { drawCard, shareOnX, type Card } from "./pnl-card";
 import { filesOf, lookup, tradesOf, type Signed } from "./ranking-lookup";
-
-Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler);
 
 type Trade = [number, "b" | "s" | "x", string, string, string];
 type Mark = [number, number, string];
 
 const DID = /^did:key:z6Mk[1-9A-HJ-NP-Za-km-z]{44}$/;
-const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const signed = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}`;
 const tone = (v: number) => (v > 0 ? "text-accent" : v < 0 ? "text-down" : "text-text-secondary");
 const n = (v: number) => v.toLocaleString("en-US");
@@ -58,7 +50,6 @@ function init(root: HTMLElement) {
   document.title = `${short} · ${document.title}`;
   const signedList: Signed[] = JSON.parse(root.dataset.signed ?? "[]");
   const marks: Mark[] = JSON.parse(root.dataset.marks ?? "[]");
-  const history: Record<string, [number, number][]> = JSON.parse(root.dataset.history ?? "{}");
   const opening = Date.parse(root.dataset.opening ?? "");
   const files = filesOf(root)!;
 
@@ -117,30 +108,15 @@ function init(root: HTMLElement) {
     // never a wrong figure)
     const complete = !trades || verifiedTrades(trades, marks, found.sweep, row[2], row[4]);
     const shown = trades && complete;
-    // no replayed curve for a key of the signed list (its trades do not add up, or are not published
-    // yet): its curve comes from the referee's signed scores, at the updates where it was listed
-    const listed = signedList.some((s) => s.did === did);
-    const own = listed && !shown ? signedCurve(history[did], marks) : [];
-    const fromSigned = own.length > 1;
     q("[data-count]").textContent = shown ? n(trades.length) : "–";
     q("[data-fees]").textContent = shown ? acct.fees.toFixed(2) : "–";
     // the POLF this key still has free: not locked as collateral in its open position (Ben, 2026-09-29)
     q("[data-cash]").textContent = shown ? acct.cash.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "–";
     if (!complete) {
       const note = q("[data-no-trades]");
-      note.textContent = fromSigned
-        ? "The curve shows the referee's signed scores, at the updates where this key was in its signed top list. Part of this key's trade history is missing from our capture, so its trades, fees and cash are not computed here."
-        : "Part of this key's trade history is missing from our capture, so nothing is computed from it here.";
+      note.textContent = "Part of this key's trade history is missing from our capture, so nothing is computed from it here.";
       note.classList.remove("hidden");
       note.dataset.incomplete = "";
-    }
-
-    // score over a day before now, when there is enough history: replayed, or both signed ends
-    const day = fromSigned ? dayChange(history[did]) : complete && curve.length > 288 ? curve[curve.length - 1].v - curve[curve.length - 289].v : undefined;
-    if (day !== undefined) {
-      const d = q("[data-day]");
-      d.textContent = `${signed(day)}  24h`;
-      d.classList.add(tone(day));
     }
 
     // best trades: what each one realized, fees included
@@ -159,60 +135,8 @@ function init(root: HTMLElement) {
       });
     }
 
-    // chart
-    const color = css(score >= 0 ? "--color-accent" : "--color-down");
-    const when = (s: string) => `${s.slice(8, 10)}/${s.slice(5, 7)} ${s.slice(11, 16)}`;
-    const area = (ctx: { chart: Chart }) => {
-      const box = ctx.chart.chartArea;
-      if (!box) return "transparent";
-      const g = ctx.chart.ctx.createLinearGradient(0, box.top, 0, box.bottom);
-      g.addColorStop(0, `${color}33`);
-      g.addColorStop(1, `${color}00`);
-      return g;
-    };
-    const yAxis = (values: number[]) => ({ ...(robustRange(values) ?? {}), position: "right" as const, grid: { color: css("--color-border") },
-      ticks: { color: css("--color-text-muted"), maxTicksLimit: 5, callback: (v: string | number) => Number(v).toLocaleString("en-US", { maximumFractionDigits: 2 }) } });
-    if (fromSigned) {
-      // placed by update, so an hour kept as one point takes an hour's width; broken where the key was not listed
-      const points = withBreaks(own, Number(root.dataset.historySweep || found.sweep));
-      const time = new Map(marks.map((m) => [m[0], m[2]]));
-      const canvas = q<HTMLCanvasElement>("[data-chart]");
-      canvas.setAttribute("aria-label", "The referee's signed score at each update where this key was in its signed top list");
-      canvas.dataset.signed = String(own.length);
-      q("[data-signed-curve]").hidden = false;
-      new Chart(canvas, {
-        type: "line",
-        // monotone: between two signed points the line never runs past either of them
-        data: { datasets: [{ label: "Signed score", data: points.map((p) => ({ x: p.n, y: p.v })), borderColor: color, borderWidth: 2, pointRadius: 0, cubicInterpolationMode: "monotone", fill: "origin",
-          spanGaps: false, backgroundColor: area }] },
-        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
-          scales: { x: { type: "linear", min: own[0].n, max: own[own.length - 1].n, grid: { display: false },
-            // the first and the last update and evenly between (three labels on a phone), each named by its time
-            afterBuildTicks: (axis: { width: number; ticks: { value: number }[] }) => {
-              const k = axis.width < 480 ? 3 : 4, lo = own[0].n, hi = own[own.length - 1].n;
-              axis.ticks = Array.from({ length: k }, (_, i) => ({ value: Math.round(lo + ((hi - lo) * i) / (k - 1)) }));
-            },
-            ticks: { color: css("--color-text-muted"), maxRotation: 0, callback: (v: string | number) => { const s = time.get(Math.round(Number(v))); return s ? when(s) : ""; } } },
-            y: yAxis(own.map((p) => p.v)) },
-          plugins: { legend: { display: false }, tooltip: { filter: (item: { parsed: { y: number | null } }) => item.parsed.y !== null, callbacks: {
-            title: (items: { parsed: { x: number | null } }[]) => { const x = items[0]?.parsed.x ?? 0; const s = time.get(x); return s ? `${when(s)} UTC · update ${x}` : ""; },
-            label: (c: { parsed: { y: number | null } }) => `Signed by the referee: ${signed(c.parsed.y ?? 0)}` } } } },
-      });
-    } else if (complete && curve.length > 1) {
-      new Chart(q<HTMLCanvasElement>("[data-chart]"), {
-        type: "line",
-        data: { labels: curve.map((p) => p.at), datasets: [{ label: "Score", data: curve.map((p) => p.v), borderColor: color, borderWidth: 2, pointRadius: 0, tension: 0.2, fill: "origin",
-          backgroundColor: area }] },
-        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
-          scales: { x: { grid: { display: false }, ticks: { color: css("--color-text-muted"), maxTicksLimit: 4, maxRotation: 0,
-            callback(this: { getLabelForValue(v: number): string }, v: string | number) { return when(this.getLabelForValue(Number(v))); } } },
-            y: yAxis(curve.map((p) => p.v)) },
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c: { parsed: { y: number | null } }) => `Score: ${signed(c.parsed.y ?? 0)}` } } } },
-      });
-    } else {
-      q("[data-chart]").parentElement!.hidden = true;
-      if (!trades || !complete) q("[data-no-trades]").classList.remove("hidden");
-    }
+    // a key without published trades says so (the incomplete case above has its own sentence)
+    if (complete && !trades) q("[data-no-trades]").classList.remove("hidden");
 
     // open position: from the ranking line, valued at the ranking's sweep, where the line is true
     const pos = row[4];
@@ -263,12 +187,12 @@ function init(root: HTMLElement) {
       draw(b.dataset.filter!);
     }));
 
-    // share: the score card with this key's own curve; it always says Score, since a saved DID proves no ownership
+    // share: the score card; it always says Score, since a saved DID proves no ownership
     const cardData: Card = { did, score, rank: row[0], traders: found.traders, contest: root.dataset.contest ?? "", official,
       sweep: found.sweep, position: pos === undefined ? undefined : pos === null ? "Flat" : `${Number(pos[0]) > 0 ? "Long" : "Short"} ${Math.abs(Number(pos[0])).toFixed(1)}`,
       line: signedList.length >= 3 ? Number(signedList[2].pnl) : undefined,
-      prices: fromSigned ? own.map((p) => p.v) : complete && curve.length > 1 ? curve.map((p) => p.v) : marks.map((m) => m[1]),
-      curveLabel: fromSigned || (complete && curve.length > 1) ? "SCORE" : "NVDA", mine: false,
+      prices: complete && curve.length > 1 ? curve.map((p) => p.v) : marks.map((m) => m[1]),
+      curveLabel: complete && curve.length > 1 ? "SCORE" : "NVDA", mine: false,
       trades: shown ? trades.length : undefined, best: top.length ? top[0].gain : undefined };
     // drawn once, as soon as the page has its numbers; a click before it is ready waits for it
     const ready = drawCard(cardData);

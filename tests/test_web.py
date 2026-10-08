@@ -319,7 +319,7 @@ class Artifact(unittest.TestCase):
                     self.assertRegex(attrs, r'type="module" src="/_astro/[\w.-]+\.js"')
                 needed = sum(hook in text for hook in ("data-chart=", "data-room-filters", "data-visit=", "data-watched ", "data-my-dids ",
                                                        "data-verify-summary ", "data-wizard ", "data-find-did ",
-                                                       "data-trading-chart=", "data-did-page ", "data-did-switcher ",
+                                                       "data-did-page ", "data-did-switcher ",
                                                        "data-rankings ", "data-paid-check "))
                 self.assertEqual(len(scripts), needed + 1)
                 srcs = re.findall(r'<script\b[^>]*\bsrc="(/_astro/[\w.-]+\.js)"', text)
@@ -544,23 +544,20 @@ class Artifact(unittest.TestCase):
             self.assertIn(route, reading)
         self.assertNotIn("/did/", reading)
 
-    def test_the_trader_page_carries_the_signed_scores_of_the_signed_list_only(self):
-        """The trader page draws a signed key's curve from the referee's signed scores (leaderboard.history):
-        it holds those of the keys of the signed list, as numbers, and nothing for any other key; an index
-        without them gives an empty history."""
-        live = DIST / "data" / "contests" / "index.json"
-        index = json.loads((live if live.is_file() else WEB / "src" / "fixtures" / "contests.sample.json").read_text(encoding="utf-8"))
-        for c in index["contests"]:
+    def test_the_trader_page_draws_no_curve_and_carries_no_curve_data(self):
+        """The contest is over (Ben, 2026-10-08): the trader page has no chart, no canvas and none of the data
+        that fed one (the signed history of the keys of the signed list, the day change)."""
+        for c in json.loads((DIST / "data" / "contests" / "index.json" if (DIST / "data" / "contests" / "index.json").is_file()
+                             else WEB / "src" / "fixtures" / "contests.sample.json").read_text(encoding="utf-8"))["contests"]:
             page = DIST / "contests" / c["id"] / "did" / "index.html"
             if not c.get("ranking") or not page.is_file():
                 continue
             with self.subTest(contest=c["id"]):
-                tag = re.search(r"<div [^>]*\bdata-did-page\b[^>]*>", page.read_text(encoding="utf-8")).group(0)
-                shown = json.loads(html.unescape(re.search(r'\sdata-history="([^"]*)"', tag).group(1)))
-                lb = c.get("leaderboard") or {}
-                history = lb.get("history") or {}
-                want = {r["did"]: [[n, float(v)] for n, v in history[r["did"]]] for r in lb.get("rows", []) if history.get(r["did"])}
-                self.assertEqual(shown, want)
+                text = page.read_text(encoding="utf-8")
+                tag = re.search(r"<div [^>]*\bdata-did-page\b[^>]*>", text).group(0)
+                self.assertNotIn("data-history", tag)
+                for hook in ("<canvas", "data-signed-curve", "data-day", "data-chart"):
+                    self.assertNotIn(hook, text)
 
     def test_the_contest_shards_stay_out_of_the_artifact(self):
         """GitHub Pages publishes at most 1 GB: only the contest index and each ranking summary are in the site."""

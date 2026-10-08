@@ -1,6 +1,6 @@
 // "Find my DID": looks a did:key up in the contest's published ranking files (the summary on this site,
 // the shard on raw.githubusercontent.com, src/lib/contest-files.mjs). Nothing is sent but the address of
-// that file, and nothing is stored. A ranked key opens its trader page directly (rank, score over time,
+// that file, and nothing is stored. A ranked key opens its trader page directly (rank, score,
 // position, every trade, the score card to share). Only keys with at least one settled trade are ranked:
 // any other key is told it has no trade yet, as far as our capture shows.
 import { avatarSvg } from "../lib/avatar.mjs";

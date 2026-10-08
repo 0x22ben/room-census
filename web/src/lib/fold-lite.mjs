@@ -1,6 +1,6 @@
 // The contest's accounting (close_call_fold.py), in floating point for display: first in, first out,
 // every fee taken from cash, a short valued at its collateral plus or minus the move. The published
-// score of a key stays the recount's own; this only draws curves between updates.
+// score of a key stays the recount's own; this only replays the trades for display.
 export const MINT = 10_000;
 
 export class Account {
