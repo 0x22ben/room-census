@@ -67,11 +67,13 @@ export async function page(expr) {
 
 export async function until(expr, what, ms = 20000) {
   const end = Date.now() + ms;
+  let last = "";
   while (Date.now() < end) {
-    if (await page(expr)) return;
+    // a page that reloads (the top bar does after a sign-in) is blank for a moment: an error then only means "not yet"
+    try { if (await page(expr)) return; } catch (e) { last = e.message; }
     await sleep(40);
   }
-  throw new Error(`timed out waiting for ${what}`);
+  throw new Error(`timed out waiting for ${what}${last ? ` (last error: ${last})` : ""}`);
 }
 
 /** Loads a path of the site and waits for its load event. */
