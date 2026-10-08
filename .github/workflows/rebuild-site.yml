@@ -1,0 +1,20 @@
+name: rebuild-site
+
+# Lives only on the contest-data branch, which the VPS replaces at every publication. It checks out nothing
+# and runs no code from this branch: it asks main's pages workflow to rebuild the site from main, now.
+on:
+  push:
+    branches: [contest-data]
+
+permissions:
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Rebuild the site from main
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
+        env:
+          GH_TOKEN: ${{ github.token }}
