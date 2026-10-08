@@ -5,6 +5,7 @@
 // of our own recount; v1 and v2 stay accepted, so a return to the previous export never stops the build.
 import { phase } from "../src/lib/contest-time.mjs";
 import { SHARDS, shard } from "../src/lib/did-shard.mjs";
+import { SCORE } from "../src/lib/standings.mjs";
 
 export class ContestContractError extends Error {}
 
@@ -63,6 +64,31 @@ function signedHistory(lb, rows, where) {
   }
 }
 
+const exactKeys = (o, keys) => o !== null && typeof o === "object" && !Array.isArray(o) && Object.keys(o).sort().join() === [...keys].sort().join();
+
+function standings(c, where) {
+  const st = c.standings;
+  need(c.final !== undefined, `${where}: final standings need the final price`);
+  need(exactKeys(st, ["next", "owners", "places", "posted_at", "price", "seq", "zero_sum"]), `${where}: the final standings are malformed`);
+  need(st.price === c.final.price, `${where}: the final standings are marked at ${st.price}, not at the final price ${c.final.price}`);
+  need(iso(st.posted_at) && Date.parse(st.posted_at) >= Date.parse(c.final.trade.time), `${where}: the final standings are dated before the closing trade`);
+  need(int(st.seq, 1) && int(st.owners, 1) && typeof st.zero_sum === "string" && SCORE.test(st.zero_sum), `${where}: the final standings have a malformed sequence, owner count or zero-sum check`);
+  need(Array.isArray(st.places) && st.places.length >= 1 && st.places.length <= 10 && Array.isArray(st.next) && st.next.length <= 100,
+    `${where}: the final standings need 1 to 10 prize places and at most 100 more`);
+  const seen = new Set();
+  let last = Infinity;
+  const line = (p, keys, i, kind) => {
+    need(exactKeys(p, keys) && typeof p.did === "string" && DID.test(p.did) && typeof p.score === "string" && SCORE.test(p.score) && int(p.rank, 1),
+      `${where}: ${kind} ${i + 1} of the final standings is malformed`);
+    need(!seen.has(p.did), `${where}: the final standings list ${p.did} twice`);
+    seen.add(p.did);
+    need(Number(p.score) <= last, `${where}: the final standings are not in decreasing order of score`);
+    last = Number(p.score);
+  };
+  st.places.forEach((p, i) => { line(p, ["did", "rank", "score", "sharing"], i, "place"); need(int(p.sharing, 1) && p.rank <= st.places.length, `${where}: place ${i + 1} of the final standings has a malformed rank or sharing count`); });
+  st.next.forEach((p, i) => { line(p, ["did", "rank", "score"], i, "next place"); need(p.rank === st.places.length + i + 1, `${where}: next place ${i + 1} of the final standings is not numbered on from the prize places`); });
+}
+
 function contest(c, capturedAt, where) {
   need(text(c.title, 80) && text(c.short, 40) && text(c.summary, 200), `${where}: title, short name or summary missing`);
   need(iso(c.opening) && iso(c.trading_lock_at), `${where}: opening or trading lock is not an ISO time`);
@@ -85,6 +111,7 @@ function contest(c, capturedAt, where) {
     need(c.final_price_at !== null && c.status === "ended", `${where}: a final price is published only for an ended contest with a final price time`);
     need(Date.parse(f.trade.time) < Date.parse(c.final_price_at), `${where}: the final price trade is not before the final price time`);
   }
+  if (c.standings !== undefined) standings(c, where);   // the referee's signed final standings, marked at the closing price
   checks(c, where);
   if (c.latest !== undefined) {
     const l = c.latest;

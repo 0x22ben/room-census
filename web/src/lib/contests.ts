@@ -54,6 +54,10 @@ export type Contest = {
   latest?: { sweep: number; at: string; owners: number; price: string; price_time: string; price_age_s: number };
   /** the closing price the referee posted after the contest, with the trade it comes from; absent until then */
   final?: { price: string; trade: { tid: number; time: string } };
+  /** the referee's signed final standings, marked at the closing price: the prize places (ties share them), then
+   * the next ones; absent until it has posted them. Scores are the referee's own, six decimals. */
+  standings?: { price: string; posted_at: string; seq: number; owners: number; zero_sum: string;
+    places: { rank: number; did: string; score: string; sharing: number }[]; next: { rank: number; did: string; score: string }[] };
   series?: SeriesPoint[];
   /** the referee's signed top list at `sweep`; `history`, for each of its keys, the referee's signed
    * scores [update, score] at the updates where the key was listed (every update of the last day, one in

@@ -9,6 +9,8 @@ import Px from "../../../components/Px.astro";
 import TradingChart, { type View } from "../../../components/TradingChart.astro";
 import { rankings } from "../../../lib/rankings";
 import { eachLabel, winnersOf } from "../../../lib/winners.mjs";
+import { standingsView } from "../../../lib/standings.mjs";
+import { dateTimeUtc } from "../../../lib/format";
 import { SHARDS_BASE, change, contests, countdown, phaseOf, positionParts, shortDid, signed, sparklines, tabs, topTraders, type Contest } from "../../../lib/contests";
 
 export function getStaticPaths() {
@@ -23,6 +25,10 @@ const num = (v: string | null | undefined) => (v === null || v === undefined ? n
 const has = (k: keyof (typeof s)[number]) => s.some((p) => p[k] !== undefined && p[k] !== null);
 const compact = (n: number) => (n >= 1e6 ? `${+(n / 1e6).toFixed(2)}M` : n >= 1e4 ? `${+(n / 1e3).toFixed(1)}k` : n.toLocaleString("en-US"));
 
+// the referee's signed final standings, marked at the closing price (its own numbers, never ours)
+const fin = c.standings ? standingsView(c.standings) : undefined;
+// the table, the chart and the lookups stay marked at the referee's last update: say so once the final standings exist
+const markedAt = fin && lb ? `update ${lb.sweep.toLocaleString("en-US")}${s.find((p) => p.n === lb.sweep)?.global ? `, agents' price ${s.find((p) => p.n === lb.sweep)!.global}` : ""}` : undefined;
 const views: View[] = [];
 if (s.length) {
   views.push({ id: "price", label: "Price", series: [
@@ -30,7 +36,7 @@ if (s.length) {
     ...(has("global") ? [{ label: "Agents' price", token: "--color-warning", values: s.map((p) => num(p.global)) }] : []),
   ] });
   if (has("top")) views.push({ id: "scores", label: "Top scores", series: [
-    { label: "#1 score", token: "--color-accent", values: s.map((p) => num(p.top)) },
+    { label: fin ? "#1 score at each update" : "#1 score", token: "--color-accent", values: s.map((p) => num(p.top)) },
     ...(has("line") ? [{ label: "Prize line", token: "--color-warning", values: s.map((p) => num(p.line)), dashed: true }] : []),
   ] });
   if (has("long")) views.push({ id: "sides", label: "Long / Short", min: 0, series: [
@@ -58,7 +64,7 @@ const cells = [
   { icon: "chart-line", tone: "accent", label: c.final ? "Final price" : "NVDA", value: price ? price : "–", delta: move, deltaTone: move?.startsWith("−") ? "text-down" : "text-accent" },
   { icon: "users", tone: "accent", label: "Active traders", value: traders !== undefined ? traders.toLocaleString("en-US") : "–",
     delta: hourAgo !== undefined ? `${hourAgo >= 0 ? "+" : "−"}${compact(Math.abs(hourAgo))} 1h` : undefined, deltaTone: "text-accent" },
-  { icon: "crown", tone: "warning", label: "#1 score", value: lb?.rows[0] ? signed(lb.rows[0].pnl) : "–", delta: lb?.rows[0] ? "POLF" : undefined, deltaTone: "text-text-muted", valueTone: "text-accent" },
+  { icon: "crown", tone: "warning", label: "#1 score", value: fin ? signed(fin.first) : lb?.rows[0] ? signed(lb.rows[0].pnl) : "–", delta: fin || lb?.rows[0] ? "POLF" : undefined, deltaTone: "text-text-muted", valueTone: "text-accent" },
   { icon: "trophy", tone: "warning", label: "Prize · top 3", value: prizeN ? compact(prizeN) : c.prize, delta: "FLOP", deltaTone: "text-text-muted" },
   { icon: "hourglass", tone: "accent", label: clock.label, value: clock.value },
 ];
@@ -93,6 +99,44 @@ const n = (v: number) => v.toLocaleString("en-US");
       <div class="grid gap-1 rounded-xl border border-border bg-surface p-4"><p class="text-sm text-text-secondary">Prize</p><p class="text-xl">{c.prize}</p></div>
       <div class="grid gap-1 rounded-xl border border-border bg-surface p-4"><p class="text-sm text-text-secondary">Rules</p><a href={c.rules} class="text-link">Rules on GitHub</a></div>
     </div>
+  )}
+
+  {fin && (
+    <section aria-labelledby="standings-title" class="mt-8 grid gap-4" data-standings>
+      <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 id="standings-title" class="text-xl font-semibold">Winners</h2>
+        <p class="font-mono text-sm text-text-muted">Final standings · final price {fin.price}</p>
+      </div>
+      <div class="overflow-hidden rounded-xl border border-border bg-surface">
+        <ul aria-label="The prize places of the referee's final standings">
+          {fin.winners.map((w, i) => (
+            <li class:list={["flex items-center justify-between gap-3 px-4 py-3.5 sm:px-6", i > 0 && "border-t border-border"]} data-place={w.rank}>
+              <span class="flex min-w-0 items-center gap-3">
+                <span class="inline-flex items-center gap-1.5 font-mono text-base font-bold text-text">{w.rank === 1 && <Px name="crown" size={12} class="text-warning" label="First place" />}#{w.rank}</span>
+                <a class="font-mono text-sm text-text" href={`/contests/${c.id}/did/?k=${w.did}`} title={w.did}>{shortDid(w.did)}</a>
+                {w.sharing > 1 && <span class="rounded-md bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">Shared with {w.sharing - 1}</span>}
+              </span>
+              <span class="font-mono font-semibold whitespace-nowrap text-accent tabular-nums">{signed(w.score)} POLF</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {fin.next.length > 0 && <details class="rounded-xl border border-border bg-surface">
+        <summary class="cursor-pointer px-4 py-3 text-sm font-semibold sm:px-6">Next places, {fin.next[0]?.rank}{fin.next.length > 1 ? ` to ${fin.next[fin.next.length - 1].rank}` : ""}</summary>
+        <ul aria-label="The next places of the referee's final standings">
+          {fin.next.map((w) => (
+            <li class="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5 sm:px-6" data-place={w.rank}>
+              <span class="flex min-w-0 items-center gap-3">
+                <span class="w-8 font-mono text-sm text-text-secondary">#{w.rank}</span>
+                <a class="font-mono text-sm text-text" href={`/contests/${c.id}/did/?k=${w.did}`} title={w.did}>{shortDid(w.did)}</a>
+              </span>
+              <span class="font-mono whitespace-nowrap text-text-secondary tabular-nums">{signed(w.score)} POLF</span>
+            </li>
+          ))}
+        </ul>
+      </details>}
+      <p class="text-sm text-text-secondary">Signed by the referee on {dateTimeUtc(fin.postedAt)} (message {c.standings!.seq.toLocaleString("en-US")} of its score room), with the scores marked at the final price {fin.price}. Prize: {c.prize}{c.prize_note ? `, ${c.prize_note}` : ""}. The referee lists the first {fin.winners.length + fin.next.length} places{markedAt ? `; the table below is marked at ${markedAt}, before the final price` : ""}.</p>
+    </section>
   )}
 
   {paid && win && (
@@ -146,6 +190,7 @@ const n = (v: number) => v.toLocaleString("en-US");
           data-signed={JSON.stringify((lb?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check })))}
           data-lock={phase === "live" ? countdown(c.trading_lock_at) : undefined}>
           <h2 id="find-title" class="flex items-center gap-2 font-semibold"><Px name="search" size={24} class="text-accent" />Find my DID</h2>
+          {markedAt && <p class="text-xs text-text-muted" data-marked-at>Ranks and scores here are marked at {markedAt}, before the final price. The final standings are above.</p>}
           <div class="grid gap-1">
             <p class="flex justify-between px-2 font-mono text-[10px] font-semibold tracking-wider text-text-muted uppercase" data-saved-head hidden><span>Trader</span><span>Rank · Score</span></p>
             <ul class="grid gap-1" data-saved-list aria-label="Saved DIDs"></ul>
@@ -169,6 +214,7 @@ const n = (v: number) => v.toLocaleString("en-US");
           <Help term="Top traders" text="The first places are the referee's signed top list, with our check next to each score. The next places come from our recount of the signed trades. Keys with equal scores share the places they span." /></h2>
         {traders !== undefined && <p class="font-mono text-xs text-text-muted">{traders.toLocaleString("en-US")} active</p>}
       </div>
+      {markedAt && <p class="px-4 pb-3 text-xs text-text-muted sm:px-5" data-marked-at>Marked at {markedAt}, before the final price of {fin!.price}. The prize places are the final standings above.</p>}
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
           <thead class="bg-surface-raised text-xs text-text-muted">
@@ -187,10 +233,10 @@ const n = (v: number) => v.toLocaleString("en-US");
               const pos = positionParts(position);
               const side = pos?.side === "Short" ? "text-down" : pos?.side === "Flat" ? "text-text-muted" : "text-accent";
               return (
-                <tr class:list={["relative border-t border-border transition-colors hover:bg-surface-raised focus-within:bg-surface-raised", rank <= 3 && "bg-accent-soft/40"]}>
+                <tr class:list={["relative border-t border-border transition-colors hover:bg-surface-raised focus-within:bg-surface-raised", rank <= 3 && !fin && "bg-accent-soft/40"]}>
                   <td class="px-4 py-2.5 sm:px-5">
-                    <span class:list={["inline-flex items-center gap-1.5 font-mono", rank <= 3 ? "font-bold text-text" : "text-text-secondary"]}>
-                      {rank === 1 && <Px name="crown" size={12} class="text-warning" label="First place" />}{rank}
+                    <span class:list={["inline-flex items-center gap-1.5 font-mono", rank <= 3 && !fin ? "font-bold text-text" : "text-text-secondary"]}>
+                      {rank === 1 && !fin && <Px name="crown" size={12} class="text-warning" label="First place" />}{rank}
                     </span>
                   </td>
                   <td class="px-4 py-2.5">
