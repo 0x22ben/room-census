@@ -68,10 +68,6 @@ const current = tabs(c)[0].label;
 const paid = rankings().paid.find((p) => p.id === c.id);
 const win = paid ? winnersOf(paid.payouts, paid.roles) : undefined;
 const n = (v: number) => v.toLocaleString("en-US");
-// the referee's signed top list is marked at the last update, before the closing price: until it publishes its final
-// standings the first three places are provisional, and a 4th place this close behind may still overtake the 3rd
-const provisional = c.final && !c.winner && !paid && lb && lb.rows.length >= 3 ? lb.rows.slice(0, 3) : undefined;
-const nextGap = lb && lb.rows[3] && provisional ? Number(lb.rows[2].pnl) - Number(lb.rows[3].pnl) : undefined;
 ---
 <Base title={`${c.title}: live leaderboard and PnL`} description={`${c.title}, live: price, active traders, the referee's signed top list and our recount, and every trader's page.`}>
   <ContestHeader contest={c} current={current} />
@@ -97,29 +93,6 @@ const nextGap = lb && lb.rows[3] && provisional ? Number(lb.rows[2].pnl) - Numbe
       <div class="grid gap-1 rounded-xl border border-border bg-surface p-4"><p class="text-sm text-text-secondary">Prize</p><p class="text-xl">{c.prize}</p></div>
       <div class="grid gap-1 rounded-xl border border-border bg-surface p-4"><p class="text-sm text-text-secondary">Rules</p><a href={c.rules} class="text-link">Rules on GitHub</a></div>
     </div>
-  )}
-
-  {provisional && (
-    <section aria-labelledby="provisional-title" class="mt-8 grid gap-4" data-provisional>
-      <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 id="provisional-title" class="text-xl font-semibold">Top 3 · provisional</h2>
-        <p class="font-mono text-sm text-text-muted">Update {n(lb!.sweep)} · final price {c.final!.price}</p>
-      </div>
-      <div class="overflow-hidden rounded-xl border border-border bg-surface">
-        <ul aria-label="The first three places of the referee's last signed list">
-          {provisional.map((r, i) => (
-            <li class:list={["flex items-center justify-between gap-3 px-4 py-3 sm:px-6", i > 0 && "border-t border-border"]} data-place={r.rank}>
-              <span class="flex min-w-0 items-center gap-3">
-                <span class="font-mono text-sm font-semibold text-text-muted">#{r.rank}</span>
-                <span class="font-mono text-sm text-text" title={r.did}>{shortDid(r.did)}</span>
-              </span>
-              <span class="font-mono font-semibold whitespace-nowrap text-accent tabular-nums">{signed(r.pnl)} POLF</span>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <p class="text-sm text-text-secondary">These are the referee's signed scores at its last update, before the closing price of {c.final!.price}. They are not final: the referee has not published its final standings yet.{nextGap !== undefined && nextGap < 25 ? ` The 4th place is only ${nextGap.toFixed(2)} POLF behind the 3rd, so the final price can change the order.` : ""}</p>
-    </section>
   )}
 
   {paid && win && (
