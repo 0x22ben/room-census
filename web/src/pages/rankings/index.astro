@@ -9,9 +9,7 @@ import PixelAvatar from "../../components/PixelAvatar.astro";
 import Px from "../../components/Px.astro";
 import { contest, ranksOf, shortDid, signed } from "../../lib/contests";
 import { standingsView } from "../../lib/standings.mjs";
-import { dateTimeUtc } from "../../lib/format";
 import { champions, ordinal, rankings, type RankedDid } from "../../lib/rankings";
-import { eachLabel, winnersOf } from "../../lib/winners.mjs";
 
 const { paid, pending, rows } = rankings();
 const champ = champions();
@@ -38,10 +36,6 @@ const fin = close?.standings ? standingsView(close.standings) : undefined;
 const finalRank = new Map(fin ? [...fin.winners, ...fin.next].map((p) => [p.did, p.rank] as const) : []);
 const live = close ? ranksOf(close, top.map((r) => r.did)) : new Map();
 const n = (v: number) => v.toLocaleString("en-US");
-// the general ranking: the winners of each contest side by side, each in its own unit (nothing is added up)
-const general = paid.map((c) => ({ c, title: contest(c.id)?.title ?? c.title, w: winnersOf(c.payouts, c.roles) }));
-const closePlaces = fin ? [...fin.winners, ...fin.next] : [];
-const FIRST = 10;
 const tied = (rank: number) => rows.filter((r) => r.rank === rank).length;
 const podium = [top[1], top[0], top[2]].filter(Boolean);
 const tone = ["#e3b341", "#c3cbd6", "#cd8a55"];
@@ -83,80 +77,7 @@ const traderHref = (did: string) => (live.has(did) ? `/contests/close-1/did/?k=$
     )}
   </p>
 
-  <section aria-labelledby="general-title" class="mt-4 grid gap-4" data-general>
-    <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-      <h2 id="general-title" class="text-xl font-semibold">General ranking</h2>
-      <p class="text-sm text-text-muted">The winners of each contest. Each keeps its own unit: nothing is added up.</p>
-    </div>
-    <div class="grid items-start gap-4 lg:grid-cols-2">
-      {close && (
-        <article class="overflow-hidden rounded-xl border border-border bg-surface" data-general-contest="close-1">
-          <header class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border px-4 py-3.5 sm:px-5">
-            <h3 class="font-semibold">{close.title}</h3>
-            <p class="font-mono text-xs text-text-muted">{fin ? `Final standings · POLF · final price ${fin.price}` : "Final standings not published yet"}</p>
-          </header>
-          {fin ? (
-            <>
-              <ol aria-label="The first places of Close Call">
-                {closePlaces.slice(0, FIRST).map((p) => (
-                  <li class:list={["flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5", p.rank > 1 && "border-t border-border"]} data-place={p.rank}>
-                    <span class="flex min-w-0 items-center gap-3">
-                      <span class="w-8 font-mono text-sm font-bold text-text">#{p.rank}</span>
-                      <a class="font-mono text-sm text-text" href={`/contests/close-1/did/?k=${p.did}`} title={p.did}>{shortDid(p.did)}</a>
-                      {p.rank <= fin.winners.length && <span class="rounded-md bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">Prize place</span>}
-                    </span>
-                    <span class="font-mono font-semibold whitespace-nowrap text-accent tabular-nums">{signed(p.score)} POLF</span>
-                  </li>
-                ))}
-              </ol>
-              {closePlaces.length > FIRST && (
-                <details class="border-t border-border">
-                  <summary class="cursor-pointer px-4 py-3 text-sm font-semibold sm:px-5">Places {FIRST + 1} to {closePlaces.length}</summary>
-                  <ol aria-label="The next places of Close Call">
-                    {closePlaces.slice(FIRST).map((p) => (
-                      <li class="flex items-center justify-between gap-3 border-t border-border px-4 py-2.5 sm:px-5" data-place={p.rank}>
-                        <span class="flex min-w-0 items-center gap-3">
-                          <span class="w-8 font-mono text-sm text-text-secondary">#{p.rank}</span>
-                          <a class="font-mono text-sm text-text" href={`/contests/close-1/did/?k=${p.did}`} title={p.did}>{shortDid(p.did)}</a>
-                        </span>
-                        <span class="font-mono whitespace-nowrap text-text-secondary tabular-nums">{signed(p.score)} POLF</span>
-                      </li>
-                    ))}
-                  </ol>
-                </details>
-              )}
-              <p class="border-t border-border px-4 py-3 text-xs text-text-muted sm:px-5">Signed by the referee on {dateTimeUtc(fin.postedAt)}. The referee lists its first {closePlaces.length} places. The three prize places share {close.prize} once FLOP Labs publishes who gets what; their FLOP is added to the ranking below at that point. <a class="text-link" href="/contests/close-1/">Final standings</a></p>
-            </>
-          ) : (
-            <p class="px-4 py-3.5 text-sm text-text-muted sm:px-5">The referee has not published its final standings yet. <a class="text-link" href="/contests/close-1/">Live ranking</a></p>
-          )}
-        </article>
-      )}
-      {general.map(({ c, title, w }) => (
-        <article class="overflow-hidden rounded-xl border border-border bg-surface" data-general-contest={c.id}>
-          <header class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border px-4 py-3.5 sm:px-5">
-            <h3 class="font-semibold">{title}</h3>
-            <p class="font-mono text-xs text-text-muted">{n(w.total)} FLOP paid to {n(w.dids)} DIDs</p>
-          </header>
-          <ul aria-label={`Authors of the winning ${c.prize.toLowerCase()}`}>
-            {w.authors.map((a, i) => (
-              <li class:list={["flex items-center justify-between gap-3 px-4 py-2.5 sm:px-5", i > 0 && "border-t border-border"]} data-author={a.did}>
-                <span class="flex min-w-0 items-center gap-3">
-                  <span class="font-mono text-sm text-text" title={a.did}>{shortDid(a.did)}</span>
-                  <span class="rounded-md bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent">{c.labels.contributor}</span>
-                </span>
-                <span class="font-mono font-semibold whitespace-nowrap text-accent tabular-nums">{n(a.flop)} FLOP</span>
-              </li>
-            ))}
-          </ul>
-          <p class="border-t border-border px-4 py-3 text-sm text-text-secondary sm:px-5">{n(w.voters.count)} voters who chose it, {eachLabel(w.voters)}.</p>
-          <p class="border-t border-border px-4 py-3 text-xs text-text-muted sm:px-5">From FLOP Labs' payout list, byte for byte the one the referee signed ({c.receipt}).</p>
-        </article>
-      ))}
-    </div>
-  </section>
-
-  <div class="mt-8 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+  <div class="mt-6 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
     <h2 class="text-xl font-semibold">FLOP awarded so far</h2>
     <p class="text-sm text-text-muted">Only the FLOP that FLOP Labs has actually paid counts here.</p>
   </div>
