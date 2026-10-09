@@ -33,13 +33,19 @@ test("rankings say beta and unofficial, and show a podium and the first hundred"
   // a shared first place stands on one step, every DID of it (Sonnet: the 4 writers of the winning poem)
   const first = doc.rows.filter((r) => r[0] === 1).length;
   assert.equal(await page(`document.querySelectorAll("[data-podium] svg[viewBox='0 0 5 5']").length`), first > 1 ? first : Math.min(3, doc.rows.length));
-  if (first > 1) assert.match(await page(`document.querySelector("[data-podium]").textContent`), /MARAGUNG-FLOP|maragung-flop/i);
+  // the shared first place is one contest's team: Close Call's top 3 (an equal split we assume, and say so) once
+  // the referee's final standings are in the data, else Sonnet's winning poem
+  const assumedIds = doc.contests.filter((c) => c.assumed).map((c) => c.id);
+  const podium = await page(`document.querySelector("[data-podium]").textContent`);
+  if (first > 1) assert.match(podium, assumedIds.length ? /Close Call[\s\S]*Equal split assumed/i : /MARAGUNG-FLOP|maragung-flop/i);
   // every line says why FLOP Labs paid it; a long tie shows three lines and how many more share it
-  const lines = await page(`[...document.querySelectorAll("[data-rankings] tbody:not([data-pinned]) tr[data-did]")].map((tr) => [tr.dataset.did, tr.textContent])`);
+  const lines = await page(`[...document.querySelectorAll("[data-rankings] tbody:not([data-pinned]) tr[data-did]")].map((tr) => [tr.dataset.did, tr.textContent, !!tr.querySelector("[data-assumed]")])`);
   assert.ok(lines.length > 0 && lines.length <= 100);
-  lines.forEach(([did, text], i) => {
+  lines.forEach(([did, text, marked], i) => {
     assert.equal(did, doc.rows[i][1]);
-    assert.match(text, /Wrote the poem|Voted for the winner/);
+    assert.match(text, /Wrote the poem|Voted for the winner|place, equal split assumed/);
+    // every amount we assume says so next to the number
+    assert.equal(marked, assumedIds.some((id) => doc.rows[i][3][id]), `the FLOP of ${did} is marked as assumed exactly when it is`);
   });
   const more = await page(`[...document.querySelectorAll("[data-rankings] tr[data-more]")].map((tr) => tr.textContent.trim())`);
   const ties = Object.values(Object.groupBy(doc.rows, (r) => r[0])).filter((g) => g.length > 10);

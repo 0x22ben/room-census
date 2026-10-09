@@ -6,8 +6,12 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { contest } from "./contests";
+import { assumedFromStandings, ordinal, rankRows } from "./rank-rows.mjs";
+export { ordinal };
 
-export type Paid = { id: string; title: string; prize: string; receipt: string; payouts: Map<string, number>; roles: Map<string, { role: string; entry: string }>; labels: Record<string, string> };
+/** assumed: a contest whose FLOP FLOP Labs has announced but not split or paid yet: its amounts are our assumption. */
+export type Paid = { id: string; title: string; prize: string; receipt: string; payouts: Map<string, number>; roles: Map<string, { role: string; entry: string }>; labels: Record<string, string>; assumed?: { pool: number; note: string } };
 export type Pending = { id: string; title: string; prize: string; note: string };
 /** One line: shared rank (ties share it), DID, total FLOP, FLOP and role per paid contest. */
 export type RankedDid = { rank: number; did: string; flop: number; by: Record<string, number>; roles: Record<string, string> };
@@ -70,42 +74,39 @@ function load(): Paid[] {
 
 let cache: { paid: Paid[]; rows: RankedDid[] } | undefined;
 
+/** Close Call, once the referee has posted its final standings: FLOP Labs announced on 6 Oct 2026 that its
+ * three prize places share the contest's prize, paid after mainnet, without saying how. Ben chose to count it
+ * now as an equal split (2026-10-09), shown as an assumption everywhere it appears. */
+function closeCall(): Paid | undefined {
+  const c = contest("close-1");
+  const a = assumedFromStandings(c?.standings, c?.prize);
+  if (!a) return undefined;
+  return { id: "close-1", title: "Close Call", prize: "Top 3", receipt: "the referee's final standings and FLOP Labs' post of 6 Oct 2026",
+    payouts: a.payouts, roles: a.roles, labels: a.labels, assumed: { pool: a.pool, note: a.note } };
+}
+
 /** Paid contests and every DID they paid, best first; equal totals share a rank (1, 1, 1, 1, 5...). */
 export function rankings(): { paid: Paid[]; pending: Pending[]; rows: RankedDid[] } {
   if (!cache) {
-    const paid = load();
-    const total = new Map<string, RankedDid>();
-    for (const c of paid) {
-      for (const [did, flop] of c.payouts) {
-        const r = total.get(did) ?? { rank: 0, did, flop: 0, by: {}, roles: {} };
-        r.flop += flop;
-        r.by[c.id] = flop;
-        r.roles[c.id] = c.roles.get(did)!.role;
-        total.set(did, r);
-      }
-    }
-    const rows = [...total.values()].sort((a, b) => b.flop - a.flop || (a.did < b.did ? -1 : 1));
-    rows.forEach((r, i) => { r.rank = i > 0 && rows[i - 1].flop === r.flop ? rows[i - 1].rank : i + 1; });
+    const cc = closeCall();
+    const paid = [...load(), ...(cc ? [cc] : [])];
+    const rows = rankRows(paid) as RankedDid[];
     cache = { paid, rows };
   }
-  return { ...cache, pending: [{ id: "close-1", title: "Close Call", prize: "1,000,000 FLOP", note: "for the top 3, paid after 4 October" }] };
+  const pending: Pending[] = cache.paid.some((p) => p.id === "close-1") ? []
+    : [{ id: "close-1", title: "Close Call", prize: "1,000,000 FLOP", note: "for the top 3, paid after 4 October" }];
+  return { ...cache, pending };
 }
 
 /** The first place: every DID at rank 1 and, when they are one team of one contest (Sonnet's winning
  * poem), that team and its prize. */
-export function champions(): { rows: RankedDid[]; team?: { name: string; prize: string; flop: number } } {
+export function champions(): { rows: RankedDid[]; team?: { name: string; prize: string; flop: number; assumed?: boolean } } {
   const { paid, rows } = rankings();
   const first = rows.filter((r) => r.rank === 1);
   const ids = new Set(first.flatMap((r) => Object.keys(r.by)));
   const c = ids.size === 1 ? paid.find((p) => ids.has(p.id)) : undefined;
   const entries = new Set(first.map((r) => c?.roles.get(r.did)?.entry));
   if (!c || first.length < 2 || entries.size !== 1) return { rows: first };
-  return { rows: first, team: { name: [...entries][0]!, prize: c.prize, flop: first.reduce((t, r) => t + r.flop, 0) } };
+  return { rows: first, team: { name: [...entries][0]!, prize: c.prize, flop: c.assumed?.pool ?? first.reduce((t, r) => t + r.flop, 0), assumed: !!c.assumed } };
 }
 
-/** "1st", "2nd", "3rd", "4th"... */
-export function ordinal(n: number): string {
-  const t = n % 100;
-  const s = t >= 11 && t <= 13 ? "th" : n % 10 === 1 ? "st" : n % 10 === 2 ? "nd" : n % 10 === 3 ? "rd" : "th";
-  return `${n}${s}`;
-}

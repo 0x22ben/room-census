@@ -7,11 +7,13 @@ import Base from "../../layouts/Base.astro";
 import Help from "../../components/Help.astro";
 import PixelAvatar from "../../components/PixelAvatar.astro";
 import Px from "../../components/Px.astro";
-import { contest, ranksOf, shortDid, signed } from "../../lib/contests";
-import { standingsView } from "../../lib/standings.mjs";
+import { contest, ranksOf, shortDid } from "../../lib/contests";
 import { champions, ordinal, rankings, type RankedDid } from "../../lib/rankings";
 
 const { paid, pending, rows } = rankings();
+// a contest whose FLOP is our assumption (Close Call, equal split): said in the heading, the help and the podium
+const assumed = paid.find((c) => c.assumed)?.assumed;
+const isAssumed = (r: RankedDid) => paid.some((c) => c.assumed && r.by[c.id]);
 const champ = champions();
 // the first hundred lines; a long tie shows its first three, then how many more share that rank
 type Line = { row: RankedDid } | { more: number; rank: number; flop: number };
@@ -30,10 +32,6 @@ const top = lines.flatMap((l) => ("row" in l ? [l.row] : []));
 const columns = 7 + paid.length + pending.length;
 const label = (r: RankedDid) => paid.filter((c) => r.roles[c.id]).map((c) => c.labels[r.roles[c.id]]);
 const close = contest("close-1");
-// Close Call has ended: once the referee has posted its final standings, they replace the ranks of the last
-// update (the referee lists its first 25 places only, so the other keys show no Close Call rank)
-const fin = close?.standings ? standingsView(close.standings) : undefined;
-const finalRank = new Map(fin ? [...fin.winners, ...fin.next].map((p) => [p.did, p.rank] as const) : []);
 const live = close ? ranksOf(close, top.map((r) => r.did)) : new Map();
 const n = (v: number) => v.toLocaleString("en-US");
 const tied = (rank: number) => rows.filter((r) => r.rank === rank).length;
@@ -49,37 +47,14 @@ const traderHref = (did: string) => (live.has(did) ? `/contests/close-1/did/?k=$
       <h1 class="flex items-center gap-3 text-3xl font-medium tracking-tight sm:text-4xl">Rankings
         <span class="rounded-md border border-warning-border bg-warning-soft px-2 py-0.5 font-mono text-xs font-bold tracking-widest text-warning">BETA</span></h1>
       <p class="flex items-center gap-2 text-sm text-text-muted">Unofficial. Made by Room Census, not by FLOP Labs.
-        <Help term="Rankings" text="Counts only the FLOP that FLOP Labs awarded, from the payout lists it published and its referee signed. Close Call's 1,000,000 FLOP are added once FLOP Labs publishes who gets what." /></p>
-    </div>
-    <div class="flex flex-wrap gap-1" role="group" aria-label="Contests">
-      {[["all", "All contests"], ...paid.map((c) => [c.id, c.title]), ...pending.map((p) => [p.id, p.title])].map(([id, label], i) => (
-        <button type="button" data-filter={id} aria-pressed={i === 0 ? "true" : "false"}
-          class="inline-flex min-h-9 items-center rounded-lg border border-transparent px-3 text-sm text-text-secondary aria-pressed:border-border-strong aria-pressed:bg-surface-raised aria-pressed:font-semibold aria-pressed:text-text">{label}</button>
-      ))}
+        <Help term="Rankings" text={assumed ? `Sonnet: the FLOP in the payout list FLOP Labs published and its referee signed. Close Call: ${assumed.note}` : "Counts only the FLOP that FLOP Labs awarded, from the payout lists it published and its referee signed. Close Call's 1,000,000 FLOP are added once FLOP Labs publishes who gets what."} /></p>
     </div>
   </div>
 
-  <p class="mt-4 hidden items-center gap-3 rounded-xl border border-border bg-surface px-5 py-4 text-sm" data-pending>
-    <Px name="hourglass" size={24} class="text-warning" />
-    {fin ? (
-      <span class="grid gap-2">
-        <span><span class="font-semibold">Close Call has ended: the referee's final standings name the top 3.</span> <span class="text-text-muted">Their share of the {close!.prize} is added here once FLOP Labs publishes who gets what.</span>
-          <a class="text-link" href="/contests/close-1/">Final standings</a></span>
-        <span class="flex flex-wrap gap-x-5 gap-y-1 font-mono text-xs" data-close-winners>
-          {fin.winners.map((w) => (
-            <span><span class="text-text-muted">#{w.rank}</span> <a class="text-text" href={`/contests/close-1/did/?k=${w.did}`} title={w.did}>{shortDid(w.did)}</a> <span class="text-accent">{signed(w.score)}</span></span>
-          ))}
-        </span>
-      </span>
-    ) : (
-      <span><span class="font-semibold">Close Call: 1,000,000 FLOP for the top 3.</span> <span class="text-text-muted">Added here once FLOP Labs publishes who gets what, after 4 October.</span>
-        <a class="text-link" href="/contests/close-1/">Live ranking</a></span>
-    )}
-  </p>
 
   <div class="mt-6 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-    <h2 class="text-xl font-semibold">FLOP awarded so far</h2>
-    <p class="text-sm text-text-muted">Only the FLOP that FLOP Labs has actually paid counts here.</p>
+    <h2 class="text-xl font-semibold">FLOP won</h2>
+    <p class="text-sm text-text-muted">{assumed ? assumed.note : "Only the FLOP that FLOP Labs has actually paid counts here."}</p>
   </div>
 
   <section aria-label="Podium" class="relative mt-3 overflow-hidden rounded-2xl border border-border bg-linear-to-b from-[#0f1220] to-bg px-4 pt-6 sm:px-10" data-podium>
@@ -93,6 +68,7 @@ const traderHref = (did: string) => (live.has(did) ? `/contests/close-1/did/?k=$
               <PixelAvatar did={r.did} size={64} class="ring-2 ring-border" />
               <span class="font-mono text-xs text-text-secondary">{shortDid(r.did)}</span>
               <span class="flex items-baseline gap-1.5"><span class="font-mono text-xl font-bold" data-tone="0">{n(r.flop)}</span><span class="font-['Silkscreen'] text-[10px] text-text-muted">FLOP</span></span>
+              {isAssumed(r) && <span class="font-['Silkscreen'] text-[10px] tracking-[0.15em] text-warning uppercase" data-assumed>assumed</span>}
             </div>
           ))}
         </div>
@@ -104,6 +80,7 @@ const traderHref = (did: string) => (live.has(did) ? `/contests/close-1/did/?k=$
               ? <>
                   <span class="font-['Silkscreen'] text-sm tracking-[0.2em] uppercase" data-tone="0">{champ.team.name}</span>
                   <span class="font-['Silkscreen'] text-[10px] tracking-[0.15em] text-text-muted uppercase">{champ.team.prize} · {n(champ.team.flop)} FLOP shared by {champ.rows.length}</span>
+                  {champ.team.assumed && <span class="font-['Silkscreen'] text-[10px] tracking-[0.15em] text-warning uppercase">Equal split assumed · paid after mainnet</span>}
                 </>
               : <span class="font-['Silkscreen'] text-[11px] tracking-[0.2em]" data-tone="0">{champ.rows.length} TIED</span>}
           </div>
@@ -117,6 +94,7 @@ const traderHref = (did: string) => (live.has(did) ? `/contests/close-1/did/?k=$
             <PixelAvatar did={r.did} size={i === 1 ? 88 : 64} class="ring-2 ring-border" />
             <span class="font-mono text-xs text-text-secondary">{shortDid(r.did)}</span>
             <span class="flex items-baseline gap-1.5"><span class="font-mono text-2xl font-bold" data-tone={at(r)}>{n(r.flop)}</span><span class="font-['Silkscreen'] text-xs text-text-muted">FLOP</span></span>
+            {isAssumed(r) && <span class="font-['Silkscreen'] text-[10px] tracking-[0.15em] text-warning uppercase" data-assumed>assumed</span>}
             <div class="w-full">
               <div class="h-4" data-top={at(r)}></div>
               <div class:list={["grid w-full place-items-center content-center gap-1 border-x-2", height(i)]} data-front={at(r)}>
@@ -166,7 +144,7 @@ const traderHref = (did: string) => (live.has(did) ? `/contests/close-1/did/?k=$
             );
             const r = l.row;
             const href = traderHref(r.did);
-            const cc = fin ? (finalRank.has(r.did) ? { rank: finalRank.get(r.did)! } : undefined) : live.get(r.did);
+            const cc = live.get(r.did);
             return (
               <tr class:list={["relative border-t border-border", href && "transition-colors hover:bg-surface-raised"]} data-did={r.did}>
                 <td class:list={["px-4 py-2.5 font-mono sm:px-5", r.rank === 1 ? "font-bold text-[#e3b341]" : "text-text-secondary"]}>{r.rank}</td>
@@ -176,12 +154,12 @@ const traderHref = (did: string) => (live.has(did) ? `/contests/close-1/did/?k=$
                     ? <a class="font-mono text-text no-underline outline-none after:absolute after:inset-0 after:content-[''] focus-visible:underline" href={href}>{shortDid(r.did)}</a>
                     : <span class="font-mono">{shortDid(r.did)}</span>}
                 </td>
-                <td class:list={["px-4 py-2.5 text-right font-mono font-bold whitespace-nowrap", r.rank === 1 ? "text-[#e3b341]" : "text-accent"]}>{n(r.flop)}</td>
+                <td class:list={["px-4 py-2.5 text-right font-mono font-bold whitespace-nowrap", r.rank === 1 ? "text-[#e3b341]" : "text-accent"]}>{n(r.flop)}{isAssumed(r) && <span class="block text-[10px] font-normal tracking-wide text-warning" data-assumed>assumed</span>}</td>
                 <td class="hidden px-4 py-2.5 font-mono text-text-secondary sm:table-cell">{Object.keys(r.by).length}</td>
                 <td class="hidden px-4 py-2.5 md:table-cell"><span class="flex flex-wrap gap-1">{label(r).map((t) => (
                   <span class:list={["rounded-md border px-2 py-0.5 text-xs font-semibold whitespace-nowrap", r.rank === 1 ? "border-[#6b5a1e] bg-[#2a2410] text-[#e3b341]" : "border-border-strong bg-surface-raised text-text-secondary"]}>{t}</span>
                 ))}</span></td>
-                {paid.map((c) => <td class="hidden px-4 py-2.5 lg:table-cell">{r.by[c.id] ? <span class="rounded-md bg-accent-soft px-2 py-0.5 font-mono text-xs font-semibold text-accent">{n(r.by[c.id])}</span> : <span class="text-text-muted">–</span>}</td>)}
+                {paid.map((c) => <td class="hidden px-4 py-2.5 lg:table-cell">{r.by[c.id] ? <span class="rounded-md bg-accent-soft px-2 py-0.5 font-mono text-xs font-semibold text-accent">{n(r.by[c.id])}{c.assumed && " assumed"}</span> : <span class="text-text-muted">–</span>}</td>)}
                 {pending.map(() => <td class="hidden px-4 py-2.5 lg:table-cell">{cc ? <span class="rounded-md bg-surface-raised px-2 py-0.5 font-mono text-xs text-text-secondary">#{n(cc.rank)}</span> : <span class="text-text-muted">–</span>}</td>)}
                 <td class="pr-4 text-right text-text-muted sm:pr-5">{href && <Px name="chevron-right" size={12} class="inline" />}</td>
               </tr>

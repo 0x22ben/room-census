@@ -9,8 +9,9 @@ export const GET: APIRoute = () => {
   const doc = {
     schema: "room-census/rankings/1",
     beta: true,
-    note: "Unofficial. Made by Room Census, not by FLOP Labs. Counts only the FLOP that FLOP Labs awarded in the payout lists it published.",
-    contests: paid.map((c) => ({ id: c.id, title: c.title, roles: c.labels })),
+    note: ["Unofficial. Made by Room Census, not by FLOP Labs. Counts the FLOP that FLOP Labs awarded in the payout lists it published.",
+      ...paid.filter((c) => c.assumed).map((c) => `${c.title}: ${c.assumed!.note} Its amounts are flagged by "assumed": true on the contest.`)].join(" "),
+    contests: paid.map((c) => ({ id: c.id, title: c.title, roles: c.labels, ...(c.assumed ? { assumed: true } : {}) })),
     pending: pending.map((p) => ({ id: p.id, title: p.title, prize: p.prize })),
     rows: rows.map((r) => [r.rank, r.did, r.flop, r.by, r.roles]),
   };

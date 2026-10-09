@@ -48,7 +48,7 @@ const cells = [
 const tile = { accent: "bg-accent-soft text-accent", warning: "bg-warning-soft text-warning" } as const;
 const current = tabs(c)[0].label;
 // an ended contest FLOP Labs has paid (Sonnet): who was paid and why, from its payout list (Pencil HTuvp)
-const paid = rankings().paid.find((p) => p.id === c.id);
+const paid = rankings().paid.find((p) => p.id === c.id && !p.assumed);
 const win = paid ? winnersOf(paid.payouts, paid.roles) : undefined;
 const n = (v: number) => v.toLocaleString("en-US");
 ---
