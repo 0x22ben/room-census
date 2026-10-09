@@ -5,6 +5,7 @@
 import Base from "../../../layouts/Base.astro";
 import Px from "../../../components/Px.astro";
 import { SHARDS_BASE, contests, type Contest } from "../../../lib/contests";
+import { signedRows } from "../../../lib/standings.mjs";
 
 export function getStaticPaths() {
   return contests().filter((c) => c.ranking).map((c) => ({ params: { id: c.id }, props: { contest: c } }));
@@ -19,7 +20,7 @@ const stat = "grid gap-0.5";
 ---
 <Base title={`${c.title}: a trader's page`} description={`Rank, score, position and every settled trade of one key in ${c.title}, recounted from the signed trades.`}>
   <div data-did-page data-url={c.ranking!.file} data-shards={SHARDS_BASE} data-contest={c.title.toUpperCase()} data-sweep={c.ranking!.sweep}
-    data-signed={JSON.stringify((c.leaderboard?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check })))}
+    data-signed={JSON.stringify(c.standings ? signedRows(c.standings) : (c.leaderboard?.rows ?? []).map((r) => ({ rank: r.rank, did: r.did, pnl: r.pnl, check: r.check })))}
     data-marks={JSON.stringify(marks)} data-opening={c.opening} data-page={new URL(`/contests/${c.id}/did/`, Astro.site).href}>
     <nav aria-label="Breadcrumb" class="text-sm">
       <ol class="flex flex-wrap items-center gap-1.5">
@@ -42,7 +43,7 @@ const stat = "grid gap-0.5";
             <button type="button" class="grid size-8 place-items-center rounded-md text-text-muted hover:text-text" data-copy aria-label="Copy the full DID"><Px name="copy" size={24} /></button>
           </h1>
           <p class="text-sm text-text-secondary">{c.title}<span data-source></span></p>
-          {c.standings && <p class="text-xs text-text-muted" data-marked-at>Rank and score are marked at update {c.ranking!.sweep.toLocaleString("en-US")}, before the final price {c.standings.price}. The final standings are on the contest page.</p>}
+          {c.standings && <p class="text-xs text-text-muted" data-marked-at>Position and trades are marked at update {c.ranking!.sweep.toLocaleString("en-US")}, before the final price {c.standings.price}. Rank and score are the referee's final standings for its first {c.standings.places.length + c.standings.next.length} places, and are marked at that update for every other key. The final standings are on the contest page.</p>}
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-6">

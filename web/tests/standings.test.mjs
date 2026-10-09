@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { standingsView, toCents } from "../src/lib/standings.mjs";
+import { refereeLine, signedRows, standingsView, toCents } from "../src/lib/standings.mjs";
 
 const did = (c) => `did:key:z6Mk${c.repeat(44)}`;
 
@@ -46,4 +46,19 @@ test("the view never reorders or drops a place", () => {
   const swapped = { ...STANDINGS, places: [STANDINGS.places[1], STANDINGS.places[0], STANDINGS.places[2]] };
   assert.deepEqual(standingsView(swapped).winners.map((w) => w.rank), [2, 1, 3]);
   assert.equal(standingsView(STANDINGS).winners.length + standingsView(STANDINGS).next.length, 5);
+});
+
+test("the final standings become the signed rows the lookups read, with their final rank and score", () => {
+  const rows = signedRows(STANDINGS);
+  assert.deepEqual(rows.map((r) => [r.rank, r.did, r.pnl]), [[1, did("A"), "1576.92"], [2, did("B"), "1424.74"], [3, did("C"), "1337.55"],
+    [4, did("D"), "1334.18"], [5, did("E"), "1305.78"]]);
+  assert.ok(rows.every((r) => r.check === "pending"), "nothing of our recount is claimed to confirm them");
+});
+
+test("the referee's line of a key is its final rank and score, and nothing for a key it does not list", () => {
+  const rows = signedRows(STANDINGS);
+  assert.deepEqual(refereeLine(rows, did("C")), { rank: 3, pnl: "1337.55" });
+  assert.deepEqual(refereeLine(rows, did("E")), { rank: 5, pnl: "1305.78" });
+  assert.equal(refereeLine(rows, did("Z")), undefined);
+  assert.equal(refereeLine([], did("A")), undefined);
 });

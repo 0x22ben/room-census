@@ -6,11 +6,14 @@
 // src/lib/contest-files.mjs), on raw.githubusercontent.com, with a plain GET: no credentials, no header.
 import { LOCAL_CONTEST_FILES, shardUrl } from "../lib/contest-files.mjs";
 import { shard } from "../lib/did-shard.mjs";
+import { refereeLine } from "../lib/standings.mjs";
 
 export type Source = "official" | "signed" | "complete" | "partial";
 export type Row = [number, string, string, Source, ([string, string] | null)?];
 export type Signed = { rank: number; did: string; pnl: string; check: "match" | "pending" | "differs" };
-export type Found = { row: Row | undefined; traders: number; sweep: number; notes: Partial<Record<Source, string>> };
+/** referee: the referee's own rank and score for the key when the page was given a signed list that names it
+ * (its final standings): shown instead of the line of our files, which is marked at the last update. */
+export type Found = { row: Row | undefined; traders: number; sweep: number; notes: Partial<Record<Source, string>>; referee?: { rank: number; pnl: string } };
 /** A contest's ranking summary (a file of this site) and the folder its shards are read from. */
 export type Files = { url: string; shards: string };
 
@@ -56,7 +59,7 @@ export async function lookup(files: Files, did: string, signed: Signed[]): Promi
   const doc = await get<V1 | V2>(files.url);
   if ("top" in doc) {
     const part = await get<{ rows: Row[] }>(shardUrl(files.shards, files.url, "ranking", shard(did)));
-    return { row: part.rows.find((r) => r[1] === did), traders: doc.traders, sweep: doc.sweep, notes: doc.notes ?? {} };
+    return { row: part.rows.find((r) => r[1] === did), traders: doc.traders, sweep: doc.sweep, notes: doc.notes ?? {}, referee: refereeLine(signed, did) };
   }
   return { row: fromV1(doc, did, signed), traders: doc.traders, sweep: doc.sweep, notes: doc.notes ?? {} };
 }

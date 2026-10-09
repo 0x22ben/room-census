@@ -26,8 +26,8 @@ export function ranker(files: Files | undefined, signed: Signed[]) {
     const hit = cached()[did];
     if (hit && Date.now() - hit.at < TTL) return hit.r;
     try {
-      const { row } = await lookup(files, did, signed);
-      const r: Rank = row ? { rank: row[0], pnl: row[2] } : null;
+      const { row, referee } = await lookup(files, did, signed);
+      const r: Rank = row ? { rank: referee?.rank ?? row[0], pnl: referee?.pnl ?? row[2] } : null;
       // read again after the wait: the DID may have been removed or forgotten meanwhile
       if (saved().some((s) => s.did === did)) {
         const now = cached();

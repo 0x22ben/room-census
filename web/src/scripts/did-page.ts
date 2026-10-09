@@ -67,14 +67,18 @@ function init(root: HTMLElement) {
       return;
     }
     const trades = await tradesOf(files, did);
-    const score = Number(row[2]);
-    const official = row[3] === "official" || row[3] === "signed";
+    // the referee's final standings, when it lists this key, are what the page shows as rank and score; the trades
+    // are still checked against our own line (row), which is marked at the last update
+    const ref = found.referee;
+    const shownRank = ref?.rank ?? row[0];
+    const score = Number(ref?.pnl ?? row[2]);
+    const official = !!ref || row[3] === "official" || row[3] === "signed";
 
     q("[data-head]").hidden = false;
     q("[data-body]").hidden = false;
     q("[data-short]").textContent = short;
     q("[data-source]").textContent = official ? " · signed by the referee" : "";
-    q("[data-rank]").textContent = `#${n(row[0])}`;
+    q("[data-rank]").textContent = `#${n(shownRank)}`;
     const scoreEl = q("[data-score]");
     scoreEl.textContent = signed(score);
     scoreEl.classList.add(tone(score));
@@ -188,7 +192,7 @@ function init(root: HTMLElement) {
     }));
 
     // share: the score card; it always says Score, since a saved DID proves no ownership
-    const cardData: Card = { did, score, rank: row[0], traders: found.traders, contest: root.dataset.contest ?? "", official,
+    const cardData: Card = { did, score, rank: shownRank, traders: found.traders, contest: root.dataset.contest ?? "", official,
       sweep: found.sweep, position: pos === undefined ? undefined : pos === null ? "Flat" : `${Number(pos[0]) > 0 ? "Long" : "Short"} ${Math.abs(Number(pos[0])).toFixed(1)}`,
       line: signedList.length >= 3 ? Number(signedList[2].pnl) : undefined,
       prices: complete && curve.length > 1 ? curve.map((p) => p.v) : marks.map((m) => m[1]),

@@ -59,10 +59,12 @@ function init(root: HTMLElement) {
       right.append(rank, pnl);
       a.append(avatarSvg(s.did, 26), names, right);
       li.append(a);
-      lookup(files, s.did, signed).then(({ row }) => {
-        rank.textContent = row ? `#${row[0].toLocaleString("en-US")}` : "–";
-        pnl.textContent = row ? `${Number(row[2]) > 0 ? "+" : ""}${row[2]}` : "No trade";
-        pnl.className = `font-mono text-[11px] ${row && Number(row[2]) > 0 ? "text-accent" : row && Number(row[2]) < 0 ? "text-down" : "text-text-muted"}`;
+      lookup(files, s.did, signed).then(({ row, referee }) => {
+        const shownRank = referee?.rank ?? row?.[0];
+        const shownPnl = referee?.pnl ?? row?.[2];
+        rank.textContent = shownRank !== undefined ? `#${shownRank.toLocaleString("en-US")}` : "–";
+        pnl.textContent = shownPnl !== undefined ? `${Number(shownPnl) > 0 ? "+" : ""}${shownPnl}` : "No trade";
+        pnl.className = `font-mono text-[11px] ${shownPnl !== undefined && Number(shownPnl) > 0 ? "text-accent" : shownPnl !== undefined && Number(shownPnl) < 0 ? "text-down" : "text-text-muted"}`;
       }).catch(() => { rank.textContent = "–"; });
       return li;
     }));

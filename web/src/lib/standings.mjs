@@ -16,6 +16,21 @@ export function toCents(score) {
   return m[1] === "-" && c !== 0n ? `-${body}` : body;
 }
 
+/** The referee's final standings as the "signed list" that Find my DID and the trader page read: its first
+ * places, with their final rank and score. Without it a finalist missing from the list of the last update
+ * would show a rank and a score of our own recount, which can differ from the referee's by a lot. */
+export function signedRows(st) {
+  return [...st.places, ...st.next].map((p) => ({ rank: p.rank, did: p.did, pnl: toCents(p.score), check: "pending" }));
+}
+
+/** The referee's own line for a key in a signed list (its final standings, once it has posted them), or
+ * undefined. Only for display: the trades of a key are checked against the line of our ranking files, never
+ * against this one, which is marked at another price. */
+export function refereeLine(signed, did) {
+  const s = signed.find((r) => r.did === did);
+  return s ? { rank: s.rank, pnl: s.pnl } : undefined;
+}
+
 /** The places to show: winners (the prize places, ties share them), the next places, the first score. */
 export function standingsView(st) {
   const line = (p) => ({ rank: p.rank, did: p.did, score: toCents(p.score) });
